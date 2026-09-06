@@ -165,6 +165,102 @@ const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
 const APP_VERSION = "uiStudy-0.1";
 
+/* ==========================================================
+   UI研究：条件割当（バリアント）と操作ログ
+   - 1回答 = 1セッション。開始からの相対ms(dt)で記録（端末時計のズレに非依存）
+   - 条件はセッションごとに順番に割当（カウンターバランス）
+   ========================================================== */
+const UI_COUNT_INIT = ["none", "min", "median"];   // RQ1: 人数入力の初期値
+const UISTUDY_KEY = "uistudy_sessions_v1";         // 未送信セッションの退避
+const UISTUDY_SEQ = "uistudy_seq_v1";              // 条件割当の通し番号
+
+function nextVariant(){
+  let n = 0;
+  try{ n = parseInt(localStorage.getItem(UISTUDY_SEQ) || "0", 10) || 0; }catch(e){}
+  try{ localStorage.setItem(UISTUDY_SEQ, String(n + 1)); }catch(e){}
+  return { count_init: UI_COUNT_INIT[n % UI_COUNT_INIT.length], seq: n };
+}
+
+let LOG = null;          // 進行中のセッション
+let pickerShownAt = 0;   // クラス選択画面が表示された時刻（熟考時間の参考値）
+
+function logStart(cls, variant){
+  LOG = { session_id: uuid(), started_at: new Date().toISOString(), t0: performance.now(),
+          variant: variant, events: [], taps: 0, taps_stepper: 0, corrections: 0,
+          t_class: null, t_count: null, t_stop: 0, stop_focus_at: null };
+  logEvent("session_start", { congestion_class: cls,
+    since_picker_ms: pickerShownAt ? Math.round(performance.now() - pickerShownAt) : null });
+}
+function logEvent(type, data){
+  if(!LOG) return;
+  LOG.events.push(Object.assign({ dt: Math.round(performance.now() - LOG.t0), type }, data || {}));
+}
+function logTap(target){ if(LOG) LOG.taps++; logEvent("tap", { target: target }); }
+
+// セッション確定（submit / skip / abandon）→ 集計してローカル保存＋送信
+function finishSession(outcome, extra){
+  if(!LOG) return;
+  const t_total = Math.round(performance.now() - LOG.t0);
+  if(LOG.stop_focus_at != null){ LOG.t_stop += Math.round(performance.now() - LOG.stop_focus_at); LOG.stop_focus_at = null; }
+  logEvent("session_end", { outcome: outcome });
+  const rec = {
+    session_id: LOG.session_id,
+    started_at: LOG.started_at,
+    outcome: outcome,
+    variant: LOG.variant,
+    context: Object.assign({
+      congestion_class: pending ? pending.congestion_class : null,
+      board_stop: pending ? (pending.board_stop || null) : null,
+      dest_stop:  pending ? (pending.dest_stop  || null) : null,
+      gps_points: (pending && pending.trajectory) ? pending.trajectory.length : 0,
+      screen_w: window.innerWidth, screen_h: window.innerHeight,
+      lang: lang, app_version: APP_VERSION
+    }, extra || {}),
+    summary: {
+      t_total: t_total,            // クラスタップ→確定までの所要時間(ms)
+      t_class: LOG.t_class,        // クラス選択画面表示→クラスタップ(参考・待機時間を含みうる)
+      t_stop:  LOG.t_stop,         // バス停欄に費やした時間(ms)
+      taps_total: LOG.taps, taps_stepper: LOG.taps_stepper, corrections: LOG.corrections
+    },
+    events: LOG.events
+  };
+  saveSession(rec);
+  LOG = null;
+}
+
+/* --- セッションのローカル退避と送信 --- */
+function uiSessions(){ try{ return JSON.parse(localStorage.getItem(UISTUDY_KEY) || "[]"); }catch(e){ return []; } }
+function saveUiSessions(a){ try{ localStorage.setItem(UISTUDY_KEY, JSON.stringify(a)); }catch(e){} }
+function saveSession(rec){ const a = uiSessions(); a.push(rec); saveUiSessions(a); flushSessions(); }
+
+async function flushSessions(){
+  if(!user || !configured) return;
+  const a = uiSessions(); if(!a.length) return;
+  const keep = [];
+  for(const rec of a){
+    try{
+      const { error } = await sb.from("ui_sessions")
+        .insert(Object.assign({}, rec, { client_submitted_at: new Date().toISOString() }));
+      if(error) throw error;
+    }catch(err){
+      console.error("[ui_sessions] insert失敗:", err?.code || "", err?.message || err);
+      keep.push(rec);
+    }
+  }
+  saveUiSessions(keep);
+}
+
+// 研究用: 未送信ぶんも含めローカルのセッションをJSONで書き出す
+function exportUiLog(){
+  const data = JSON.stringify(uiSessions(), null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "ui_sessions_" + new Date().toISOString().slice(0,19).replace(/[:T]/g,"-") + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+}
+window.exportUiLog = exportUiLog;
+
 /* 管理者アカウント: ここに載るメールのみ「データ一覧」を閲覧・遷移できる。
    スタッフ（それ以外）にはデータ一覧ボタン自体を表示しない。必要に応じて編集。
    ※これは画面上の制御。真のアクセス制限にはSupabase側RLSも別途必要（相談）。 */
@@ -238,6 +334,7 @@ const T = {
     nav_report:"報告", nav_feed:"データ一覧", brand_tag:"スタッフ調査",
     feed_title:"報告データ一覧", feed_sub:"届いた直近200件を新しい順に表示します（氏名・位置は非表示）。",
     feed_all:"すべての混雑度", feed_update:"更新", feed_loading:"読み込み中…",
+    ui_export:"操作ログをJSON出力",
     feed_empty:"まだ報告がありません", feed_count:(n)=>`${n}件を表示中`,
     staff_tag:"スタッフ", feed_err:"読み込みに失敗しました",
     feed_login:"データ一覧を見るにはログインが必要です。", feed_login_btn:"報告へ戻る",
@@ -284,6 +381,7 @@ const T = {
     nav_report:"Report", nav_feed:"Data", brand_tag:"Staff survey",
     feed_title:"Reports", feed_sub:"The latest 200 reports, newest first (names and location are hidden).",
     feed_all:"All levels", feed_update:"Refresh", feed_loading:"Loading…",
+    ui_export:"Export interaction log (JSON)",
     feed_empty:"No reports yet", feed_count:(n)=>`Showing ${n}`,
     staff_tag:"Staff", feed_err:"Failed to load",
     feed_login:"Please sign in to view the data.", feed_login_btn:"Back to report",
@@ -382,11 +480,15 @@ function stopSampling(){ if(watchId!=null){ navigator.geolocation.clearWatch(wat
 function pickClass(cls){
   // 直前の回答が確定待ちなら即確定
   if(pending) finalizeNow(true);
+  const variant = nextVariant();       // ★UI研究: この回答に使う条件を割当
+  logStart(cls, variant);
+  LOG.t_class = LOG.events[0] ? LOG.events[0].since_picker_ms : null;
+  logTap("class_" + cls);
   const now=Date.now();
   // クラスタップ“前”の直近PRE_MS秒の測位を取り込む（前倒し）
   const seed = preBuffer.filter(p=>p._ms>=now-PRE_MS).map(({_ms,...pt})=>pt);
   pending = { cid: uuid(), congestion_class:cls, exact_count:null,
-              answered_at:new Date().toISOString(),
+              answered_at:new Date().toISOString(), variant: variant,
               firstTs: seed.length ? (now-PRE_MS) : now, trajectory: seed };
   startSampling();
   grabOneShot();     // #5(A): 即しまわれても代表点が1つ残るよう、その場で一発測位
@@ -434,8 +536,11 @@ function wireStopField(inputId, listId, selId, field){
   const inp=$(inputId), list=$(listId), sel=$(selId);
   if(!inp) return;
   const fmtD=(d)=> d<1000 ? Math.round(d)+"m" : (d/1000).toFixed(1)+"km";
-  const clear=()=>{ if(pending) pending[field]=null; inp.value=""; sel.innerHTML=""; list.classList.remove("show"); };
-  const choose=(s)=>{ if(pending) pending[field]={name:s.n, lat:s.a, lng:s.o};
+  const clear=()=>{ if(pending) pending[field]=null; inp.value=""; sel.innerHTML=""; list.classList.remove("show");
+    if(LOG) LOG.corrections++; logEvent("stop_clear", { field:field }); };
+  const choose=(s, rank)=>{ if(pending) pending[field]={name:s.n, lat:s.a, lng:s.o};
+    logEvent("stop_select", { field:field, rank:(rank==null?null:rank+1), name:s.n });
+    if(LOG && LOG.stop_focus_at!=null){ LOG.t_stop += Math.round(performance.now()-LOG.stop_focus_at); LOG.stop_focus_at=null; }
     inp.value=s.n; list.classList.remove("show");
     sel.innerHTML=`✓ ${T[lang].stop_selected}: ${s.n} <span class="clr">${T[lang].stop_clear}</span>`;
     const c=sel.querySelector(".clr"); if(c) c.onclick=clear; };
@@ -444,14 +549,21 @@ function wireStopField(inputId, listId, selId, field){
     if(!cs.length){ list.classList.remove("show"); list.innerHTML=""; return; }
     list.innerHTML=cs.map((s,i)=>`<div class="stoprow" data-i="${i}">${s.n}${s._d!=null?`<span class="dist">${fmtD(s._d)}</span>`:""}</div>`).join("");
     list.classList.add("show");
+    logEvent("stop_candidates", { field:field, count:cs.length });
     // clickで確定（ドラッグ＝スクロール時はclickが発火しないので、スクロールと両立）
-    list.querySelectorAll(".stoprow").forEach(row=>{ row.addEventListener("click",()=>choose(cs[+row.dataset.i])); });
+    list.querySelectorAll(".stoprow").forEach(row=>{
+      row.addEventListener("click",()=>choose(cs[+row.dataset.i], +row.dataset.i)); });
   };
   inp.addEventListener("input", ()=>{ if(pending) pending[field]=null;
     // 文字はあるが未選択 → 「候補から選んで」を表示（この状態では保存されない）
     sel.innerHTML = inp.value.trim() ? `<span style="color:var(--muted)">${T[lang].stop_pick_hint}</span>` : "";
+    if(LOG && LOG.stop_focus_at == null) LOG.stop_focus_at = performance.now();  // focus未取得でも計測開始
+    logEvent("stop_input", { field:field, chars: inp.value.trim().length });
     render(inp.value); });
-  inp.addEventListener("focus", ()=>{ if(!inp.value) render(""); });
+  inp.addEventListener("focus", ()=>{
+    logEvent("stop_focus", { field:field });
+    if(LOG) LOG.stop_focus_at = performance.now();
+    if(!inp.value) render(""); });
   // blurでの自動閉じはしない（一覧のスクロールを妨げるため）。一覧外タップで閉じる（下の共通ハンドラ）。
   if(pending && pending[field]){                       // 既存選択を復元
     inp.value=pending[field].name;
@@ -474,7 +586,10 @@ function renderCount(){
   const t=T[lang];
   const [lo,hi]=COUNT_RANGES[pending.congestion_class-1];
   const step2=(hi-lo)<=10?5:10;   // クラス範囲が狭ければ大ステップは5、広ければ10
-  let n=null;                     // 未入力（触るまでnull＝数えていない）
+  // ★UI研究: 人数入力の初期値を条件で切替（none=未入力 / min=下限 / median=中央値）
+  const initMode = (pending.variant && pending.variant.count_init) || "none";
+  let n = (initMode==="min") ? lo : (initMode==="median") ? Math.round((lo+hi)/2) : null;
+  const nInit = n;                // 初期値（触ったかの判定に使う）
   const cls=t.classes[pending.congestion_class-1];
   main.innerHTML = `
     <button class="backbtn" id="backPick">← ${t.back}</button>
@@ -512,14 +627,20 @@ function renderCount(){
   const cval=$("cval");
   const show=()=>{ cval.textContent = (n===null)?"—":((hi>=99 && n>=99)?"99+":String(n)); };
   show();                         // 初期は「—」＝未入力
+  logEvent("screen_view", { screen:"count", count_init:initMode, lo:lo, hi:hi, step2:step2 });
   main.querySelectorAll(".stepper button").forEach(b=>{ b.onclick=()=>{
     const d=parseInt(b.dataset.d,10);
     n=Math.max(lo,Math.min(hi,(n===null?lo:n)+d));   // 初回タップはlo基準・範囲内にクランプ
     show();
+    if(LOG) LOG.taps_stepper++;
+    logTap("step_"+(d>0?"+":"")+d); logEvent("stepper", { delta:d, value:n });
   }; });
-  $("sendBtn").onclick=()=>{ answering=false; pending.exact_count=n; submit(); };
-  $("skipBtn").onclick=()=>{ answering=false; pending.exact_count=null; submit(); };
-  $("backPick").onclick=cancelPick;
+  $("sendBtn").onclick=()=>{ answering=false; pending.exact_count=n;
+    logTap("send"); finishSession("submit", { count_touched: n!==nInit, exact_count:n }); submit(); };
+  $("skipBtn").onclick=()=>{ answering=false; pending.exact_count=null;
+    logTap("skip"); finishSession("skip", { count_touched:false, exact_count:null }); submit(); };
+  $("backPick").onclick=()=>{ logTap("back"); if(LOG) LOG.corrections++;
+    finishSession("abandon", {}); cancelPick(); };
 }
 
 // 人数画面で「戻る」: 誤タップしたクラス選択を破棄してクラス一覧へ戻す
@@ -643,6 +764,7 @@ function renderMain(){
       ${rows}
     </div>`;
   setStatus();
+  pickerShownAt = performance.now();   // ★UI研究: クラス選択画面が出た時刻
   startSampling();   // 一覧表示中は測位を回してpreBufferを温める（前倒し）
 }
 
@@ -692,11 +814,13 @@ function renderFeed(){
             ${t.classes.map((c,i)=>`<option value="${i+1}">${i+1} · ${c.lbl}</option>`).join("")}
           </select>
           <button id="fRefresh">${t.feed_update}</button>
+          <button id="fExport">${t.ui_export}</button>
         </div>
       </div>
       <div class="feedlist" id="feedlist"><div class="empty">${t.feed_loading}</div></div>
     </div>`;
   $("fRefresh").onclick=loadFeed;
+  if($("fExport")) $("fExport").onclick=exportUiLog;
   $("fFilter").onchange=loadFeed;
   setStatus();
   loadFeed();
@@ -898,7 +1022,7 @@ async function boot(){
     // 画面を保持する（回答中にクラス選択へ戻される不具合を防ぐ）。
     if(uid!==prevUid){ render(); }
     else { updateNav(); }
-    if(user) flushOutbox();
+    if(user){ flushOutbox(); flushSessions(); }
   });
 
   const { data:{ session } } = await sb.auth.getSession();
@@ -910,7 +1034,7 @@ async function boot(){
   document.addEventListener("visibilitychange", ()=>{
     // 背景化: 送信後の記録中(pending & 人数入力は終了)だけ確定。人数入力中は保持したまま測位停止。
     if(document.hidden){ if(pending && !answering) finalizeNow(true); stopSampling(); }
-    else if(user){ startSampling(); flushOutbox(); }                        // 復帰: 測位再開＆再送
+    else if(user){ startSampling(); flushOutbox(); flushSessions(); }                        // 復帰: 測位再開＆再送
   });
   window.addEventListener("pagehide", ()=>{ if(pending) finalizeNow(true); });
 }
