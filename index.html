@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>バス混雑度 計測</title>
+<style>
+  :root{
+    --c1:#16a34a; --c2:#65a30d; --c3:#ca8a04; --c4:#ea580c; --c5:#dc2626; --c6:#991b1b;
+    --bg:#0f172a; --panel:#1e293b; --line:#334155; --ink:#f1f5f9; --muted:#94a3b8;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%; margin:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    background:var(--bg); color:var(--ink); display:flex; flex-direction:column; overflow:hidden;
+  }
+  header{flex:0 0 auto; padding:7px 12px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--line); background:var(--panel);}
+  .brand{flex:0 0 auto; font-size:14px; font-weight:800; display:flex; flex-direction:column; line-height:1.15;}
+  .brand .staff{font-size:10px; font-weight:600; color:var(--muted);}
+  .nav{flex:1; display:flex; gap:4px; justify-content:center;}
+  .navb{border:none; background:transparent; color:var(--muted); font-family:inherit; font-size:13px; font-weight:700; padding:7px 12px; border-radius:9px;}
+  .navb.on{background:var(--bg); color:var(--ink);}
+  .hactions{flex:0 0 auto; display:flex; align-items:center; gap:7px;}
+  .sess{min-width:0; font-size:11px; color:var(--muted); line-height:1.2; max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .sess b{color:var(--ink); font-weight:600;}
+  .iconbtn{flex:0 0 auto; border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:10px; padding:7px 10px; font-size:13px; font-weight:600;}
+
+  /* データ一覧 */
+  .feed{flex:1 1 auto; min-height:0; display:flex; flex-direction:column;}
+  .feedhead{flex:0 0 auto; padding:10px 12px; border-bottom:1px solid var(--line);}
+  .feedhead h2{margin:0 0 3px; font-size:16px;}
+  .feedhead p{margin:0 0 9px; font-size:12px; color:var(--muted);}
+  .feedctl{display:flex; gap:8px; align-items:center;}
+  .feedctl select{flex:1; padding:9px; border-radius:9px; border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:14px; font-family:inherit;}
+  .feedctl button{flex:0 0 auto; border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:9px; padding:9px 13px; font-size:13px; font-weight:700; font-family:inherit;}
+  .feedlist{flex:1 1 auto; min-height:0; overflow-y:auto; padding:6px 10px 16px;}
+  .frow{display:flex; align-items:center; gap:11px; padding:11px 8px; border-bottom:1px solid #1e2a3d;}
+  .ft{flex:0 0 auto; width:70px; font-variant-numeric:tabular-nums; font-size:12.5px; color:var(--muted); line-height:1.25;}
+  .fmid{flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:9px;}
+  .flabel{font-size:14px; font-weight:700;}
+  .fcount{font-size:13px; color:var(--muted);}
+  .ftag{flex:0 0 auto; font-size:11px; font-weight:700; color:#93c5fd; background:#1e3a5f; padding:3px 9px; border-radius:999px;}
+  .fcount-badge{margin-left:auto; font-size:12px; color:var(--muted);}
+
+  main{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; position:relative;}
+  .backbtn{position:absolute; top:10px; left:10px; z-index:5; border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:10px; padding:9px 14px; font-size:14px; font-weight:700; font-family:inherit; display:inline-flex; align-items:center; gap:6px;}
+  .backbtn:active{background:var(--line);}
+
+  .picker{flex:0 0 auto; padding:8px 10px; border-bottom:1px solid var(--line);}
+  .ptitle{font-size:12px; color:var(--muted); margin:0 2px 6px;}
+  .grid{display:grid; grid-template-columns:1fr; gap:7px; max-width:300px; margin:0 auto;}
+  .card{
+    border:none; border-radius:12px; color:#fff; font-family:inherit; padding:0 16px; min-height:56px;
+    display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:14px;
+    transition:transform .06s ease; text-align:left;
+  }
+  .card:active{transform:scale(.97);}
+  .card .num{font-size:23px; font-weight:800; width:30px; text-align:center; flex:0 0 auto;}
+  .card .cardtext{display:flex; flex-direction:row; align-items:baseline; gap:8px; line-height:1.15;}
+  .card .lbl{font-size:14px; font-weight:800;}
+  .card .rng{font-size:12px; opacity:.9; font-weight:600;}
+  .c1{background:var(--c1);} .c2{background:var(--c2);} .c3{background:var(--c3);}
+  .c4{background:var(--c4);} .c5{background:var(--c5);} .c6{background:var(--c6);}
+
+  .log{flex:1 1 auto; min-height:0; overflow-y:auto; padding:0 10px 14px; background:var(--bg);}
+  .lhead{position:sticky; top:0; z-index:3; background:var(--bg); font-size:12px; color:var(--muted); padding:9px 12px; margin:0 -10px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line);}
+  .empty{color:var(--muted); font-size:13px; text-align:center; padding:28px 10px;}
+  .logrow{display:flex; align-items:center; gap:10px; padding:9px 6px; border-bottom:1px solid #1e2a3d;}
+  .chip{flex:0 0 auto; width:26px; height:26px; border-radius:7px; color:#fff; font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center;}
+  .lt{flex:0 0 auto; font-variant-numeric:tabular-nums; font-size:13px; color:var(--muted); width:42px;}
+  .lmid{flex:1 1 auto; min-width:0;}
+  .lcount{font-size:15px; font-weight:700;}
+  .lsub{font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .lstat{flex:0 0 auto; font-size:11px; color:var(--muted); text-align:right;}
+  .lstat.ok{color:#34d399;} .lstat.pend{color:#fbbf24;} .lstat.rec{color:#60a5fa;}
+
+  .center{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:16px; overflow-y:auto;}
+
+  /* 停留所オートコンプリート */
+  .stopwrap{width:100%; max-width:420px; display:flex; flex-direction:column; gap:10px; text-align:left;}
+  .stopfield{position:relative;}
+  .stopfield label{font-size:12px; color:var(--muted); display:block; margin:0 2px 4px;}
+  .stopinput{width:100%;}
+  .stoplist{position:absolute; left:0; right:0; top:100%; z-index:20; background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-top:4px; max-height:220px; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; display:none; box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .stoprow{touch-action:pan-y;}
+  .stoplist.show{display:block;}
+  .stoprow{padding:11px 12px; font-size:14px; border-bottom:1px solid #26344a;}
+  .stoprow:last-child{border-bottom:none;}
+  .stoprow:active{background:var(--line);}
+  .stoprow .dist{float:right; color:var(--muted); font-size:12px;}
+  .stopsel{font-size:12px; color:#34d399; margin:4px 2px 0; min-height:15px;}
+  .stopsel .clr{color:#fca5a5; margin-left:8px; text-decoration:underline;}
+  .stopsrc{font-size:10px; color:var(--muted); margin:2px 2px 0;}
+  .center h2{margin:0; font-size:18px; font-weight:700;}
+  .center .hint{color:var(--muted); font-size:13px; margin:0;}
+  .selchip{display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--muted);}
+  .selchip .chip{width:24px; height:24px;}
+  .stepper{display:flex; align-items:center; gap:10px;}
+  .stepper button{width:58px; height:58px; border-radius:14px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:20px; font-weight:700;}
+  .stepper button:active{background:var(--line);}
+  .count{min-width:110px; font-size:46px; font-weight:800;}
+  .rangeind{font-size:14px; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:5px 14px;}
+  .rangeind b{font-weight:800;}
+  .row{display:flex; gap:10px; width:100%; max-width:420px;}
+  .btn{flex:1; border:none; border-radius:14px; padding:15px; font-size:15px; font-weight:700; font-family:inherit; color:#fff;}
+  .btn.primary{background:#2563eb;} .btn.ghost{background:transparent; color:var(--muted); border:1px solid var(--line);}
+  .btn.gh{background:#24292f; display:inline-flex; align-items:center; justify-content:center; gap:10px;}
+  .btn:active{filter:brightness(.9);}
+  .btn:disabled{opacity:.5;}
+
+  .statusbar{flex:0 0 auto; padding:6px 12px; font-size:12px; color:var(--muted); text-align:center; border-top:1px solid var(--line); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .statusbar.warn{background:#7c2d12; color:#fed7aa;}
+
+  .toast{position:fixed; left:50%; bottom:44px; transform:translateX(-50%) translateY(12px); opacity:0; background:#16a34a; color:#fff; padding:10px 18px; border-radius:12px; font-size:14px; font-weight:700; transition:all .2s ease; pointer-events:none; z-index:30;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  /* login screen */
+  .login{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:24px; text-align:center;}
+  .login h1{font-size:22px; margin:0;}
+  .reseticon{font-size:42px; line-height:1;}
+  .login p{color:var(--muted); font-size:14px; margin:0; max-width:340px; line-height:1.5;}
+  .login .btn{flex:0 0 auto; width:100%; max-width:320px;}
+  .authtabs{display:flex; gap:6px; width:100%; max-width:320px;}
+  .atab{flex:1; border:1px solid var(--line); background:transparent; color:var(--muted); border-radius:11px; padding:10px; font-size:14px; font-weight:700; font-family:inherit;}
+  .atab.on{background:var(--panel); color:var(--ink); border-color:#2563eb;}
+  .authform{display:flex; flex-direction:column; gap:10px; width:100%; max-width:320px;}
+  .afield{width:100%; padding:13px; border-radius:11px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:16px; font-family:inherit;}
+  .authform .btn{max-width:none;}
+  #authNote{color:#fca5a5; font-size:12px; min-height:16px; margin:0;}
+</style>
+</head>
+<body>
+
+<header id="hdr">
+  <div class="brand">バス混雑度<span class="staff" id="brandTag">スタッフ調査</span></div>
+  <nav class="nav">
+    <button class="navb" id="navReport">報告</button>
+    <button class="navb" id="navFeed">データ一覧</button>
+  </nav>
+  <div class="hactions">
+    <span class="sess" id="sess"></span>
+    <button class="iconbtn" id="langBtn">EN</button>
+    <button class="iconbtn" id="outBtn" style="display:none">⎋</button>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<div class="statusbar" id="status"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="stops.js"></script>
+<script>
+/* ==========================================================
+   バス混雑度 HITL 収集アプリ (Phase A)
+   - メール＋パスワードで登録/ログイン(Supabase Auth)
+   - 回答者が押すのは「クラス＋人数」だけ
+   - 軌跡(約2.5秒間隔・回答前後 約20秒／方位・速度も)/時刻/surveyor_id は自動付与
+   - 保存先: Supabase responses（失敗時は端末に退避して再送）
+   ---- 下の SUPABASE_URL / ANON_KEY に自分のプロジェクト値を入れる ----
+   ========================================================== */
+const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
+const APP_VERSION = "uiStudy-0.1";
+
+/* 管理者アカウント: ここに載るメールのみ「データ一覧」を閲覧・遷移できる。
+   スタッフ（それ以外）にはデータ一覧ボタン自体を表示しない。必要に応じて編集。
+   ※これは画面上の制御。真のアクセス制限にはSupabase側RLSも別途必要（相談）。 */
+const ADMIN_EMAILS = ["taichi1104.deters@gmail.com", "admin@id.local"];  // admin@id.local = 共有管理者(ID:admin)
+function isAdmin(){ return !!(user && ADMIN_EMAILS.map(s=>s.toLowerCase()).includes((user.email||"").toLowerCase())); }
+
+/* ID ログイン: "@"を含まない入力は固定ドメインを付けてメール扱いにする。
+   → 先輩/先方と共有する管理者アカウントを ID＋パスワードだけでログインできる。 */
+const ID_DOMAIN = "id.local";
+function normLogin(v){ v=(v||"").trim(); return (v && !v.includes("@")) ? v.toLowerCase()+"@"+ID_DOMAIN : v; }
+
+/* 軌跡サンプリング設定 */
+const SAMPLE_MS = 2500;   // サンプル間隔(約2.5秒)
+const WINDOW_MS = 20000;  // 1回答あたりの軌跡ウィンドウ(約20秒)
+const PRE_MS = 15000;     // クラスタップ“前”の直近測位をこの秒数ぶん取り込む(前倒し)
+const POST_SUBMIT_MIN_MS = 4000; // 送信後に最低これだけ測位を続ける
+const WINDOW_MAX_MS = 30000;
+const OUTBOX_KEY = "uistudy_outbox_v1";
+
+const configured = !!(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
+let sb = null, user = null;
+if (configured) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, flowType:'pkce' }
+});
+
+const $ = (id)=>document.getElementById(id);
+const main = $("main");
+let lang = "ja";
+let view = "report";        // 画面: report(報告) | feed(データ一覧)
+let pending = null;         // 回答中レコード
+let answering = false;      // 人数入力画面を表示中か（表示中は再送等で画面を作り直さない）
+const preBuffer = [];       // 直近の測位（クラスタップ前の軌跡を前倒しで取り込む用）
+let finalizeTimer = null;   // 送信後の確定タイマー
+let countdownTimer = null;
+const logEntries = [];      // 画面表示用(新しい順)
+
+/* ---------------- i18n ---------------- */
+const T = {
+  ja:{
+    auth_title:"バス混雑度 計測",
+    auth_intro:"NAIST共同研究の教師データ収集です。メールアドレスで登録／ログインしてください。回答はクラスと人数だけ、位置と時刻は自動で記録されます。",
+    tab_login:"ログイン", tab_signup:"新規登録",
+    ph_name:"表示名（調査員名）", ph_email:"メールアドレス", ph_pass:"パスワード（8文字以上）",
+    do_login:"ログイン", do_signup:"登録してはじめる", signing:"処理中…",
+    sent_title:"確認メールを送信しました",
+    sent_desc:(e)=>`${e} 宛に確認メールを送りました。<b>同じ端末のこのブラウザ</b>でメール内のリンクを開くと、ここに戻って自動でログインします。`,
+    resend:"確認メールを再送", to_login:"ログインへ戻る", resent:"再送しました",
+    err_login:"メールまたはパスワードが違います", err_unconfirmed:"メール確認が未完了です。受信した確認メールのリンクを開いてください。",
+    err_pass:"パスワードは8文字以上にしてください", err_email:"メールアドレスを入力してください", err_name:"表示名を入力してください",
+    login_wait:"処理中…",
+    pick:"混雑度を選択", records:"記録", none:"まだ記録がありません",
+    classes:[
+      {lbl:"ガラガラ", rng:"0〜5人"},{lbl:"やや空き", rng:"6〜15人"},{lbl:"席が埋まる", rng:"16〜25人"},
+      {lbl:"立ち客", rng:"26〜40人"},{lbl:"混雑", rng:"41〜55人"},{lbl:"満員近い", rng:"56人〜"},
+    ],
+    countTitle:"正確な人数（任意）", countHint:"数えられれば入力してください",
+    back:"戻る", already_registered:"このメールは登録済みです。「ログイン」から入ってください。",
+    board_label:"乗車バス停（任意）", dest_label:"降車バス停（任意）",
+    board_ph:"バス停名を選択（任意）", dest_ph:"バス停名を選択（任意）",
+    stop_selected:"選択済み", stop_clear:"取消",
+    stop_source:"バス停データ出典：国土数値情報（国土交通省）",
+    stop_pick_hint:"候補から選んでください", count_range:"入力範囲",
+    send:"送信", skip:"スキップ", ppl:"人",
+    saved:"保存しました", queued:"端末に保存（後で自動送信）", finishing:"軌跡を記録中",
+    saveNow:"今すぐ保存", recording:"記録中", pendingN:(n)=>`未送信 ${n}件`,
+    st_ok:"送信済", st_pend:"未送信", st_rec:"記録中", log_head:"送信状況",
+    gpsOn:"位置情報 取得中…", gpsOk:"位置情報 OK", gpsNo:"位置情報が取得できません（許可が必要）",
+    gpsSlow:"位置情報を取得中…（少し時間がかかっています）",
+    who:(h)=>`調査員 <b>${h}</b>`, langLabel:"EN",
+    notconf:"バックエンド未設定（管理者に連絡）",
+    nav_report:"報告", nav_feed:"データ一覧", brand_tag:"スタッフ調査",
+    feed_title:"報告データ一覧", feed_sub:"届いた直近200件を新しい順に表示します（氏名・位置は非表示）。",
+    feed_all:"すべての混雑度", feed_update:"更新", feed_loading:"読み込み中…",
+    feed_empty:"まだ報告がありません", feed_count:(n)=>`${n}件を表示中`,
+    staff_tag:"スタッフ", feed_err:"読み込みに失敗しました",
+    feed_login:"データ一覧を見るにはログインが必要です。", feed_login_btn:"報告へ戻る",
+    feed_admin_only:"データ一覧は管理者のみ閲覧できます。",
+    forgot:"パスワードを忘れた方",
+    reset_title:"パスワード再設定", reset_desc:"登録したメールアドレスに、再設定用リンクを送ります。",
+    reset_send:"再設定メールを送る", reset_sent:"再設定メールを送信しました。同じ端末のこのブラウザでメール内のリンクを開いてください。",
+    newpass_title:"パスワードの再設定", newpass_desc:"新しいパスワードを入力してください。設定するとそのままログインします（追加の確認メールは届きません）。",
+    newpass_ph:"新しいパスワード（8文字以上）", newpass_save:"パスワードを更新", newpass_done:"パスワードを更新しました",
+    newpass_done_desc:"新しいパスワードでログインしました。", go_app:"アプリへ進む",
+  },
+  en:{
+    auth_title:"Bus Crowding Survey",
+    auth_intro:"Training-data collection for the NAIST joint research. Register or sign in with your email. You only choose the crowding level and count — your location and time are recorded automatically.",
+    tab_login:"Sign in", tab_signup:"Sign up",
+    ph_name:"Display name (surveyor)", ph_email:"Email address", ph_pass:"Password (8+ characters)",
+    do_login:"Sign in", do_signup:"Register & start", signing:"Processing…",
+    sent_title:"Confirmation email sent",
+    sent_desc:(e)=>`We sent a confirmation email to ${e}. Open the link <b>in this same browser</b> to return here signed in.`,
+    resend:"Resend confirmation email", to_login:"Back to sign in", resent:"Resent",
+    err_login:"Incorrect email or password", err_unconfirmed:"Your email isn't confirmed yet. Open the link in the confirmation email.",
+    err_pass:"Password must be at least 8 characters", err_email:"Please enter your email", err_name:"Please enter a display name",
+    login_wait:"Processing…",
+    pick:"Select the crowding level", records:"Records", none:"No records yet",
+    classes:[
+      {lbl:"Empty", rng:"0–5"},{lbl:"Fairly empty", rng:"6–15"},{lbl:"Seats filling up", rng:"16–25"},
+      {lbl:"Some standing", rng:"26–40"},{lbl:"Crowded", rng:"41–55"},{lbl:"Nearly full", rng:"56+"},
+    ],
+    countTitle:"Exact count (optional)", countHint:"Enter it only if you actually counted",
+    back:"Back", already_registered:"This email is already registered. Please sign in instead.",
+    board_label:"Boarding stop (optional)", dest_label:"Alighting stop (optional)",
+    board_ph:"Select a stop name (optional)", dest_ph:"Select a stop name (optional)",
+    stop_selected:"Selected", stop_clear:"Clear",
+    stop_source:"Bus-stop data: MLIT National Land Numerical Information",
+    stop_pick_hint:"Choose one from the list", count_range:"Range",
+    send:"Submit", skip:"Skip", ppl:"",
+    saved:"Saved", queued:"Saved on your device (will send later)", finishing:"Recording your path",
+    saveNow:"Save now", recording:"Recording", pendingN:(n)=>`${n} unsent`,
+    st_ok:"Sent", st_pend:"Not sent", st_rec:"Recording", log_head:"Status",
+    gpsOn:"Getting location…", gpsOk:"Location OK", gpsNo:"Location unavailable (permission required)",
+    gpsSlow:"Getting location… (taking a little while)",
+    who:(h)=>`Surveyor <b>${h}</b>`, langLabel:"日本語",
+    notconf:"Backend not configured (contact the administrator)",
+    nav_report:"Report", nav_feed:"Data", brand_tag:"Staff survey",
+    feed_title:"Reports", feed_sub:"The latest 200 reports, newest first (names and location are hidden).",
+    feed_all:"All levels", feed_update:"Refresh", feed_loading:"Loading…",
+    feed_empty:"No reports yet", feed_count:(n)=>`Showing ${n}`,
+    staff_tag:"Staff", feed_err:"Failed to load",
+    feed_login:"Please sign in to view the data.", feed_login_btn:"Back to report",
+    feed_admin_only:"The data list is available to administrators only.",
+    forgot:"Forgot your password?",
+    reset_title:"Reset password", reset_desc:"We'll email a reset link to your registered address.",
+    reset_send:"Send reset email", reset_sent:"Reset email sent. Open the link in this same browser.",
+    newpass_title:"Set a new password", newpass_desc:"Enter a new password. You'll be signed in as soon as it's set (no extra confirmation email).",
+    newpass_ph:"New password (8+ characters)", newpass_save:"Update password", newpass_done:"Password updated",
+    newpass_done_desc:"You're signed in with your new password.", go_app:"Go to the app",
+  }
+};
+
+/* ---------------- helpers ---------------- */
+function toast(msg,color){ const el=$("toast"); el.textContent=msg; el.style.background=color||"#16a34a"; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),1500); }
+function hhmm(iso){ const d=new Date(iso); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+function nowSec(){ return Math.floor(Date.now()/1000); }
+function uuid(){   // crypto.randomUUID 未対応環境(旧iOS Safari等)でも落ちないように
+  if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
+    const r=Math.random()*16|0; return (c==="x"?r:(r&0x3|0x8)).toString(16); });
+}
+function handleName(){
+  if(!user) return "—";
+  const m=user.user_metadata||{};
+  return m.display_name || m.name || (user.email||"").split("@")[0] || user.id.slice(0,8);
+}
+function setStatus(msg,warn){
+  const s=$("status"); const n=outbox().length;
+  let base = msg||"";
+  if(n>0) base = (base?base+" · ":"") + T[lang].pendingN(n);
+  s.textContent = base;
+  s.className = "statusbar" + (warn?" warn":"");
+}
+
+/* ---------------- outbox (端末退避＆再送) ---------------- */
+function outbox(){ try{ return JSON.parse(localStorage.getItem(OUTBOX_KEY)||"[]"); }catch(e){ return []; } }
+function saveOutbox(a){ try{ localStorage.setItem(OUTBOX_KEY, JSON.stringify(a)); }catch(e){} }
+function outboxUpsert(item){ const a=outbox(); const i=a.findIndex(x=>x.cid===item.cid); if(i>=0)a[i]=item; else a.push(item); saveOutbox(a); }
+function outboxRemove(cid){ saveOutbox(outbox().filter(x=>x.cid!==cid)); }
+
+async function insertRecord(rec){
+  // 実際に送信する瞬間の端末時刻を付与（サーバのcreated_atとの差＝端末時計のズレ検出用）
+  const payload = Object.assign({}, rec, { client_submitted_at: new Date().toISOString() });
+  const { error } = await sb.from("ui_responses").insert(payload);
+  if(error) throw error;
+}
+async function flushOutbox(){
+  if(!user) return;
+  for(const item of outbox().filter(x=>x.ready)){
+    try{ await insertRecord(item.rec); outboxRemove(item.cid);
+      const e=logEntries.find(x=>x.cid===item.cid); if(e){ e.state="ok"; }
+    }catch(err){ console.error("[flushOutbox] insert失敗:", err?.code||"", err?.message||err); }
+  }
+  // 人数入力中は画面を作り直さない（回答フローを中断させない）
+  if(view==="report" && !answering && !pending) renderMain();
+  setStatus();
+}
+
+/* ---------------- GPS 軌跡サンプリング ---------------- */
+let watchId=null, lastSampleTs=0, geoOk=false;
+function startSampling(){
+  if(watchId!=null) return;
+  if(!navigator.geolocation){ setStatus(T[lang].gpsNo,true); return; }
+  setStatus(T[lang].gpsOn);
+  watchId = navigator.geolocation.watchPosition(
+    (p)=>{
+      geoOk=true;
+      const now=Date.now();
+      if(now-lastSampleTs < SAMPLE_MS-300) return;   // 約2.5秒間隔に間引き
+      lastSampleTs=now;
+      const c=p.coords;
+      const hdg=(c.heading!=null && !isNaN(c.heading)) ? Math.round(c.heading) : null;   // 進行方位(度)
+      const spd=(c.speed!=null && !isNaN(c.speed)) ? +c.speed.toFixed(1) : null;          // 速度(m/s)
+      const pt={ t:nowSec(), lat:+c.latitude.toFixed(6), lng:+c.longitude.toFixed(6), acc:Math.round(c.accuracy), hdg:hdg, spd:spd };
+      // 常時: 直近30秒をpreBufferに保持（前倒し用）
+      preBuffer.push({ ...pt, _ms:now });
+      const cut=now-30000; while(preBuffer.length && preBuffer[0]._ms<cut) preBuffer.shift();
+      // 回答中なら軌跡にも追加
+      if(pending && pending.trajectory){
+        pending.trajectory.push(pt);
+        if(pending.cid) syncPendingToOutbox(false);
+      }
+      setStatus(T[lang].gpsOk);
+    },
+    (e)=>{   // 許可拒否と、車内でありがちなタイムアウト/一時的な取得不可を区別
+      if(e && e.code===1) setStatus(T[lang].gpsNo,true);     // PERMISSION_DENIED
+      else setStatus(T[lang].gpsSlow,false);                 // TIMEOUT / POSITION_UNAVAILABLE
+    },
+    { enableHighAccuracy:true, maximumAge:3000, timeout:15000 }
+  );
+}
+function stopSampling(){ if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; } }
+
+/* ---------------- 回答フロー ---------------- */
+function pickClass(cls){
+  // 直前の回答が確定待ちなら即確定
+  if(pending) finalizeNow(true);
+  const now=Date.now();
+  // クラスタップ“前”の直近PRE_MS秒の測位を取り込む（前倒し）
+  const seed = preBuffer.filter(p=>p._ms>=now-PRE_MS).map(({_ms,...pt})=>pt);
+  pending = { cid: uuid(), congestion_class:cls, exact_count:null,
+              answered_at:new Date().toISOString(),
+              firstTs: seed.length ? (now-PRE_MS) : now, trajectory: seed };
+  startSampling();
+  grabOneShot();     // #5(A): 即しまわれても代表点が1つ残るよう、その場で一発測位
+  renderCount();
+}
+
+// 回答時に位置を一発取得（軌跡が空でも代表点を確保）。任意・失敗しても無視。
+function grabOneShot(){
+  if(!navigator.geolocation) return;
+  const cid=pending && pending.cid;
+  navigator.geolocation.getCurrentPosition((p)=>{
+    if(!pending || pending.cid!==cid || !pending.trajectory) return;
+    const c=p.coords;
+    const pt={ t:nowSec(), lat:+c.latitude.toFixed(6), lng:+c.longitude.toFixed(6), acc:Math.round(c.accuracy),
+               hdg:(c.heading!=null&&!isNaN(c.heading))?Math.round(c.heading):null,
+               spd:(c.speed!=null&&!isNaN(c.speed))?+c.speed.toFixed(1):null };
+    if(!pending.trajectory.some(q=>Math.abs(q.t-pt.t)<2)){   // 同時刻の重複を避けて先頭に
+      pending.trajectory.unshift(pt);
+      if(pending.cid) syncPendingToOutbox(false);
+    }
+    geoOk=true; setStatus(T[lang].gpsOk);
+  }, ()=>{}, { enableHighAccuracy:true, maximumAge:10000, timeout:15000 });
+}
+
+/* ---------------- 停留所オートコンプリート ---------------- */
+function jhav(la1,ln1,la2,ln2){ const R=6371000,r=Math.PI/180;
+  const dla=(la2-la1)*r, dln=(ln2-ln1)*r;
+  const a=Math.sin(dla/2)**2+Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dln/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a)); }
+function userLoc(){ for(let i=preBuffer.length-1;i>=0;i--){ const p=preBuffer[i]; if(p.lat&&p.lng) return [p.lat,p.lng]; } return null; }
+function stopCandidates(q){
+  const S=window.NARA_STOPS||[]; const loc=userLoc(); const ql=(q||"").trim().toLowerCase();
+  let arr;
+  if(!ql){                               // 空欄: 近い順（GPSがあれば）、無ければ先頭数件
+    arr = loc ? S.slice().sort((x,y)=>jhav(loc[0],loc[1],x.a,x.o)-jhav(loc[0],loc[1],y.a,y.o)) : S.slice();
+  } else {                               // 入力あり: 前方一致→部分一致
+    const pre=[], sub=[];
+    for(const s of S){ const n=s.n.toLowerCase(); if(n.startsWith(ql)) pre.push(s); else if(n.includes(ql)) sub.push(s); }
+    arr = pre.concat(sub);
+  }
+  const cap = ql ? 200 : 20;   // 入力あり=該当を全部(最大200)スクロール表示 / 空欄=近い順20件
+  return arr.slice(0,cap).map(s=> loc ? Object.assign({_d:jhav(loc[0],loc[1],s.a,s.o)}, s) : Object.assign({}, s));
+}
+function wireStopField(inputId, listId, selId, field){
+  const inp=$(inputId), list=$(listId), sel=$(selId);
+  if(!inp) return;
+  const fmtD=(d)=> d<1000 ? Math.round(d)+"m" : (d/1000).toFixed(1)+"km";
+  const clear=()=>{ if(pending) pending[field]=null; inp.value=""; sel.innerHTML=""; list.classList.remove("show"); };
+  const choose=(s)=>{ if(pending) pending[field]={name:s.n, lat:s.a, lng:s.o};
+    inp.value=s.n; list.classList.remove("show");
+    sel.innerHTML=`✓ ${T[lang].stop_selected}: ${s.n} <span class="clr">${T[lang].stop_clear}</span>`;
+    const c=sel.querySelector(".clr"); if(c) c.onclick=clear; };
+  const render=(q)=>{
+    const cs=stopCandidates(q);
+    if(!cs.length){ list.classList.remove("show"); list.innerHTML=""; return; }
+    list.innerHTML=cs.map((s,i)=>`<div class="stoprow" data-i="${i}">${s.n}${s._d!=null?`<span class="dist">${fmtD(s._d)}</span>`:""}</div>`).join("");
+    list.classList.add("show");
+    // clickで確定（ドラッグ＝スクロール時はclickが発火しないので、スクロールと両立）
+    list.querySelectorAll(".stoprow").forEach(row=>{ row.addEventListener("click",()=>choose(cs[+row.dataset.i])); });
+  };
+  inp.addEventListener("input", ()=>{ if(pending) pending[field]=null;
+    // 文字はあるが未選択 → 「候補から選んで」を表示（この状態では保存されない）
+    sel.innerHTML = inp.value.trim() ? `<span style="color:var(--muted)">${T[lang].stop_pick_hint}</span>` : "";
+    render(inp.value); });
+  inp.addEventListener("focus", ()=>{ if(!inp.value) render(""); });
+  // blurでの自動閉じはしない（一覧のスクロールを妨げるため）。一覧外タップで閉じる（下の共通ハンドラ）。
+  if(pending && pending[field]){                       // 既存選択を復元
+    inp.value=pending[field].name;
+    sel.innerHTML=`✓ ${T[lang].stop_selected}: ${pending[field].name} <span class="clr">${T[lang].stop_clear}</span>`;
+    const c=sel.querySelector(".clr"); if(c) c.onclick=clear;
+  }
+  // 一覧外をタップしたら開いている候補一覧を閉じる（全フィールド共通・1回だけ登録）
+  if(!window.__stopOutsideBound){
+    document.addEventListener("pointerdown",(e)=>{
+      const fld=(e.target.closest)?e.target.closest(".stopfield"):null;
+      document.querySelectorAll(".stoplist.show").forEach(l=>{ if(!fld || !fld.contains(l)) l.classList.remove("show"); });
+    });
+    window.__stopOutsideBound=true;
+  }
+}
+
+// クラスごとの人数レンジ（選んだクラスの範囲内でのみ増減できる）
+const COUNT_RANGES=[[0,5],[6,15],[16,25],[26,40],[41,55],[56,99]];
+function renderCount(){
+  const t=T[lang];
+  const [lo,hi]=COUNT_RANGES[pending.congestion_class-1];
+  const step2=(hi-lo)<=10?5:10;   // クラス範囲が狭ければ大ステップは5、広ければ10
+  let n=null;                     // 未入力（触るまでnull＝数えていない）
+  const cls=t.classes[pending.congestion_class-1];
+  main.innerHTML = `
+    <button class="backbtn" id="backPick">← ${t.back}</button>
+    <div class="center">
+      <div class="selchip"><span class="chip c${pending.congestion_class}">${pending.congestion_class}</span>${cls.lbl}（${cls.rng}）</div>
+      <h2>${t.countTitle}</h2>
+      <div class="rangeind">${t.count_range}：<b>${cls.rng}</b></div>
+      <p class="hint">${t.countHint}</p>
+      <div class="stepper">
+        <button data-d="-${step2}">−${step2}</button><button data-d="-1">−</button>
+        <div class="count" id="cval">—</div>
+        <button data-d="1">＋</button><button data-d="${step2}">+${step2}</button>
+      </div>
+      <div class="stopwrap">
+        <div class="stopfield">
+          <label>${t.board_label}</label>
+          <input class="afield stopinput" id="boardInput" type="text" autocomplete="off" placeholder="${t.board_ph}">
+          <div class="stoplist" id="boardList"></div>
+          <div class="stopsel" id="boardSel"></div>
+        </div>
+        <div class="stopfield">
+          <label>${t.dest_label}</label>
+          <input class="afield stopinput" id="destInput" type="text" autocomplete="off" placeholder="${t.dest_ph}">
+          <div class="stoplist" id="destList"></div>
+          <div class="stopsel" id="destSel"></div>
+        </div>
+        <div class="stopsrc">${t.stop_source}</div>
+      </div>
+      <div class="row"><button class="btn primary" id="sendBtn">${t.send}</button></div>
+      <div class="row"><button class="btn ghost" id="skipBtn">${t.skip}</button></div>
+    </div>`;
+  answering = true;             // 人数入力画面を表示中（背景の再描画から保護）
+  wireStopField("boardInput","boardList","boardSel","board_stop");
+  wireStopField("destInput","destList","destSel","dest_stop");
+  const cval=$("cval");
+  const show=()=>{ cval.textContent = (n===null)?"—":((hi>=99 && n>=99)?"99+":String(n)); };
+  show();                         // 初期は「—」＝未入力
+  main.querySelectorAll(".stepper button").forEach(b=>{ b.onclick=()=>{
+    const d=parseInt(b.dataset.d,10);
+    n=Math.max(lo,Math.min(hi,(n===null?lo:n)+d));   // 初回タップはlo基準・範囲内にクランプ
+    show();
+  }; });
+  $("sendBtn").onclick=()=>{ answering=false; pending.exact_count=n; submit(); };
+  $("skipBtn").onclick=()=>{ answering=false; pending.exact_count=null; submit(); };
+  $("backPick").onclick=cancelPick;
+}
+
+// 人数画面で「戻る」: 誤タップしたクラス選択を破棄してクラス一覧へ戻す
+function cancelPick(){
+  answering=false;
+  pending=null;                 // 未送信の回答を破棄
+  renderMain();                 // クラス選択画面へ
+}
+
+// 回答の代表GPS点（answered_atに最も近い軌跡点）。軌跡が空なら位置なし。
+function repPoint(p){
+  const tj=p.trajectory||[];
+  if(!tj.length) return { lat:null, lng:null, acc:null, at:null };
+  const ansSec=Math.floor(new Date(p.answered_at).getTime()/1000);
+  let best=tj[0], bd=Math.abs((tj[0].t||0)-ansSec);
+  for(const q of tj){ const d=Math.abs((q.t||0)-ansSec); if(d<bd){ bd=d; best=q; } }
+  return { lat: best.lat??null, lng: best.lng??null, acc: best.acc??null,
+           at: best.t ? new Date(best.t*1000).toISOString() : null };
+}
+function buildRec(p){
+  const rp=repPoint(p);
+  return { answered_at:p.answered_at, congestion_class:p.congestion_class,
+           exact_count:p.exact_count, trajectory:p.trajectory,
+           board_stop:p.board_stop||null, dest_stop:p.dest_stop||null,
+           lat:rp.lat, lng:rp.lng, gps_accuracy:rp.acc, gps_fixed_at:rp.at,   // 代表位置(独立カラム)
+           lang:lang, app_version:APP_VERSION };
+}
+function syncPendingToOutbox(ready){
+  if(!pending) return;
+  outboxUpsert({ cid:pending.cid, ready:!!ready, rec:buildRec(pending) });
+}
+
+function submit(){
+  // 画面ログに「記録中」で追加
+  const entry={ cid:pending.cid, congestion_class:pending.congestion_class,
+                exact_count:pending.exact_count, answered_at:pending.answered_at, state:"rec" };
+  logEntries.unshift(entry);
+  syncPendingToOutbox(false);   // 未確定として退避(クラッシュ耐性)
+  // 送信後もしばらく測位を続け、ウィンドウ到達で確定
+  const now=Date.now();
+  let target = pending.firstTs + WINDOW_MS;
+  target = Math.max(target, now + POST_SUBMIT_MIN_MS);
+  target = Math.min(target, pending.firstTs + WINDOW_MAX_MS);
+  pending.finalizeAt = target;
+  renderMain();
+  startCountdown();
+  finalizeTimer = setTimeout(()=>finalizeNow(false), Math.max(0, target-now));
+}
+
+function startCountdown(){
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(()=>{
+    if(!pending){ clearInterval(countdownTimer); return; }
+    const remain=Math.max(0,Math.ceil((pending.finalizeAt-Date.now())/1000));
+    const e=logEntries.find(x=>x.cid===pending.cid);
+    if(e){ e.remain=remain; e.npts=pending.trajectory.length;
+      // 全画面ではなく該当行のステータスだけ更新（スクロール位置やタップを壊さない）
+      const cell=document.querySelector(`.lstat[data-cid="${e.cid}"]`);
+      if(cell){ const s=statusOf(e); cell.className="lstat "+s.stc; cell.innerHTML=s.st; }
+    }
+    if(remain<=0){ clearInterval(countdownTimer); }
+  }, 1000);
+}
+
+async function finalizeNow(immediate){
+  if(!pending) return;
+  clearTimeout(finalizeTimer); finalizeTimer=null;
+  clearInterval(countdownTimer);
+  const p=pending; pending=null;
+  const rec=buildRec(p);
+  const entry=logEntries.find(x=>x.cid===p.cid);
+  // 送信試行
+  let ok=false;
+  if(user){
+    try{ await insertRecord(rec); ok=true; outboxRemove(p.cid); }
+    catch(err){ ok=false; console.error("[finalizeNow] insert失敗:", err?.code||"", err?.message||err); }
+  }
+  if(!ok){ outboxUpsert({ cid:p.cid, ready:true, rec }); }
+  if(entry){ entry.state = ok?"ok":"pend"; entry.npts=p.trajectory.length; delete entry.remain; }
+  // 非同期の後処理: 次の回答を入力中(新pending)や人数画面表示中は画面を作り直さない
+  // （前の回答の確定処理が、出したばかりの人数画面を上書きしてしまう不具合を防ぐ）
+  if(view==="report" && !answering && !pending) renderMain();
+  setStatus();
+  toast(ok?T[lang].saved:T[lang].queued, ok?"#16a34a":"#f59e0b");
+  // 測位は止めない（次回の前倒し用にpreBufferを温め続ける。画面を離れた時のみ停止）
+}
+
+/* ---------------- 画面描画 ---------------- */
+function statusOf(e){   // ログ行の送信状況（記録中/送信済/未送信）
+  const t=T[lang];
+  if(e.state==="rec")  return {stc:"rec",  st:`${t.st_rec} ${e.remain!=null?e.remain+"s":""}<br>${(e.npts||0)}pt`};
+  if(e.state==="ok")   return {stc:"ok",   st:`✓ ${t.st_ok}<br>${(e.npts||0)}pt`};
+  if(e.state==="pend") return {stc:"pend", st:`⧗ ${t.st_pend}<br>${(e.npts||0)}pt`};
+  return {stc:"", st:""};
+}
+function renderMain(){
+  if(view!=="report") { updateNav(); return; }   // データ一覧表示中は報告画面で上書きしない
+  const t=T[lang];
+  updateNav();
+  let cards="";
+  t.classes.forEach((c,i)=>{ cards+=`<button class="card c${i+1}" onclick="pickClass(${i+1})"><span class="num">${i+1}</span><span class="cardtext"><span class="lbl">${c.lbl}</span><span class="rng">${c.rng}</span></span></button>`; });
+  let rows="";
+  if(logEntries.length===0){ rows=`<div class="empty">${t.none}</div>`; }
+  else{
+    logEntries.forEach(e=>{
+      const cls=t.classes[e.congestion_class-1];
+      const countTxt=(e.exact_count!=null)?`${e.exact_count}${t.ppl}`:`<span style="color:var(--muted)">${cls.lbl}</span>`;
+      const {stc,st}=statusOf(e);
+      rows+=`<div class="logrow">
+        <span class="chip c${e.congestion_class}">${e.congestion_class}</span>
+        <span class="lt">${hhmm(e.answered_at)}</span>
+        <span class="lmid"><div class="lcount">${countTxt}</div><div class="lsub">${cls.lbl}</div></span>
+        <span class="lstat ${stc}" data-cid="${e.cid}">${st}</span>
+      </div>`;
+    });
+  }
+  main.innerHTML = `
+    <div class="picker"><p class="ptitle">${t.pick}</p><div class="grid">${cards}</div></div>
+    <div class="log">
+      <div class="lhead"><span>${t.records} ${logEntries.length}</span><span>${t.log_head}</span></div>
+      ${rows}
+    </div>`;
+  setStatus();
+  startSampling();   // 一覧表示中は測位を回してpreBufferを温める（前倒し）
+}
+
+/* ---------------- 画面ルーター & ナビ ---------------- */
+function updateNav(){
+  const t=T[lang];
+  $("brandTag").textContent=t.brand_tag;
+  $("navReport").textContent=t.nav_report; $("navFeed").textContent=t.nav_feed;
+  $("navReport").classList.toggle("on", view==="report");
+  $("navFeed").classList.toggle("on", view==="feed");
+  $("langBtn").textContent=t.langLabel;
+  $("sess").innerHTML = (user && view==="report") ? t.who(handleName()) : "";
+  $("outBtn").style.display = user ? "" : "none";
+  // データ一覧は管理者のみ。スタッフにはボタンを出さない
+  const adminOK = isAdmin();
+  $("navReport").classList.toggle("solo", !adminOK);   // 管理者以外は「報告」だけ
+  $("navFeed").style.display = adminOK ? "" : "none";
+  // パスワード再設定中はナビを隠して画面に集中させる
+  const focus = (view==="report" && (authMode==="reset" || authMode==="newpass"));
+  $("navReport").style.visibility = focus ? "hidden" : "";
+  $("navFeed").style.visibility  = (focus||!adminOK) ? "hidden" : "";
+}
+function setView(v){ if(v==="feed" && !isAdmin()) v="report"; view=v; render(); }
+function render(){
+  updateNav();
+  if(view==="feed"){ renderFeed(); return; }
+  if(user && authMode!=="newpass"){ renderMain(); }   // 通常のログイン中
+  else { renderAuth(); }                               // 未ログイン or パスワード再設定中
+}
+
+/* ---------------- データ一覧（公開ビュー report_feed を表示） ---------------- */
+function renderFeed(){
+  const t=T[lang];
+  if(!user || !isAdmin()){   // データ一覧は管理者のみ（未ログイン/スタッフは報告へ）
+    main.innerHTML=`<div class="login"><h1>${t.feed_title}</h1><p>${!user?t.feed_login:t.feed_admin_only}</p>
+      <button class="btn primary" id="toLogin">${t.feed_login_btn}</button></div>`;
+    $("toLogin").onclick=()=>setView("report");
+    setStatus(); return;
+  }
+  main.innerHTML=`
+    <div class="feed">
+      <div class="feedhead">
+        <h2>${t.feed_title}</h2><p>${t.feed_sub}</p>
+        <div class="feedctl">
+          <select id="fFilter">
+            <option value="0">${t.feed_all}</option>
+            ${t.classes.map((c,i)=>`<option value="${i+1}">${i+1} · ${c.lbl}</option>`).join("")}
+          </select>
+          <button id="fRefresh">${t.feed_update}</button>
+        </div>
+      </div>
+      <div class="feedlist" id="feedlist"><div class="empty">${t.feed_loading}</div></div>
+    </div>`;
+  $("fRefresh").onclick=loadFeed;
+  $("fFilter").onchange=loadFeed;
+  setStatus();
+  loadFeed();
+}
+async function loadFeed(){
+  const t=T[lang]; const el=$("feedlist"); if(!el) return;
+  if(!configured){ el.innerHTML=`<div class="empty">${t.notconf}</div>`; return; }
+  const cls=parseInt(($("fFilter")||{}).value||"0",10);
+  el.innerHTML=`<div class="empty">${t.feed_loading}</div>`;
+  let q=sb.from("ui_report_feed").select("*").order("created_at",{ascending:false}).limit(200);
+  if(cls) q=q.eq("congestion_class",cls);
+  const { data, error } = await q;
+  if(!el.isConnected) return;
+  if(error){ el.innerHTML=`<div class="empty">${t.feed_err}<br><span style="font-size:11px">${error.message||""}</span></div>`; return; }
+  if(!data || !data.length){ el.innerHTML=`<div class="empty">${t.feed_empty}</div>`; return; }
+  const rows=data.map(r=>{
+    const c=t.classes[r.congestion_class-1]||{lbl:"?"};
+    const d=new Date(r.answered_at||r.created_at);
+    const tm=`${d.getMonth()+1}/${d.getDate()}<br>${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    const cnt=(r.exact_count!=null)?`${r.exact_count}${t.ppl}`:"";
+    return `<div class="frow">
+      <span class="ft">${tm}</span>
+      <span class="chip c${r.congestion_class}">${r.congestion_class}</span>
+      <span class="fmid"><span class="flabel">${c.lbl}</span><span class="fcount">${cnt}</span></span>
+      <span class="ftag">${t.staff_tag}</span>
+    </div>`;
+  }).join("");
+  el.innerHTML=`<div style="font-size:12px;color:var(--muted);padding:6px 2px 8px">${t.feed_count(data.length)}</div>${rows}`;
+}
+
+/* ---------------- 認証（メール＋パスワード） ---------------- */
+let authMode = "login";   // login | signup | sent
+let authForm = { email:"", pass:"", name:"", sentEmail:"" };
+
+function renderAuth(){
+  const t=T[lang];
+  updateNav();
+  if(authMode==="sent"){
+    main.innerHTML=`
+      <div class="login">
+        <h1>${t.sent_title}</h1>
+        <p>${t.sent_desc(authForm.sentEmail)}</p>
+        <button class="btn ghost" id="resendBtn">${t.resend}</button>
+        <button class="btn ghost" id="backBtn">${t.to_login}</button>
+      </div>`;
+    $("resendBtn").onclick=async()=>{
+      try{ await sb.auth.resend({ type:'signup', email:authForm.sentEmail,
+            options:{ emailRedirectTo: location.origin+location.pathname } });
+        toast(t.resent); }catch(e){ toast(e.message||"error","#dc2626"); }
+    };
+    $("backBtn").onclick=()=>{ authMode="login"; renderAuth(); };
+    setStatus(configured?"":T[lang].notconf, !configured);
+    return;
+  }
+  if(authMode==="reset"){   // パスワード再設定メールを送る
+    main.innerHTML=`
+      <div class="login"><h1>${t.reset_title}</h1><p>${t.reset_desc}</p>
+        <div class="authform">
+          <input class="afield" id="fEmail" type="email" inputmode="email" autocapitalize="none" autocomplete="email" placeholder="${t.ph_email}" value="${authForm.email||''}">
+          <button class="btn primary" id="resetBtn">${t.reset_send}</button>
+          <p class="hint" id="authNote"></p>
+        </div>
+        <button class="atab" id="backToLogin" style="border:none">${t.to_login}</button>
+      </div>`;
+    $("resetBtn").onclick=async()=>{
+      const email=($("fEmail").value||"").trim();
+      if(!email){ authNote(t.err_email); return; }
+      authForm.email=email;
+      const b=$("resetBtn"); b.disabled=true; b.textContent=t.signing;
+      try{
+        const { error }=await sb.auth.resetPasswordForEmail(email,{ redirectTo: location.origin+location.pathname });
+        if(error) throw error;
+        main.innerHTML=`<div class="login"><h1>${t.reset_title}</h1><p>${t.reset_sent}</p>
+          <button class="btn ghost" id="backToLogin2">${t.to_login}</button></div>`;
+        $("backToLogin2").onclick=()=>{ authMode="login"; renderAuth(); };
+      }catch(e){ authNote(e.message||"error"); b.disabled=false; b.textContent=t.reset_send; }
+    };
+    $("backToLogin").onclick=()=>{ authMode="login"; renderAuth(); };
+    setStatus(configured?"":t.notconf, !configured);
+    return;
+  }
+  if(authMode==="newpass"){   // メールのリンクから戻ってきた: 専用の再設定画面
+    main.innerHTML=`
+      <div class="login">
+        <div class="reseticon">🔑</div>
+        <h1>${t.newpass_title}</h1>
+        <p>${t.newpass_desc}</p>
+        <div class="authform">
+          <input class="afield" id="fNewPass" type="password" autocomplete="new-password" placeholder="${t.newpass_ph}">
+          <button class="btn primary" id="npBtn">${t.newpass_save}</button>
+          <p class="hint" id="authNote"></p>
+        </div>
+      </div>`;
+    const submit=async()=>{
+      const pass=$("fNewPass").value||"";
+      if(pass.length<8){ authNote(t.err_pass); return; }
+      const b=$("npBtn"); b.disabled=true; b.textContent=t.signing;
+      try{
+        const { error }=await sb.auth.updateUser({ password:pass }); if(error) throw error;
+        // 成功: 明確な完了画面を出す（トーストだけだと分かりづらいため）
+        main.innerHTML=`<div class="login"><div class="reseticon">✅</div>
+          <h1>${t.newpass_done}</h1><p>${t.newpass_done_desc}</p>
+          <button class="btn primary" id="goApp">${t.go_app}</button></div>`;
+        $("goApp").onclick=()=>{ authMode="login"; view="report"; render(); };
+      }catch(e){ authNote(e.message||"error"); b.disabled=false; b.textContent=t.newpass_save; }
+    };
+    $("npBtn").onclick=submit;
+    $("fNewPass").addEventListener("keydown",(e)=>{ if(e.key==="Enter") submit(); });
+    setStatus();
+    return;
+  }
+  const isSignup = authMode==="signup";
+  main.innerHTML=`
+    <div class="login">
+      <h1>${t.auth_title}</h1>
+      <p>${t.auth_intro}</p>
+      <div class="authtabs">
+        <button class="atab ${!isSignup?'on':''}" id="tabLogin">${t.tab_login}</button>
+        <button class="atab ${isSignup?'on':''}" id="tabSignup">${t.tab_signup}</button>
+      </div>
+      <div class="authform">
+        ${isSignup?`<input class="afield" id="fName" type="text" placeholder="${t.ph_name}" autocomplete="name" value="${authForm.name||''}">`:``}
+        <input class="afield" id="fEmail" type="email" inputmode="email" autocapitalize="none" autocomplete="email" placeholder="${t.ph_email}" value="${authForm.email||''}">
+        <input class="afield" id="fPass" type="password" autocomplete="${isSignup?'new-password':'current-password'}" placeholder="${t.ph_pass}" value="${authForm.pass||''}">
+        <button class="btn primary" id="authBtn">${isSignup?t.do_signup:t.do_login}</button>
+        <p class="hint" id="authNote"></p>
+        ${!isSignup?`<button class="atab" id="forgotBtn" style="border:none;color:var(--muted);font-weight:600">${t.forgot}</button>`:``}
+      </div>
+    </div>`;
+  $("tabLogin").onclick=()=>{ grabAuth(); authMode="login"; renderAuth(); };
+  $("tabSignup").onclick=()=>{ grabAuth(); authMode="signup"; renderAuth(); };
+  $("authBtn").onclick=submitAuth;
+  if($("forgotBtn")) $("forgotBtn").onclick=()=>{ grabAuth(); authMode="reset"; renderAuth(); };
+  setStatus(configured?"":T[lang].notconf, !configured);
+}
+function grabAuth(){
+  if($("fEmail")) authForm.email=$("fEmail").value.trim();
+  if($("fPass"))  authForm.pass=$("fPass").value;
+  if($("fName"))  authForm.name=$("fName").value.trim();
+}
+function authNote(msg){ const n=$("authNote"); if(n) n.textContent=msg||""; }
+async function submitAuth(){
+  const t=T[lang];
+  if(!configured){ toast(t.notconf,"#dc2626"); return; }
+  grabAuth();
+  const email=normLogin(authForm.email), pass=authForm.pass;   // ID入力なら固定ドメイン付与
+  if(!email){ authNote(t.err_email); return; }
+  if(!pass || pass.length<8){ authNote(t.err_pass); return; }
+  const btn=$("authBtn"); if(btn){ btn.disabled=true; btn.textContent=t.signing; }
+  try{
+    if(authMode==="signup"){
+      if(!authForm.name){ authNote(t.err_name); return; }
+      const { data, error } = await sb.auth.signUp({ email, password:pass,
+        options:{ emailRedirectTo: location.origin+location.pathname, data:{ display_name:authForm.name } } });
+      if(error) throw error;
+      // 既登録メールの検知: Supabaseはユーザー列挙対策で、登録済みメールでも
+      // エラーを返さず identities:[] の“ダミー”userを返す。これを弾いてログインへ誘導。
+      if(data.user && Array.isArray(data.user.identities) && data.user.identities.length===0){
+        authForm.email=email; authMode="login"; renderAuth(); authNote(t.already_registered); return;
+      }
+      if(data.session){ /* 確認OFF環境: 即ログイン(onAuthStateChangeが処理) */ }
+      else { authForm.sentEmail=email; authMode="sent"; renderAuth(); return; }
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password:pass });
+      if(error){
+        const m=(error.message||"").toLowerCase();
+        if(m.includes("not confirmed")||m.includes("confirm")) authNote(t.err_unconfirmed);
+        else authNote(t.err_login);
+        throw error;
+      }
+    }
+  }catch(e){
+    if(!$("authNote")||!$("authNote").textContent) authNote(e.message||"error");
+  }finally{
+    const b=$("authBtn"); if(b){ b.disabled=false; b.textContent=(authMode==="signup")?t.do_signup:t.do_login; }
+  }
+}
+
+async function boot(){
+  $("langBtn").onclick=()=>{ lang=(lang==="ja")?"en":"ja"; render(); };
+  $("outBtn").onclick=async()=>{ if(sb){ await sb.auth.signOut(); } user=null; authMode="login"; view="report"; render(); };
+  $("navReport").onclick=()=>setView("report");
+  $("navFeed").onclick=()=>setView("feed");
+
+  if(!configured){ render(); return; }
+
+  // 再設定リンクから戻ってきた場合を早期検知（URLに type=recovery が付く）
+  if(location.hash.includes("type=recovery") || new URLSearchParams(location.search).get("type")==="recovery"){
+    authMode="newpass"; view="report";
+  }
+  // リスナーは getSession より前に登録（初期URL処理で発火する PASSWORD_RECOVERY を取りこぼさない）
+  sb.auth.onAuthStateChange((ev, sess)=>{
+    const prevUid = user ? user.id : null;
+    user = sess ? sess.user : null;
+    const uid = user ? user.id : null;
+    if(ev==="PASSWORD_RECOVERY"){ authMode="newpass"; view="report"; render(); return; }  // 再設定リンクから復帰
+    // ログイン/ログアウトが実際に変わった時だけ画面を作り直す。
+    // スマホのフォーカス復帰やトークン更新でも発火するため、同一ユーザー継続中は
+    // 画面を保持する（回答中にクラス選択へ戻される不具合を防ぐ）。
+    if(uid!==prevUid){ render(); }
+    else { updateNav(); }
+    if(user) flushOutbox();
+  });
+
+  const { data:{ session } } = await sb.auth.getSession();
+  user = session ? session.user : null;
+  render();
+  if(user && authMode!=="newpass") flushOutbox();
+
+  // アプリを離れた瞬間に回答中レコードを確定（手動ボタンの代替）／復帰時に未送信を再送
+  document.addEventListener("visibilitychange", ()=>{
+    // 背景化: 送信後の記録中(pending & 人数入力は終了)だけ確定。人数入力中は保持したまま測位停止。
+    if(document.hidden){ if(pending && !answering) finalizeNow(true); stopSampling(); }
+    else if(user){ startSampling(); flushOutbox(); }                        // 復帰: 測位再開＆再送
+  });
+  window.addEventListener("pagehide", ()=>{ if(pending) finalizeNow(true); });
+}
+boot();
+</script>
+</body>
+</html>

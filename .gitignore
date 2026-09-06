@@ -1,0 +1,14 @@
+# 収集した回答・操作ログ（個人に関わるため管理外）
+responses.json
+ui_logs*.json
+exports/
+
+# 生成物
+*.png
+analysis/out/
+
+# OS/エディタ
+Thumbs.db
+.DS_Store
+__pycache__/
+*.pyc

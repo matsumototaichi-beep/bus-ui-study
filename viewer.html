@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>軌跡ビューア（回答データ確認）</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root{--bg:#0f172a;--panel:#1e293b;--line:#334155;--ink:#f1f5f9;--muted:#94a3b8;}
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;height:100vh;}
+  header{flex:0 0 auto;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  header h1{font-size:15px;margin:0;flex:0 0 auto;}
+  header .sp{flex:1;}
+  button{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:9px;padding:7px 12px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;}
+  button.primary{background:#2563eb;border-color:#2563eb;}
+  button:active{filter:brightness(.9);}
+  label.chk{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:5px;}
+  .wrap{flex:1 1 auto;display:flex;min-height:0;}
+  #map{flex:1 1 auto;min-width:0;}
+  .side{flex:0 0 300px;max-width:44vw;border-left:1px solid var(--line);background:var(--panel);overflow-y:auto;padding:10px;}
+  .side.hidden{display:none;}
+  textarea{width:100%;height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;font-family:ui-monospace,monospace;font-size:12px;padding:8px;}
+  .hint{font-size:11px;color:var(--muted);line-height:1.5;}
+  .hint code{background:#0b1220;padding:1px 4px;border-radius:4px;}
+  .tr{border:1px solid var(--line);border-radius:9px;padding:8px;margin:8px 0;font-size:12px;cursor:pointer;}
+  .tr:hover{border-color:#2563eb;}
+  .tr b{color:var(--ink);}
+  .tr .k{color:var(--muted);}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+  .stat{font-size:11px;color:var(--muted);margin-top:3px;}
+  .empty{color:var(--muted);font-size:13px;padding:14px;}
+  .leaflet-popup-content{font-size:12px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>軌跡ビューア</h1>
+  <button id="toggleSide" class="primary">データ貼付</button>
+  <label class="chk"><input type="checkbox" id="showHeading"> 方位矢印</label>
+  <label class="chk"><input type="checkbox" id="colorSpeed" checked> 速度で色分け</label>
+  <span class="sp"></span>
+  <span class="hint" id="summary"></span>
+</header>
+<div class="wrap">
+  <div id="map"></div>
+  <div class="side" id="side">
+    <div class="hint">
+      Supabaseで下のSQLを実行し、結果(JSON)をコピーして貼り付け → <b>描画</b>。<br>
+      <code>select json_agg(x) from (select id, answered_at, congestion_class, exact_count, trajectory from public.responses order by created_at desc limit 50) x;</code><br>
+      ※ 単一の <code>trajectory</code> 配列だけを貼ってもOK。
+    </div>
+    <textarea id="input" placeholder='[{"id":1,"answered_at":"...","congestion_class":3,"exact_count":20,"trajectory":[{"t":...,"lat":...,"lng":...,"acc":..,"hdg":..,"spd":..}, ...]}, ...]'></textarea>
+    <div style="display:flex;gap:8px;margin:8px 0;">
+      <button class="primary" id="render">描画</button>
+      <button id="sample">サンプル表示</button>
+      <button id="clear">クリア</button>
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const COLORS=["#2563eb","#e0453e","#16a34a","#ca8a04","#9333ea","#0891b2","#db2777","#65a30d"];
+let map=L.map('map',{zoomControl:true}).setView([34.71,135.75],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+let layers=[]; let trajs=[];
+
+function hav(a,b,c,d){const R=6371000,r=Math.PI/180;const dp=(c-a)*r,dl=(d-b)*r;const x=Math.sin(dp/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(dl/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+function clearMap(){layers.forEach(l=>map.removeLayer(l));layers=[];}
+function speedColor(v){ // m/s -> color
+  if(v==null||isNaN(v)) return "#64748b";
+  const t=Math.max(0,Math.min(1,v/15)); // 0..15 m/s (~54km/h)
+  const r=Math.round(30+t*200), g=Math.round(160-t*120), b=Math.round(90+t*20);
+  return `rgb(${r},${g},${b})`;
+}
+function normalize(data){
+  // -> [{label, meta, points:[{t,lat,lng,acc,hdg,spd}]}]
+  let out=[];
+  const isPt=(o)=>o&&typeof o.lat==='number'&&typeof o.lng==='number';
+  if(Array.isArray(data)&&data.length&&isPt(data[0])){
+    out.push({label:'trajectory', meta:{}, points:data});
+  } else if(Array.isArray(data)){
+    data.forEach((r,i)=>{
+      let tr=r.trajectory; if(typeof tr==='string'){try{tr=JSON.parse(tr);}catch(e){tr=null;}}
+      if(Array.isArray(tr)&&tr.length){
+        out.push({label:`#${r.id??i+1}`, meta:r, points:tr});
+      }
+    });
+  } else if(data&&data.trajectory){
+    let tr=data.trajectory; if(typeof tr==='string')tr=JSON.parse(tr);
+    out.push({label:`#${data.id??1}`, meta:data, points:tr});
+  }
+  // clean points
+  out.forEach(o=>{ o.points=o.points.filter(p=>p&&p.lat&&p.lng&&p.lat!==0&&p.lng!==0); });
+  return out.filter(o=>o.points.length);
+}
+function stats(pts){
+  let dist=0; for(let i=1;i<pts.length;i++)dist+=hav(pts[i-1].lat,pts[i-1].lng,pts[i].lat,pts[i].lng);
+  const ts=pts.map(p=>p.t).filter(x=>x!=null); const dur=ts.length?Math.max(...ts)-Math.min(...ts):null;
+  const accs=pts.map(p=>p.acc).filter(x=>x!=null);
+  const acc=accs.length?accs.reduce((a,b)=>a+b,0)/accs.length:null;
+  const spds=pts.map(p=>p.spd).filter(x=>x!=null&&!isNaN(x));
+  return {n:pts.length,dist,dur,acc,spdMax:spds.length?Math.max(...spds):null};
+}
+function render(list){
+  clearMap(); trajs=list;
+  const colorSpeed=document.getElementById('colorSpeed').checked;
+  const showHead=document.getElementById('showHeading').checked;
+  let allBounds=[];
+  list.forEach((o,idx)=>{
+    const col=COLORS[idx%COLORS.length];
+    const latlngs=o.points.map(p=>[p.lat,p.lng]);
+    const pl=L.polyline(latlngs,{color:colorSpeed?'#94a3b8':col,weight:2,opacity:.8}).addTo(map); layers.push(pl);
+    o.points.forEach((p,i)=>{
+      const c=colorSpeed?speedColor(p.spd):col;
+      const m=L.circleMarker([p.lat,p.lng],{radius:i===0?6:4,color:c,fillColor:c,fillOpacity:.9,weight:i===0?2:1}).addTo(map);
+      const tm=p.t?new Date(p.t*1000).toLocaleTimeString('ja-JP'):'';
+      m.bindPopup(`${o.label} #${i+1}<br>${tm}<br>acc ${p.acc??'–'}m / hdg ${p.hdg??'–'}° / spd ${p.spd??'–'}m/s`);
+      layers.push(m);
+      if(showHead&&p.hdg!=null){
+        const r=0.00025, a=p.hdg*Math.PI/180;
+        const e=[p.lat+r*Math.cos(a),p.lng+r*Math.sin(a)/Math.cos(p.lat*Math.PI/180)];
+        const ar=L.polyline([[p.lat,p.lng],e],{color:c,weight:1.5,opacity:.8}).addTo(map); layers.push(ar);
+      }
+      allBounds.push([p.lat,p.lng]);
+    });
+  });
+  if(allBounds.length) map.fitBounds(allBounds,{padding:[30,30]});
+  renderList(list);
+  document.getElementById('summary').textContent=`${list.length}件の軌跡 / 計${list.reduce((a,o)=>a+o.points.length,0)}点`;
+}
+function renderList(list){
+  const el=document.getElementById('list');
+  if(!list.length){el.innerHTML='<div class="empty">軌跡がありません</div>';return;}
+  el.innerHTML=list.map((o,idx)=>{
+    const s=stats(o.points); const col=COLORS[idx%COLORS.length]; const m=o.meta||{};
+    const cls=m.congestion_class?`class ${m.congestion_class}`:''; const cnt=(m.exact_count!=null)?`${m.exact_count}人`:'人数なし';
+    const at=m.answered_at?new Date(m.answered_at).toLocaleString('ja-JP'):'';
+    return `<div class="tr" data-i="${idx}">
+      <div><span class="dot" style="background:${col}"></span><b>${o.label}</b> <span class="k">${cls} · ${cnt}</span></div>
+      <div class="stat">${at}</div>
+      <div class="stat">${s.n}点 · ${s.dur!=null?s.dur+'秒':'–'} · ${Math.round(s.dist)}m · 平均精度 ${s.acc!=null?Math.round(s.acc)+'m':'–'} · 最大速度 ${s.spdMax!=null?s.spdMax+'m/s':'–'}</div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.tr').forEach(d=>d.onclick=()=>{
+    const o=list[+d.dataset.i]; map.fitBounds(o.points.map(p=>[p.lat,p.lng]),{padding:[40,40]});
+  });
+}
+document.getElementById('render').onclick=()=>{
+  try{ const data=JSON.parse(document.getElementById('input').value); const list=normalize(data);
+    if(!list.length){alert('軌跡データが見つかりません。JSON形式を確認してください。');return;}
+    render(list);
+  }catch(e){ alert('JSONの解析に失敗: '+e.message); }
+};
+document.getElementById('clear').onclick=()=>{document.getElementById('input').value='';clearMap();document.getElementById('list').innerHTML='';document.getElementById('summary').textContent='';};
+document.getElementById('toggleSide').onclick=()=>document.getElementById('side').classList.toggle('hidden');
+document.getElementById('showHeading').onchange=()=>{if(trajs.length)render(trajs);};
+document.getElementById('colorSpeed').onchange=()=>{if(trajs.length)render(trajs);};
+document.getElementById('sample').onclick=()=>{
+  // NAIST周辺のダミー軌跡（動作確認用）
+  const t0=Math.floor(Date.now()/1000); const pts=[]; let lat=34.7009,lng=135.7377;
+  for(let i=0;i<16;i++){lat+=0.0006+Math.random()*0.0002;lng+=0.0004;pts.push({t:t0+i*3,lat:+lat.toFixed(6),lng:+lng.toFixed(6),acc:8+Math.round(Math.random()*20),hdg:Math.round(20+Math.random()*20),spd:+(4+Math.random()*6).toFixed(1)});}
+  document.getElementById('input').value=JSON.stringify([{id:'sample',answered_at:new Date().toISOString(),congestion_class:3,exact_count:20,trajectory:pts}],null,0);
+  document.getElementById('render').click();
+};
+</script>
+</body>
+</html>
