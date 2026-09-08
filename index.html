@@ -11,6 +11,8 @@
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{height:100%; margin:0;}
+  /* iOS Safari のツールバー伸縮で下部が隠れないように */
+  @supports (height:100dvh){ html,body{height:100dvh;} }
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
     background:var(--bg); color:var(--ink); display:flex; flex-direction:column; overflow:hidden;
@@ -94,22 +96,26 @@
   .stopsrc{font-size:10px; color:var(--muted); margin:2px 2px 0;}
   .center h2{margin:0; font-size:18px; font-weight:700;}
   .center .hint{color:var(--muted); font-size:13px; margin:0;}
-  .selchip{display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--muted);}
+  /* 選んだクラス＋その目安人数（入力の制限ではない） */
+  .selchip{display:inline-flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:var(--ink);
+           background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:4px 14px 4px 5px; max-width:100%;}
   .selchip .chip{width:24px; height:24px;}
-  .stepper{display:flex; align-items:center; gap:10px;}
-  .stepper button{width:58px; height:58px; border-radius:14px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:20px; font-weight:700;}
+  .selchip .rng{font-size:12px; font-weight:600; color:var(--muted);}
+  .counter{display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; max-width:420px;}
+  .count{min-width:110px; font-size:46px; font-weight:800; line-height:1.05; font-variant-numeric:tabular-nums;}
+  .stepper{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; width:100%;}
+  .stepper button{height:52px; padding:0; border-radius:12px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:15px; font-weight:800; font-family:inherit; font-variant-numeric:tabular-nums;}
+  .stepper button.mi{color:#fca5a5;} .stepper button.pl{color:#93c5fd;}
   .stepper button:active{background:var(--line);}
-  .count{min-width:110px; font-size:46px; font-weight:800;}
-  .rangeind{font-size:14px; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:5px 14px;}
-  .rangeind b{font-weight:800;}
   .row{display:flex; gap:10px; width:100%; max-width:420px;}
+  .row.actions{flex-direction:column;}   /* 通常は縦積み。縦の短い端末では横並びに切替（下部@media） */
   .btn{flex:1; border:none; border-radius:14px; padding:15px; font-size:15px; font-weight:700; font-family:inherit; color:#fff;}
   .btn.primary{background:#2563eb;} .btn.ghost{background:transparent; color:var(--muted); border:1px solid var(--line);}
   .btn.gh{background:#24292f; display:inline-flex; align-items:center; justify-content:center; gap:10px;}
   .btn:active{filter:brightness(.9);}
   .btn:disabled{opacity:.5;}
 
-  .statusbar{flex:0 0 auto; padding:6px 12px; font-size:12px; color:var(--muted); text-align:center; border-top:1px solid var(--line); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .statusbar{flex:0 0 auto; padding:6px 12px calc(6px + env(safe-area-inset-bottom,0px)); font-size:12px; color:var(--muted); text-align:center; border-top:1px solid var(--line); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .statusbar.warn{background:#7c2d12; color:#fed7aa;}
 
   .toast{position:fixed; left:50%; bottom:44px; transform:translateX(-50%) translateY(12px); opacity:0; background:#16a34a; color:#fff; padding:10px 18px; border-radius:12px; font-size:14px; font-weight:700; transition:all .2s ease; pointer-events:none; z-index:30;}
@@ -128,6 +134,51 @@
   .afield{width:100%; padding:13px; border-radius:11px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:16px; font-family:inherit;}
   .authform .btn{max-width:none;}
   #authNote{color:#fca5a5; font-size:12px; min-height:16px; margin:0;}
+  /* ── 小さい画面（iPhone SE 375x667 / 320x568 など）向けの詰め ── */
+  @media (max-height:700px){
+    header{padding:5px 10px;}
+    .picker{padding:6px 10px;}
+    .ptitle{margin-bottom:5px;}
+    .grid{gap:6px;}
+    .card{min-height:48px; padding:0 13px; gap:11px;}
+    .card .num{font-size:20px; width:26px;}
+    .card .lbl{font-size:13px;} .card .rng{font-size:11px;}
+    .logrow{padding:7px 6px;}
+    .lhead{padding:7px 12px;}
+    /* 人数入力画面：上寄せ＋余白圧縮（戻るボタンに重ならない高さを確保） */
+    .center{justify-content:flex-start; gap:10px; padding:56px 12px 14px;}
+    .center h2{font-size:16px;}
+    .center .hint{font-size:12px;}
+    .count{font-size:36px;}
+    .stepper button{height:46px; font-size:14px;}
+    .stopwrap{gap:8px;}
+    .afield{padding:11px;}
+    .stoplist{max-height:150px;}
+    .btn{padding:13px; font-size:14px;}
+    .backbtn{top:8px; left:8px; padding:7px 12px; font-size:13px;}
+  }
+  /* ── さらに縦が短い画面（iPhone SE 1st 320x568 / 横向き） ── */
+  @media (max-height:620px){
+    .center{gap:8px; padding:48px 12px 10px;}
+    .count{font-size:30px;}
+    .stepper button{height:42px;}
+    .stopwrap{gap:6px;}
+    .afield{padding:9px 11px;}   /* font-size は16pxのまま＝iOSの自動ズーム回避 */
+    .stoplist{max-height:132px;}
+    .btn{padding:11px; font-size:14px;}
+    .row.actions{flex-direction:row;}
+    #sendBtn{flex:2;} #skipBtn{flex:1;}
+  }
+  @media (max-width:360px){
+    .brand{font-size:13px;}
+    .navb{font-size:12px; padding:6px 9px;}
+    .sess{max-width:70px; font-size:10px;}
+    .iconbtn{padding:6px 8px; font-size:12px;}
+    .stepper{gap:4px;}
+    .stepper button{font-size:13px;}
+    .count{font-size:32px;}
+    .card{padding:0 11px; gap:9px;}
+  }
 </style>
 </head>
 <body>
@@ -163,7 +214,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.1";
+const APP_VERSION = "uiStudy-0.2";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -316,13 +367,13 @@ const T = {
       {lbl:"ガラガラ", rng:"0〜5人"},{lbl:"やや空き", rng:"6〜15人"},{lbl:"席が埋まる", rng:"16〜25人"},
       {lbl:"立ち客", rng:"26〜40人"},{lbl:"混雑", rng:"41〜55人"},{lbl:"満員近い", rng:"56人〜"},
     ],
-    countTitle:"正確な人数（任意）", countHint:"数えられれば入力してください",
+    countTitle:"正確な人数（任意）", countHint:"数えられれば入力（目安外の人数でもOK）",
     back:"戻る", already_registered:"このメールは登録済みです。「ログイン」から入ってください。",
     board_label:"乗車バス停（任意）", dest_label:"降車バス停（任意）",
     board_ph:"バス停名を選択（任意）", dest_ph:"バス停名を選択（任意）",
     stop_selected:"選択済み", stop_clear:"取消",
     stop_source:"バス停データ出典：国土数値情報（国土交通省）",
-    stop_pick_hint:"候補から選んでください", count_range:"入力範囲",
+    stop_pick_hint:"候補から選んでください", count_range:"目安",
     send:"送信", skip:"スキップ", ppl:"人",
     saved:"保存しました", queued:"端末に保存（後で自動送信）", finishing:"軌跡を記録中",
     saveNow:"今すぐ保存", recording:"記録中", pendingN:(n)=>`未送信 ${n}件`,
@@ -363,13 +414,13 @@ const T = {
       {lbl:"Empty", rng:"0–5"},{lbl:"Fairly empty", rng:"6–15"},{lbl:"Seats filling up", rng:"16–25"},
       {lbl:"Some standing", rng:"26–40"},{lbl:"Crowded", rng:"41–55"},{lbl:"Nearly full", rng:"56+"},
     ],
-    countTitle:"Exact count (optional)", countHint:"Enter it only if you actually counted",
+    countTitle:"Exact count (optional)", countHint:"Enter it only if you actually counted (any number is fine)",
     back:"Back", already_registered:"This email is already registered. Please sign in instead.",
     board_label:"Boarding stop (optional)", dest_label:"Alighting stop (optional)",
     board_ph:"Select a stop name (optional)", dest_ph:"Select a stop name (optional)",
     stop_selected:"Selected", stop_clear:"Clear",
     stop_source:"Bus-stop data: MLIT National Land Numerical Information",
-    stop_pick_hint:"Choose one from the list", count_range:"Range",
+    stop_pick_hint:"Choose one from the list", count_range:"guide",
     send:"Submit", skip:"Skip", ppl:"",
     saved:"Saved", queued:"Saved on your device (will send later)", finishing:"Recording your path",
     saveNow:"Save now", recording:"Recording", pendingN:(n)=>`${n} unsent`,
@@ -580,12 +631,13 @@ function wireStopField(inputId, listId, selId, field){
   }
 }
 
-// クラスごとの人数レンジ（選んだクラスの範囲内でのみ増減できる）
+// クラスごとの人数レンジ。**入力の制限ではなく「目安」と初期値の基準**として使う。
 const COUNT_RANGES=[[0,5],[6,15],[16,25],[26,40],[41,55],[56,99]];
+// 実際に入力できる範囲：クラスに関係なく共通
+const COUNT_MIN=0, COUNT_MAX=99;
 function renderCount(){
   const t=T[lang];
   const [lo,hi]=COUNT_RANGES[pending.congestion_class-1];
-  const step2=(hi-lo)<=10?5:10;   // クラス範囲が狭ければ大ステップは5、広ければ10
   // ★UI研究: 人数入力の初期値を条件で切替（none=未入力 / min=下限 / median=中央値）
   const initMode = (pending.variant && pending.variant.count_init) || "none";
   let n = (initMode==="min") ? lo : (initMode==="median") ? Math.round((lo+hi)/2) : null;
@@ -594,14 +646,15 @@ function renderCount(){
   main.innerHTML = `
     <button class="backbtn" id="backPick">← ${t.back}</button>
     <div class="center">
-      <div class="selchip"><span class="chip c${pending.congestion_class}">${pending.congestion_class}</span>${cls.lbl}（${cls.rng}）</div>
+      <div class="selchip"><span class="chip c${pending.congestion_class}">${pending.congestion_class}</span>${cls.lbl}<span class="rng">${t.count_range} ${cls.rng}</span></div>
       <h2>${t.countTitle}</h2>
-      <div class="rangeind">${t.count_range}：<b>${cls.rng}</b></div>
       <p class="hint">${t.countHint}</p>
-      <div class="stepper">
-        <button data-d="-${step2}">−${step2}</button><button data-d="-1">−</button>
+      <div class="counter">
         <div class="count" id="cval">—</div>
-        <button data-d="1">＋</button><button data-d="${step2}">+${step2}</button>
+        <div class="stepper">
+          <button class="mi" data-d="-10">−10</button><button class="mi" data-d="-5">−5</button><button class="mi" data-d="-1">−1</button>
+          <button class="pl" data-d="1">＋1</button><button class="pl" data-d="5">＋5</button><button class="pl" data-d="10">＋10</button>
+        </div>
       </div>
       <div class="stopwrap">
         <div class="stopfield">
@@ -618,19 +671,22 @@ function renderCount(){
         </div>
         <div class="stopsrc">${t.stop_source}</div>
       </div>
-      <div class="row"><button class="btn primary" id="sendBtn">${t.send}</button></div>
-      <div class="row"><button class="btn ghost" id="skipBtn">${t.skip}</button></div>
+      <div class="row actions">
+        <button class="btn primary" id="sendBtn">${t.send}</button>
+        <button class="btn ghost" id="skipBtn">${t.skip}</button>
+      </div>
     </div>`;
   answering = true;             // 人数入力画面を表示中（背景の再描画から保護）
   wireStopField("boardInput","boardList","boardSel","board_stop");
   wireStopField("destInput","destList","destSel","dest_stop");
   const cval=$("cval");
-  const show=()=>{ cval.textContent = (n===null)?"—":((hi>=99 && n>=99)?"99+":String(n)); };
+  const show=()=>{ cval.textContent = (n===null)?"—":((n>=COUNT_MAX)?COUNT_MAX+"+":String(n)); };
   show();                         // 初期は「—」＝未入力
-  logEvent("screen_view", { screen:"count", count_init:initMode, lo:lo, hi:hi, step2:step2 });
+  logEvent("screen_view", { screen:"count", count_init:initMode, lo:lo, hi:hi, cmin:COUNT_MIN, cmax:COUNT_MAX });
   main.querySelectorAll(".stepper button").forEach(b=>{ b.onclick=()=>{
     const d=parseInt(b.dataset.d,10);
-    n=Math.max(lo,Math.min(hi,(n===null?lo:n)+d));   // 初回タップはlo基準・範囲内にクランプ
+    // 初回タップはクラスの目安下限(lo)から開始（タップ数削減）。値はクラスに縛らず 0〜99 で自由。
+    n=Math.max(COUNT_MIN,Math.min(COUNT_MAX,(n===null?lo:n)+d));
     show();
     if(LOG) LOG.taps_stepper++;
     logTap("step_"+(d>0?"+":"")+d); logEvent("stepper", { delta:d, value:n });
