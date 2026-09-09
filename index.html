@@ -8,6 +8,7 @@
   :root{
     --c1:#16a34a; --c2:#65a30d; --c3:#ca8a04; --c4:#ea580c; --c5:#dc2626; --c6:#991b1b;
     --bg:#0f172a; --panel:#1e293b; --line:#334155; --ink:#f1f5f9; --muted:#94a3b8;
+    --ctlh:56px;   /* 人数入力部品の高さ（画面サイズで@mediaが上書き） */
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{height:100%; margin:0;}
@@ -103,7 +104,7 @@
   .selchip .rng{font-size:12px; font-weight:600; color:var(--muted);}
   /* −と＋の間に人数を挿す（ボタンが何を増減させるのか一目で分かるように） */
   .stepper{display:grid; grid-template-columns:repeat(3,1fr) 1.7fr repeat(3,1fr); gap:5px; align-items:stretch; width:100%; max-width:420px;}
-  .stepper button{height:56px; padding:0; border-radius:12px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:15px; font-weight:800; font-family:inherit; font-variant-numeric:tabular-nums;}
+  .stepper button{height:var(--ctlh); padding:0; border-radius:12px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:15px; font-weight:800; font-family:inherit; font-variant-numeric:tabular-nums;}
   /* 人数の表示枠：ここに数字が入ると一目で分かるよう常に囲う。未入力は破線・入力後は青の実線 */
   .count{display:flex; align-items:center; justify-content:center; border-radius:12px;
          border:2px solid #2563eb; background:var(--bg); color:var(--ink);
@@ -111,8 +112,24 @@
   .count.noval{border-style:dashed; border-color:var(--line); color:var(--muted); font-size:22px;}
   .stepper button.mi{color:#fca5a5;} .stepper button.pl{color:#93c5fd;}
   .stepper button:active{background:var(--line);}
+  /* テンキー方式（UI条件）：OSのキーボードは使わない。
+     表示遅延と画面占有が交絡して「遅いのはキーボード待ちのせい」と反論されるため */
+  .numwrap{display:flex; flex-direction:column; align-items:center; gap:6px; width:100%; max-width:290px;}
+  .numwrap .count{width:100%; height:var(--ctlh);}
+  .numpad{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; width:100%;}
+  .numpad button{height:calc(var(--ctlh) - 8px); min-height:44px; padding:0; border-radius:12px;
+                 border:1px solid var(--line); background:var(--panel); color:var(--ink);
+                 font-size:20px; font-weight:700; font-family:inherit; font-variant-numeric:tabular-nums;}
+  .numpad button.npfn{font-size:16px; color:#fca5a5;}
+  .numpad button:active{background:var(--line);}
+  /* 2桁を超えるキーは無効。無反応だと不安なので枠を一瞬光らせる */
+  .count.full{animation:cflash .18s ease;}
+  @keyframes cflash{0%,100%{border-color:#2563eb;}50%{border-color:#f59e0b;}}
   .row{display:flex; gap:10px; width:100%; max-width:420px;}
   .row.actions{flex-direction:column;}   /* 通常は縦積み。縦の短い端末では横並びに切替（下部@media） */
+  /* 送信/スキップはスクロール領域の下端に固定。入力方式によって到達コストが変わると
+     「テンキーが遅い」のが入力ではなくスクロールのせいになってしまうため */
+  .row.actions{position:sticky; bottom:0; z-index:2; background:var(--bg); padding:8px 0 2px;}
   .btn{flex:1; border:none; border-radius:14px; padding:15px; font-size:15px; font-weight:700; font-family:inherit; color:#fff;}
   .btn.primary{background:#2563eb;} .btn.ghost{background:transparent; color:var(--muted); border:1px solid var(--line);}
   .btn.gh{background:#24292f; display:inline-flex; align-items:center; justify-content:center; gap:10px;}
@@ -153,7 +170,9 @@
     .center{justify-content:flex-start; gap:10px; padding:56px 12px 14px;}
     .center h2{font-size:16px;}
     .center .hint{font-size:12px;}
-    .stepper button{height:50px; font-size:14px;}
+    :root{--ctlh:50px;}
+    .stepper button{font-size:14px;}
+    .numpad button{font-size:18px;}
     .count{font-size:24px;} .count.noval{font-size:20px;}
     .stopwrap{gap:8px;}
     .afield{padding:11px;}
@@ -164,7 +183,10 @@
   /* ── さらに縦が短い画面（iPhone SE 1st 320x568 / 横向き） ── */
   @media (max-height:620px){
     .center{gap:8px; padding:48px 12px 10px;}
-    .stepper button{height:46px;}
+    :root{--ctlh:46px;}
+    .numwrap{gap:5px;}
+    .numpad{gap:5px;}
+    .numpad button{font-size:17px;}
     .count{font-size:22px;} .count.noval{font-size:19px;}
     .stopwrap{gap:6px;}
     .afield{padding:9px 11px;}   /* font-size は16pxのまま＝iOSの自動ズーム回避 */
@@ -218,22 +240,42 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.3";
+const APP_VERSION = "uiStudy-0.4";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
    - 1回答 = 1セッション。開始からの相対ms(dt)で記録（端末時計のズレに非依存）
    - 条件はセッションごとに順番に割当（カウンターバランス）
    ========================================================== */
-const UI_COUNT_INIT = ["none", "min", "median"];   // RQ1: 人数入力の初期値
+// UI条件：入力方式 × 初期値 の2要因（各2水準＝4条件）。
+// 連続で同じ方式が続かない順に並べてある
+const UI_CONDS = [
+  { input:"stepper", count_init:"none"   },
+  { input:"numpad",  count_init:"median" },
+  { input:"stepper", count_init:"median" },
+  { input:"numpad",  count_init:"none"   },
+];
 const UISTUDY_KEY = "uistudy_sessions_v1";         // 未送信セッションの退避
 const UISTUDY_SEQ = "uistudy_seq_v1";              // 条件割当の通し番号
+const UISTUDY_OFF = "uistudy_offset_v1";           // 被験者ごとの開始位置（順序効果の相殺）
 
+// 端末（＝被験者）ごとに違う位置から回し始める。全員が同じ順なら順序効果と条件が区別できないため
+function condOffset(){
+  let o = null;
+  try{ o = localStorage.getItem(UISTUDY_OFF); }catch(e){}
+  if(o === null){
+    o = String(Math.floor(Math.random() * UI_CONDS.length));
+    try{ localStorage.setItem(UISTUDY_OFF, o); }catch(e){}
+  }
+  return parseInt(o, 10) || 0;
+}
 function nextVariant(){
   let n = 0;
   try{ n = parseInt(localStorage.getItem(UISTUDY_SEQ) || "0", 10) || 0; }catch(e){}
   try{ localStorage.setItem(UISTUDY_SEQ, String(n + 1)); }catch(e){}
-  return { count_init: UI_COUNT_INIT[n % UI_COUNT_INIT.length], seq: n };
+  const off = condOffset();
+  const c = UI_CONDS[(n + off) % UI_CONDS.length];
+  return { input: c.input, count_init: c.count_init, seq: n, offset: off };
 }
 
 let LOG = null;          // 進行中のセッション
@@ -241,7 +283,7 @@ let pickerShownAt = 0;   // クラス選択画面が表示された時刻（熟�
 
 function logStart(cls, variant){
   LOG = { session_id: uuid(), started_at: new Date().toISOString(), t0: performance.now(),
-          variant: variant, events: [], taps: 0, taps_stepper: 0, corrections: 0,
+          variant: variant, events: [], taps: 0, taps_value: 0, corrections: 0,
           t_class: null, t_count: null, t_stop: 0, stop_focus_at: null };
   logEvent("session_start", { congestion_class: cls,
     since_picker_ms: pickerShownAt ? Math.round(performance.now() - pickerShownAt) : null });
@@ -275,7 +317,7 @@ function finishSession(outcome, extra){
       t_total: t_total,            // クラスタップ→確定までの所要時間(ms)
       t_class: LOG.t_class,        // クラス選択画面表示→クラスタップ(参考・待機時間を含みうる)
       t_stop:  LOG.t_stop,         // バス停欄に費やした時間(ms)
-      taps_total: LOG.taps, taps_stepper: LOG.taps_stepper, corrections: LOG.corrections
+      taps_total: LOG.taps, taps_value: LOG.taps_value, corrections: LOG.corrections
     },
     events: LOG.events
   };
@@ -643,21 +685,34 @@ function renderCount(){
   const t=T[lang];
   const [lo,hi]=COUNT_RANGES[pending.congestion_class-1];
   // ★UI研究: 人数入力の初期値を条件で切替（none=未入力 / min=下限 / median=中央値）
-  const initMode = (pending.variant && pending.variant.count_init) || "none";
+  const initMode  = (pending.variant && pending.variant.count_init) || "none";
+  const inputMode = (pending.variant && pending.variant.input) || "stepper";
   let n = (initMode==="min") ? lo : (initMode==="median") ? Math.round((lo+hi)/2) : null;
   const nInit = n;                // 初期値（触ったかの判定に使う）
   const cls=t.classes[pending.congestion_class-1];
+  // 入力方式の条件で人数入力部を差し替える（他の要素は完全に同じにする）
+  const ctrlHtml = (inputMode === "numpad") ? `
+      <div class="numwrap">
+        <div class="count noval" id="cval">—</div>
+        <div class="numpad">
+          <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+          <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+          <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+          <button class="npfn" data-k="C">C</button><button data-k="0">0</button><button class="npfn" data-k="B">⌫</button>
+        </div>
+      </div>` : `
+      <div class="stepper">
+        <button class="mi" data-d="-10">−10</button><button class="mi" data-d="-5">−5</button><button class="mi" data-d="-1">−1</button>
+        <div class="count noval" id="cval">—</div>
+        <button class="pl" data-d="1">＋1</button><button class="pl" data-d="5">＋5</button><button class="pl" data-d="10">＋10</button>
+      </div>`;
   main.innerHTML = `
     <button class="backbtn" id="backPick">← ${t.back}</button>
     <div class="center">
       <div class="selchip"><span class="chip c${pending.congestion_class}">${pending.congestion_class}</span>${cls.lbl}<span class="rng">${t.count_range} ${cls.rng}</span></div>
       <h2>${t.countTitle}</h2>
       <p class="hint">${t.countHint}</p>
-      <div class="stepper">
-        <button class="mi" data-d="-10">−10</button><button class="mi" data-d="-5">−5</button><button class="mi" data-d="-1">−1</button>
-        <div class="count noval" id="cval">—</div>
-        <button class="pl" data-d="1">＋1</button><button class="pl" data-d="5">＋5</button><button class="pl" data-d="10">＋10</button>
-      </div>
+      ${ctrlHtml}
       <div class="stopwrap">
         <div class="stopfield">
           <label>${t.board_label}</label>
@@ -687,15 +742,42 @@ function renderCount(){
     cval.classList.toggle("noval", n===null);   // 未入力は破線枠で「まだ答えていない」と分かるように
   };
   show();                         // 初期は「—」＝未入力
-  logEvent("screen_view", { screen:"count", count_init:initMode, lo:lo, hi:hi, cmin:COUNT_MIN, cmax:COUNT_MAX });
-  main.querySelectorAll(".stepper button").forEach(b=>{ b.onclick=()=>{
-    const d=parseInt(b.dataset.d,10);
-    // 初回タップはクラスの目安下限(lo)から開始（タップ数削減）。値はクラスに縛らず 0〜99 で自由。
-    n=Math.max(COUNT_MIN,Math.min(COUNT_MAX,(n===null?lo:n)+d));
-    show();
-    if(LOG) LOG.taps_stepper++;
-    logTap("step_"+(d>0?"+":"")+d); logEvent("stepper", { delta:d, value:n });
-  }; });
+  logEvent("screen_view", { screen:"count", input:inputMode, count_init:initMode,
+                            lo:lo, hi:hi, cmin:COUNT_MIN, cmax:COUNT_MAX });
+
+  if(inputMode === "numpad"){
+    // プリセット値が入ったままの状態。最初の数字キーで置き換え、以降は追記
+    let fresh = (n !== null);
+    main.querySelectorAll(".numpad button").forEach(b=>{ b.onclick=()=>{
+      const k = b.dataset.k;
+      if(k === "C"){ n = null; fresh = false; if(LOG) LOG.corrections++; }
+      else if(k === "B"){ n = (n === null || n < 10) ? null : Math.floor(n/10); fresh = false; }
+      else {
+        const cur = fresh ? "" : (n === null ? "" : String(n));
+        fresh = false;
+        if(cur.length >= 2){                       // 2桁上限。無反応だと不安なので枠を光らせる
+          cval.classList.add("full");
+          setTimeout(()=>cval.classList.remove("full"), 200);
+          if(LOG) LOG.taps_value++;
+          logTap("key_"+k); logEvent("numkey", { key:k, value:n, ignored:true });
+          return;
+        }
+        n = Math.min(COUNT_MAX, parseInt(cur + k, 10));
+      }
+      show();
+      if(LOG) LOG.taps_value++;
+      logTap("key_"+k); logEvent("numkey", { key:k, value:n });
+    }; });
+  } else {
+    main.querySelectorAll(".stepper button").forEach(b=>{ b.onclick=()=>{
+      const d=parseInt(b.dataset.d,10);
+      // 初回タップはクラスの目安下限(lo)から開始（タップ数削減）。値はクラスに縛らず 0〜99 で自由。
+      n=Math.max(COUNT_MIN,Math.min(COUNT_MAX,(n===null?lo:n)+d));
+      show();
+      if(LOG) LOG.taps_value++;
+      logTap("step_"+(d>0?"+":"")+d); logEvent("stepper", { delta:d, value:n });
+    }; });
+  }
   $("sendBtn").onclick=()=>{ answering=false; pending.exact_count=n;
     logTap("send"); finishSession("submit", { count_touched: n!==nInit, exact_count:n }); submit(); };
   $("skipBtn").onclick=()=>{ answering=false; pending.exact_count=null;
