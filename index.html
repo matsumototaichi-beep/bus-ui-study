@@ -101,10 +101,14 @@
            background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:4px 14px 4px 5px; max-width:100%;}
   .selchip .chip{width:24px; height:24px;}
   .selchip .rng{font-size:12px; font-weight:600; color:var(--muted);}
-  .counter{display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; max-width:420px;}
-  .count{min-width:110px; font-size:46px; font-weight:800; line-height:1.05; font-variant-numeric:tabular-nums;}
-  .stepper{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; width:100%;}
-  .stepper button{height:52px; padding:0; border-radius:12px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:15px; font-weight:800; font-family:inherit; font-variant-numeric:tabular-nums;}
+  /* −と＋の間に人数を挿す（ボタンが何を増減させるのか一目で分かるように） */
+  .stepper{display:grid; grid-template-columns:repeat(3,1fr) 1.7fr repeat(3,1fr); gap:5px; align-items:stretch; width:100%; max-width:420px;}
+  .stepper button{height:56px; padding:0; border-radius:12px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:15px; font-weight:800; font-family:inherit; font-variant-numeric:tabular-nums;}
+  /* 人数の表示枠：ここに数字が入ると一目で分かるよう常に囲う。未入力は破線・入力後は青の実線 */
+  .count{display:flex; align-items:center; justify-content:center; border-radius:12px;
+         border:2px solid #2563eb; background:var(--bg); color:var(--ink);
+         font-size:26px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums;}
+  .count.noval{border-style:dashed; border-color:var(--line); color:var(--muted); font-size:22px;}
   .stepper button.mi{color:#fca5a5;} .stepper button.pl{color:#93c5fd;}
   .stepper button:active{background:var(--line);}
   .row{display:flex; gap:10px; width:100%; max-width:420px;}
@@ -149,8 +153,8 @@
     .center{justify-content:flex-start; gap:10px; padding:56px 12px 14px;}
     .center h2{font-size:16px;}
     .center .hint{font-size:12px;}
-    .count{font-size:36px;}
-    .stepper button{height:46px; font-size:14px;}
+    .stepper button{height:50px; font-size:14px;}
+    .count{font-size:24px;} .count.noval{font-size:20px;}
     .stopwrap{gap:8px;}
     .afield{padding:11px;}
     .stoplist{max-height:150px;}
@@ -160,8 +164,8 @@
   /* ── さらに縦が短い画面（iPhone SE 1st 320x568 / 横向き） ── */
   @media (max-height:620px){
     .center{gap:8px; padding:48px 12px 10px;}
-    .count{font-size:30px;}
-    .stepper button{height:42px;}
+    .stepper button{height:46px;}
+    .count{font-size:22px;} .count.noval{font-size:19px;}
     .stopwrap{gap:6px;}
     .afield{padding:9px 11px;}   /* font-size は16pxのまま＝iOSの自動ズーム回避 */
     .stoplist{max-height:132px;}
@@ -176,7 +180,7 @@
     .iconbtn{padding:6px 8px; font-size:12px;}
     .stepper{gap:4px;}
     .stepper button{font-size:13px;}
-    .count{font-size:32px;}
+    .count{font-size:20px;} .count.noval{font-size:18px;}
     .card{padding:0 11px; gap:9px;}
   }
 </style>
@@ -214,7 +218,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.2";
+const APP_VERSION = "uiStudy-0.3";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -649,12 +653,10 @@ function renderCount(){
       <div class="selchip"><span class="chip c${pending.congestion_class}">${pending.congestion_class}</span>${cls.lbl}<span class="rng">${t.count_range} ${cls.rng}</span></div>
       <h2>${t.countTitle}</h2>
       <p class="hint">${t.countHint}</p>
-      <div class="counter">
-        <div class="count" id="cval">—</div>
-        <div class="stepper">
-          <button class="mi" data-d="-10">−10</button><button class="mi" data-d="-5">−5</button><button class="mi" data-d="-1">−1</button>
-          <button class="pl" data-d="1">＋1</button><button class="pl" data-d="5">＋5</button><button class="pl" data-d="10">＋10</button>
-        </div>
+      <div class="stepper">
+        <button class="mi" data-d="-10">−10</button><button class="mi" data-d="-5">−5</button><button class="mi" data-d="-1">−1</button>
+        <div class="count noval" id="cval">—</div>
+        <button class="pl" data-d="1">＋1</button><button class="pl" data-d="5">＋5</button><button class="pl" data-d="10">＋10</button>
       </div>
       <div class="stopwrap">
         <div class="stopfield">
@@ -680,7 +682,10 @@ function renderCount(){
   wireStopField("boardInput","boardList","boardSel","board_stop");
   wireStopField("destInput","destList","destSel","dest_stop");
   const cval=$("cval");
-  const show=()=>{ cval.textContent = (n===null)?"—":((n>=COUNT_MAX)?COUNT_MAX+"+":String(n)); };
+  const show=()=>{
+    cval.textContent = (n===null)?"—":((n>=COUNT_MAX)?COUNT_MAX+"+":String(n));
+    cval.classList.toggle("noval", n===null);   // 未入力は破線枠で「まだ答えていない」と分かるように
+  };
   show();                         // 初期は「—」＝未入力
   logEvent("screen_view", { screen:"count", count_init:initMode, lo:lo, hi:hi, cmin:COUNT_MIN, cmax:COUNT_MAX });
   main.querySelectorAll(".stepper button").forEach(b=>{ b.onclick=()=>{
