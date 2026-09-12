@@ -53,6 +53,18 @@
   .picker{flex:0 0 auto; padding:8px 10px; border-bottom:1px solid var(--line);}
   .ptitle{font-size:12px; color:var(--muted); margin:0 2px 6px;}
   .grid{display:grid; grid-template-columns:1fr; gap:7px; max-width:300px; margin:0 auto;}
+  /* 実験バー：実験コード（同じ便に乗った人の紐づけ）と着席/立席。未設定は橙で目立たせる */
+  .expbar{display:flex; align-items:center; justify-content:space-between; gap:8px; max-width:300px; margin:0 auto 6px;}
+  .expcode{border:1px solid var(--line); background:var(--bg); color:var(--muted); border-radius:9px; padding:6px 10px; font-size:12px; font-family:inherit; white-space:nowrap;}
+  .expcode b{color:var(--ink);}
+  .expcode.unset{border-color:#f59e0b; color:#fbbf24;} .expcode.unset b{color:#fbbf24;}
+  .expedit{display:flex; gap:6px;}
+  .expinput{width:92px; padding:5px 8px; border-radius:9px; border:1px solid #2563eb; background:var(--bg); color:var(--ink); font-size:16px; font-family:inherit;}
+  .expok{border:none; background:#2563eb; color:#fff; border-radius:9px; padding:6px 12px; font-size:13px; font-weight:700; font-family:inherit;}
+  .posture{display:flex; flex:0 0 auto; border:1px solid var(--line); border-radius:9px; overflow:hidden;}
+  .posture.unset{border-color:#f59e0b;}
+  .pz{border:none; background:transparent; color:var(--muted); padding:6px 11px; font-size:12px; font-weight:700; font-family:inherit;}
+  .pz.on{background:#2563eb; color:#fff;}
   .card{
     border:none; border-radius:12px; color:#fff; font-family:inherit; padding:0 16px; min-height:56px;
     display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:14px;
@@ -204,6 +216,7 @@
     .stepper button{font-size:13px;}
     .count{font-size:20px;} .count.noval{font-size:18px;}
     .card{padding:0 11px; gap:9px;}
+    .expcode{padding:6px 8px;} .pz{padding:6px 8px;}
   }
 </style>
 </head>
@@ -240,7 +253,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.4";
+const APP_VERSION = "uiStudy-0.5";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -279,12 +292,54 @@ function nextVariant(){
 }
 
 let LOG = null;          // 進行中のセッション
-let pickerShownAt = 0;   // クラス選択画面が表示された時刻（熟考時間の参考値）
+let pickerShownAt = 0;
+
+// ★UI研究: 実験コード（＝同じ便に乗った人を紐づける識別子）と着席/立席。
+// 日付つきで保存し、日付が変わったら未設定に戻す（前日のコードのまま別の便と誤って紐づくのを防ぐ）
+const EXP_CODE_KEY = "uistudy_expcode_v1";
+const POSTURE_KEY  = "uistudy_posture_v1";
+let expEditing = false;
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function getDaily(k){
+  let raw=null; try{ raw=localStorage.getItem(k); }catch(e){}
+  if(!raw) return null;
+  const i=raw.lastIndexOf("|");
+  return (i>0 && raw.slice(i+1)===todayStr()) ? raw.slice(0,i) : null;
+}
+function setDaily(k,v){ try{ if(v) localStorage.setItem(k, v+"|"+todayStr()); else localStorage.removeItem(k); }catch(e){} }
+function cleanCode(v){ return (v||"").replace(/[^0-9A-Za-z-]/g,"").slice(0,8); }
+function curExpKeep(){ const i=$("expInput"); return (expEditing && i) ? cleanCode(i.value) : null; }
+function expBarInner(t, keep){
+  const code=getDaily(EXP_CODE_KEY), pos=getDaily(POSTURE_KEY);
+  const codePart = expEditing
+    ? `<span class="expedit"><input id="expInput" class="expinput" inputmode="numeric" autocomplete="off" maxlength="8" value="${keep!=null?keep:(code||"")}" placeholder="${t.exp_ph}"><button id="expOk" class="expok">${t.exp_ok}</button></span>`
+    : `<button id="expCodeBtn" class="expcode${code?"":" unset"}">${t.exp_code} <b>${code||t.exp_unset}</b></button>`;
+  return codePart +
+    `<div class="posture${pos?"":" unset"}"><button class="pz${pos==="sit"?" on":""}" data-p="sit">${t.sit}</button><button class="pz${pos==="stand"?" on":""}" data-p="stand">${t.stand}</button></div>`;
+}
+// バーだけ描き直す（renderMainを呼ぶとクラス選択画面の表示時刻 pickerShownAt がリセットされ t_class が狂うため）
+function renderExpBar(){ const el=$("expbar"); if(!el) return; el.innerHTML=expBarInner(T[lang], curExpKeep()); wireExpBar(); }
+function wireExpBar(){
+  const btn=$("expCodeBtn");
+  if(btn) btn.onclick=()=>{ expEditing=true; renderExpBar(); const i=$("expInput"); if(i) i.focus(); };
+  const ok=$("expOk"), inp=$("expInput");
+  if(ok && inp){
+    const commit=()=>{ setDaily(EXP_CODE_KEY, cleanCode(inp.value)||null); expEditing=false; renderExpBar(); };
+    ok.onclick=commit;
+    inp.onkeydown=(e)=>{ if(e.key==="Enter"){ e.preventDefault(); commit(); } };
+  }
+  document.querySelectorAll("#expbar .pz").forEach(b=>{ b.onclick=()=>{ setDaily(POSTURE_KEY, b.dataset.p); renderExpBar(); }; });
+}
+// 人数画面で最初に値を操作した時刻（＝考えていた時間の目安）
+function markFirst(){
+  if(LOG && LOG.t_first==null && LOG.count_view_at!=null) LOG.t_first=Math.round(performance.now()-LOG.count_view_at);
+}   // クラス選択画面が表示された時刻（熟考時間の参考値）
 
 function logStart(cls, variant){
   LOG = { session_id: uuid(), started_at: new Date().toISOString(), t0: performance.now(),
           variant: variant, events: [], taps: 0, taps_value: 0, corrections: 0,
-          t_class: null, t_count: null, t_stop: 0, stop_focus_at: null };
+          t_class: null, t_count: null, t_first: null, count_view_at: null, t_stop: 0, stop_focus_at: null,
+          exp_code: getDaily(EXP_CODE_KEY), posture: getDaily(POSTURE_KEY) };
   logEvent("session_start", { congestion_class: cls,
     since_picker_ms: pickerShownAt ? Math.round(performance.now() - pickerShownAt) : null });
 }
@@ -311,12 +366,16 @@ function finishSession(outcome, extra){
       dest_stop:  pending ? (pending.dest_stop  || null) : null,
       gps_points: (pending && pending.trajectory) ? pending.trajectory.length : 0,
       screen_w: window.innerWidth, screen_h: window.innerHeight,
-      lang: lang, app_version: APP_VERSION
+      lang: lang, app_version: APP_VERSION,
+      exp_code: LOG.exp_code, posture: LOG.posture,   // セッション開始時点の値
+      response_cid: pending ? pending.cid : null
     }, extra || {}),
     summary: {
       t_total: t_total,            // クラスタップ→確定までの所要時間(ms)
       t_class: LOG.t_class,        // クラス選択画面表示→クラスタップ(参考・待機時間を含みうる)
       t_stop:  LOG.t_stop,         // バス停欄に費やした時間(ms)
+      t_count: (LOG.count_view_at!=null) ? Math.round(performance.now()-LOG.count_view_at) : null,  // 人数画面表示→確定
+      t_first: LOG.t_first,        // 人数画面表示→最初の値入力操作（思考時間の目安）
       taps_total: LOG.taps, taps_value: LOG.taps_value, corrections: LOG.corrections
     },
     events: LOG.events
@@ -424,6 +483,7 @@ const T = {
     saved:"保存しました", queued:"端末に保存（後で自動送信）", finishing:"軌跡を記録中",
     saveNow:"今すぐ保存", recording:"記録中", pendingN:(n)=>`未送信 ${n}件`,
     st_ok:"送信済", st_pend:"未送信", st_rec:"記録中", log_head:"送信状況",
+    exp_code:"実験コード", exp_unset:"未設定", exp_ph:"例 0312", exp_ok:"設定", sit:"着席", stand:"立席",
     gpsOn:"位置情報 取得中…", gpsOk:"位置情報 OK", gpsNo:"位置情報が取得できません（許可が必要）",
     gpsSlow:"位置情報を取得中…（少し時間がかかっています）",
     who:(h)=>`調査員 <b>${h}</b>`, langLabel:"EN",
@@ -471,6 +531,7 @@ const T = {
     saved:"Saved", queued:"Saved on your device (will send later)", finishing:"Recording your path",
     saveNow:"Save now", recording:"Recording", pendingN:(n)=>`${n} unsent`,
     st_ok:"Sent", st_pend:"Not sent", st_rec:"Recording", log_head:"Status",
+    exp_code:"Trial code", exp_unset:"not set", exp_ph:"e.g. 0312", exp_ok:"Set", sit:"Seated", stand:"Standing",
     gpsOn:"Getting location…", gpsOk:"Location OK", gpsNo:"Location unavailable (permission required)",
     gpsSlow:"Getting location… (taking a little while)",
     who:(h)=>`Surveyor <b>${h}</b>`, langLabel:"日本語",
@@ -587,6 +648,7 @@ function pickClass(cls){
   pending = { cid: uuid(), congestion_class:cls, exact_count:null,
               answered_at:new Date().toISOString(), variant: variant,
               firstTs: seed.length ? (now-PRE_MS) : now, trajectory: seed };
+  pending.session_id = LOG.session_id;   // ★UI研究: 操作ログとGPS軌跡を突合するためのキー
   startSampling();
   grabOneShot();     // #5(A): 即しまわれても代表点が1つ残るよう、その場で一発測位
   renderCount();
@@ -744,6 +806,7 @@ function renderCount(){
   show();                         // 初期は「—」＝未入力
   logEvent("screen_view", { screen:"count", input:inputMode, count_init:initMode,
                             lo:lo, hi:hi, cmin:COUNT_MIN, cmax:COUNT_MAX });
+  if(LOG) LOG.count_view_at = performance.now();
 
   if(inputMode === "numpad"){
     // プリセット値が入ったままの状態。最初の数字キーで置き換え、以降は追記
@@ -758,14 +821,14 @@ function renderCount(){
         if(cur.length >= 2){                       // 2桁上限。無反応だと不安なので枠を光らせる
           cval.classList.add("full");
           setTimeout(()=>cval.classList.remove("full"), 200);
-          if(LOG) LOG.taps_value++;
+          if(LOG){ LOG.taps_value++; markFirst(); }
           logTap("key_"+k); logEvent("numkey", { key:k, value:n, ignored:true });
           return;
         }
         n = Math.min(COUNT_MAX, parseInt(cur + k, 10));
       }
       show();
-      if(LOG) LOG.taps_value++;
+      if(LOG){ LOG.taps_value++; markFirst(); }
       logTap("key_"+k); logEvent("numkey", { key:k, value:n });
     }; });
   } else {
@@ -774,7 +837,7 @@ function renderCount(){
       // 初回タップはクラスの目安下限(lo)から開始（タップ数削減）。値はクラスに縛らず 0〜99 で自由。
       n=Math.max(COUNT_MIN,Math.min(COUNT_MAX,(n===null?lo:n)+d));
       show();
-      if(LOG) LOG.taps_value++;
+      if(LOG){ LOG.taps_value++; markFirst(); }
       logTap("step_"+(d>0?"+":"")+d); logEvent("stepper", { delta:d, value:n });
     }; });
   }
@@ -809,7 +872,8 @@ function buildRec(p){
            exact_count:p.exact_count, trajectory:p.trajectory,
            board_stop:p.board_stop||null, dest_stop:p.dest_stop||null,
            lat:rp.lat, lng:rp.lng, gps_accuracy:rp.acc, gps_fixed_at:rp.at,   // 代表位置(独立カラム)
-           lang:lang, app_version:APP_VERSION };
+           lang:lang, app_version:APP_VERSION,
+           session_id:p.session_id||null, client_id:p.cid };   // ★UI研究: ui_sessions と結合
 }
 function syncPendingToOutbox(ready){
   if(!pending) return;
@@ -901,11 +965,12 @@ function renderMain(){
     });
   }
   main.innerHTML = `
-    <div class="picker"><p class="ptitle">${t.pick}</p><div class="grid">${cards}</div></div>
+    <div class="picker"><div class="expbar" id="expbar">${expBarInner(t, curExpKeep())}</div><p class="ptitle">${t.pick}</p><div class="grid">${cards}</div></div>
     <div class="log">
       <div class="lhead"><span>${t.records} ${logEntries.length}</span><span>${t.log_head}</span></div>
       ${rows}
     </div>`;
+  wireExpBar();
   setStatus();
   pickerShownAt = performance.now();   // ★UI研究: クラス選択画面が出た時刻
   startSampling();   // 一覧表示中は測位を回してpreBufferを温める（前倒し）

@@ -20,6 +20,8 @@ create table if not exists public.ui_responses (
   gps_accuracy     real,                                       -- 代表位置の精度(m)
   gps_fixed_at     timestamptz,                                -- 代表位置の測位時刻
   client_submitted_at timestamptz,                             -- 実際に送信した端末時刻(時計ズレ検出用)
+  session_id       text,                                       -- ★UI研究: ui_sessions.session_id と結合するキー
+  client_id        text,                                       -- 端末側の回答ID(cid)
   lang             text,
   app_version      text,
   constraint congestion_class_range check (congestion_class between 1 and 6),
@@ -34,6 +36,9 @@ alter table public.ui_responses add column if not exists lng double precision;
 alter table public.ui_responses add column if not exists gps_accuracy real;
 alter table public.ui_responses add column if not exists gps_fixed_at timestamptz;
 alter table public.ui_responses add column if not exists client_submitted_at timestamptz;
+alter table public.ui_responses add column if not exists session_id text;
+alter table public.ui_responses add column if not exists client_id  text;
+create index if not exists ui_responses_session_idx on public.ui_responses (session_id);
 
 create index if not exists responses_created_at_idx on public.ui_responses (created_at desc);
 create index if not exists responses_surveyor_idx   on public.ui_responses (surveyor_id);

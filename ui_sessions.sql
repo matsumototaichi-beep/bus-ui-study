@@ -12,9 +12,9 @@ create table if not exists public.ui_sessions (
   started_at          timestamptz,                           -- セッション開始(端末時刻)
   client_submitted_at timestamptz,                           -- 実送信時の端末時刻
   outcome             text,                                  -- submit | skip | abandon
-  variant             jsonb,                                 -- 割り当てたUI条件 {count_init, seq}
-  context             jsonb,                                 -- 回答内容・画面サイズ等
-  summary             jsonb,                                 -- t_total/t_class/t_stop/taps/corrections
+  variant             jsonb,                                 -- 割り当てたUI条件 {input, count_init, seq, offset}
+  context             jsonb,                                 -- 回答内容・画面サイズ・exp_code・posture・response_cid 等
+  summary             jsonb,                                 -- t_total/t_class/t_count/t_first/t_stop/taps/corrections
   events              jsonb                                  -- 操作イベント列 [{dt,type,...}]
 );
 
