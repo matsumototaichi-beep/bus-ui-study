@@ -32,6 +32,12 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 - `ui_responses.sql` / `ui_report_feed.sql` … Supabaseスキーマ（テーブル名を分離済み）
 - `viewer.html` … 軌跡ビューア（元アプリから流用）
 - `UI_STUDY_SPEC.md` … **研究計画・計測仕様（RQ／実験デザイン／ログスキーマ）**
+- `EXPERIMENT_PLAN.md` … **実施計画の大枠**（奈良交通前提：人数・日数・時間帯・費用・基準値の作り方・想定問答）
+- `QUESTIONNAIRE.md` … 事後アンケート
+- `DESIGN_PHILOSOPHY.md` … UIの設計思想・改善シーケンス・変更台帳
+- `LITERATURE.md` … 文献メモ（**本文をどこまで読んだか**を記録）
+- `WORKFLOW.md` … 教授との共有・文献調査のルール
+- `docs/log/` … 打ち合わせ・作業ごとの要点ログ
 
 ## これからやること（順序）
 1. **Supabaseにテーブル作成**：`ui_responses` ＋ 操作ログ用 `ui_sessions` / `ui_events`
