@@ -160,8 +160,10 @@ UI_CONDS = [ stepper/none, numpad/median, stepper/median, numpad/none ]
 | 時間帯・曜日 | ✅ |
 | 実験コード（＝便の識別） | ✅ `exp_code` |
 | 端末サイズ | ✅ |
-| 何回目のセッションか（学習効果） | ✅ `variant.seq` |
+| 何回目のセッションか（学習効果） | ✅ `variant.seq`（参加者番号を変えると 0 に戻る） |
 | 条件の開始位置 | ✅ `variant.offset` |
+| **参加者番号**（＝開始位置の根拠。同じ便で条件をずらす） | ✅ `variant.participant` / `context.participant` |
+| 開始位置の決まり方（ラテン方格が効いていたか） | ✅ `variant.offset_src`（`participant` or `random`） |
 
 凡例：✅実装済み ／ 🔧既存ログから計算可能 ／ ➕要実装
 
@@ -176,12 +178,13 @@ UI_CONDS = [ stepper/none, numpad/median, stepper/median, numpad/none ]
   "session_id": "uuid",
   "started_at": "2026-09-10T10:12:33.120Z",
   "outcome": "submit | skip | abandon",
-  "variant": { "input": "numpad", "count_init": "median", "seq": 7, "offset": 2 },
+  "variant": { "input": "numpad", "count_init": "median", "seq": 7,
+               "offset": 2, "offset_src": "participant", "participant": 3 },
   "context": {
     "congestion_class": 4, "exact_count": 31, "count_touched": true,
     "board_stop": "...", "dest_stop": "...", "gps_points": 12,
-    "screen_w": 375, "screen_h": 667, "lang": "ja", "app_version": "uiStudy-0.5",
-    "exp_code": "0312", "posture": "stand", "response_cid": "uuid"
+    "screen_w": 375, "screen_h": 667, "lang": "ja", "app_version": "uiStudy-0.6",
+    "exp_code": "0312", "posture": "stand", "participant": 3, "response_cid": "uuid"
   },
   "summary": { "t_total": 18420, "t_class": 3110, "t_count": 15300, "t_first": 2100, "t_stop": 5200,
                "taps_total": 9, "taps_value": 5, "corrections": 1 },

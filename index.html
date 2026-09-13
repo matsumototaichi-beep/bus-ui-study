@@ -54,7 +54,7 @@
   .ptitle{font-size:12px; color:var(--muted); margin:0 2px 6px;}
   .grid{display:grid; grid-template-columns:1fr; gap:7px; max-width:300px; margin:0 auto;}
   /* 実験バー：実験コード（同じ便に乗った人の紐づけ）と着席/立席。未設定は橙で目立たせる */
-  .expbar{display:flex; align-items:center; justify-content:space-between; gap:8px; max-width:300px; margin:0 auto 6px;}
+  .expbar{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; max-width:300px; margin:0 auto 6px;}
   .expcode{border:1px solid var(--line); background:var(--bg); color:var(--muted); border-radius:9px; padding:6px 10px; font-size:12px; font-family:inherit; white-space:nowrap;}
   .expcode b{color:var(--ink);}
   .expcode.unset{border-color:#f59e0b; color:#fbbf24;} .expcode.unset b{color:#fbbf24;}
@@ -253,7 +253,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.5";
+const APP_VERSION = "uiStudy-0.6";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -272,7 +272,8 @@ const UISTUDY_KEY = "uistudy_sessions_v1";         // 未送信セッション�
 const UISTUDY_SEQ = "uistudy_seq_v1";              // 条件割当の通し番号
 const UISTUDY_OFF = "uistudy_offset_v1";           // 被験者ごとの開始位置（順序効果の相殺）
 
-// 端末（＝被験者）ごとに違う位置から回し始める。全員が同じ順なら順序効果と条件が区別できないため
+// 端末ごとに違う位置から回し始める。全員が同じ順なら順序効果と条件が区別できないため。
+// ※参加者番号が未設定のときのフォールバック（下見・パイロット・単独テスト用）
 function condOffset(){
   let o = null;
   try{ o = localStorage.getItem(UISTUDY_OFF); }catch(e){}
@@ -282,13 +283,24 @@ function condOffset(){
   }
   return parseInt(o, 10) || 0;
 }
+// 条件の開始位置を決める。実験者が参加者番号(1,2,3…)を入れていれば
+// 開始位置 =(番号-1) mod 4 となり、同じ便に乗った参加者が同じ瞬間に別々の条件になる
+// （＝EXPERIMENT_PLAN.md §3.1 のラテン方格）。未設定なら端末ごとのランダムに落ちる。
+// ※PID_KEY は下の「実験バー」ブロックで定義（呼び出しは回答時なので初期化済み）
+function assignOffset(){
+  const p = parseInt(getDaily(PID_KEY) || "", 10);
+  if(p >= 1) return { off: (p - 1) % UI_CONDS.length, src: "participant", pid: p };
+  return { off: condOffset(), src: "random", pid: null };
+}
 function nextVariant(){
   let n = 0;
   try{ n = parseInt(localStorage.getItem(UISTUDY_SEQ) || "0", 10) || 0; }catch(e){}
   try{ localStorage.setItem(UISTUDY_SEQ, String(n + 1)); }catch(e){}
-  const off = condOffset();
-  const c = UI_CONDS[(n + off) % UI_CONDS.length];
-  return { input: c.input, count_init: c.count_init, seq: n, offset: off };
+  const a = assignOffset();
+  const c = UI_CONDS[(n + a.off) % UI_CONDS.length];
+  // offset_src は解析時に「ラテン方格が実際に効いていたか」を判別するために必ず残す
+  return { input: c.input, count_init: c.count_init, seq: n,
+           offset: a.off, offset_src: a.src, participant: a.pid };
 }
 
 let LOG = null;          // 進行中のセッション
@@ -298,7 +310,10 @@ let pickerShownAt = 0;
 // 日付つきで保存し、日付が変わったら未設定に戻す（前日のコードのまま別の便と誤って紐づくのを防ぐ）
 const EXP_CODE_KEY = "uistudy_expcode_v1";
 const POSTURE_KEY  = "uistudy_posture_v1";
-let expEditing = false;
+// ★UI研究: 参加者番号。実験者が参加者ごとに 1,2,3… を入れる＝条件の開始位置になる（assignOffset）。
+// 実験コードと同じく日付で失効させる（前日の番号が残ったまま別人に使われるのを防ぐ）
+const PID_KEY      = "uistudy_pid_v1";
+let expEditing = null;   // null | "code" | "pid"（同時に1つだけ編集）
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
 function getDaily(k){
   let raw=null; try{ raw=localStorage.getItem(k); }catch(e){}
@@ -308,23 +323,43 @@ function getDaily(k){
 }
 function setDaily(k,v){ try{ if(v) localStorage.setItem(k, v+"|"+todayStr()); else localStorage.removeItem(k); }catch(e){} }
 function cleanCode(v){ return (v||"").replace(/[^0-9A-Za-z-]/g,"").slice(0,8); }
-function curExpKeep(){ const i=$("expInput"); return (expEditing && i) ? cleanCode(i.value) : null; }
+function cleanPid(v){ return (v||"").replace(/[^0-9]/g,"").slice(0,2).replace(/^0+/,""); }
+function curExpKeep(){
+  const i=$("expInput"); if(!expEditing || !i) return null;
+  return (expEditing==="pid") ? cleanPid(i.value) : cleanCode(i.value);
+}
 function expBarInner(t, keep){
-  const code=getDaily(EXP_CODE_KEY), pos=getDaily(POSTURE_KEY);
-  const codePart = expEditing
+  const code=getDaily(EXP_CODE_KEY), pos=getDaily(POSTURE_KEY), pid=getDaily(PID_KEY);
+  const codePart = (expEditing==="code")
     ? `<span class="expedit"><input id="expInput" class="expinput" inputmode="numeric" autocomplete="off" maxlength="8" value="${keep!=null?keep:(code||"")}" placeholder="${t.exp_ph}"><button id="expOk" class="expok">${t.exp_ok}</button></span>`
     : `<button id="expCodeBtn" class="expcode${code?"":" unset"}">${t.exp_code} <b>${code||t.exp_unset}</b></button>`;
-  return codePart +
+  const pidPart = (expEditing==="pid")
+    ? `<span class="expedit"><input id="expInput" class="expinput" inputmode="numeric" autocomplete="off" maxlength="2" value="${keep!=null?keep:(pid||"")}" placeholder="${t.pid_ph}"><button id="expOk" class="expok">${t.exp_ok}</button></span>`
+    : `<button id="pidBtn" class="expcode${pid?"":" unset"}">${t.pid} <b>${pid||t.exp_unset}</b></button>`;
+  return codePart + pidPart +
     `<div class="posture${pos?"":" unset"}"><button class="pz${pos==="sit"?" on":""}" data-p="sit">${t.sit}</button><button class="pz${pos==="stand"?" on":""}" data-p="stand">${t.stand}</button></div>`;
 }
 // バーだけ描き直す（renderMainを呼ぶとクラス選択画面の表示時刻 pickerShownAt がリセットされ t_class が狂うため）
 function renderExpBar(){ const el=$("expbar"); if(!el) return; el.innerHTML=expBarInner(T[lang], curExpKeep()); wireExpBar(); }
 function wireExpBar(){
   const btn=$("expCodeBtn");
-  if(btn) btn.onclick=()=>{ expEditing=true; renderExpBar(); const i=$("expInput"); if(i) i.focus(); };
+  if(btn) btn.onclick=()=>{ expEditing="code"; renderExpBar(); const i=$("expInput"); if(i) i.focus(); };
+  const pbtn=$("pidBtn");
+  if(pbtn) pbtn.onclick=()=>{ expEditing="pid"; renderExpBar(); const i=$("expInput"); if(i) i.focus(); };
   const ok=$("expOk"), inp=$("expInput");
   if(ok && inp){
-    const commit=()=>{ setDaily(EXP_CODE_KEY, cleanCode(inp.value)||null); expEditing=false; renderExpBar(); };
+    const commit=()=>{
+      if(expEditing==="pid"){
+        const v=cleanPid(inp.value)||null, prev=getDaily(PID_KEY);
+        setDaily(PID_KEY, v);
+        // 参加者が変わったら試行カウンタを0に戻す。
+        // これを残すと「何回目の回答か」（計画書§3.2-3の統制変数）に前の参加者の回数が混ざる
+        if(v !== prev){ try{ localStorage.setItem(UISTUDY_SEQ, "0"); }catch(e){} }
+      }else{
+        setDaily(EXP_CODE_KEY, cleanCode(inp.value)||null);
+      }
+      expEditing=null; renderExpBar();
+    };
     ok.onclick=commit;
     inp.onkeydown=(e)=>{ if(e.key==="Enter"){ e.preventDefault(); commit(); } };
   }
@@ -339,7 +374,8 @@ function logStart(cls, variant){
   LOG = { session_id: uuid(), started_at: new Date().toISOString(), t0: performance.now(),
           variant: variant, events: [], taps: 0, taps_value: 0, corrections: 0,
           t_class: null, t_count: null, t_first: null, count_view_at: null, t_stop: 0, stop_focus_at: null,
-          exp_code: getDaily(EXP_CODE_KEY), posture: getDaily(POSTURE_KEY) };
+          exp_code: getDaily(EXP_CODE_KEY), posture: getDaily(POSTURE_KEY),
+          participant: variant.participant };   // 数値で統一（variant側と型を揃える）
   logEvent("session_start", { congestion_class: cls,
     since_picker_ms: pickerShownAt ? Math.round(performance.now() - pickerShownAt) : null });
 }
@@ -368,6 +404,7 @@ function finishSession(outcome, extra){
       screen_w: window.innerWidth, screen_h: window.innerHeight,
       lang: lang, app_version: APP_VERSION,
       exp_code: LOG.exp_code, posture: LOG.posture,   // セッション開始時点の値
+      participant: LOG.participant,                   // 参加者番号（＝条件の開始位置の根拠）
       response_cid: pending ? pending.cid : null
     }, extra || {}),
     summary: {
@@ -484,6 +521,7 @@ const T = {
     saveNow:"今すぐ保存", recording:"記録中", pendingN:(n)=>`未送信 ${n}件`,
     st_ok:"送信済", st_pend:"未送信", st_rec:"記録中", log_head:"送信状況",
     exp_code:"実験コード", exp_unset:"未設定", exp_ph:"例 0312", exp_ok:"設定", sit:"着席", stand:"立席",
+    pid:"参加者", pid_ph:"例 3",
     gpsOn:"位置情報 取得中…", gpsOk:"位置情報 OK", gpsNo:"位置情報が取得できません（許可が必要）",
     gpsSlow:"位置情報を取得中…（少し時間がかかっています）",
     who:(h)=>`調査員 <b>${h}</b>`, langLabel:"EN",
@@ -532,6 +570,7 @@ const T = {
     saveNow:"Save now", recording:"Recording", pendingN:(n)=>`${n} unsent`,
     st_ok:"Sent", st_pend:"Not sent", st_rec:"Recording", log_head:"Status",
     exp_code:"Trial code", exp_unset:"not set", exp_ph:"e.g. 0312", exp_ok:"Set", sit:"Seated", stand:"Standing",
+    pid:"P no.", pid_ph:"e.g. 3",
     gpsOn:"Getting location…", gpsOk:"Location OK", gpsNo:"Location unavailable (permission required)",
     gpsSlow:"Getting location… (taking a little while)",
     who:(h)=>`Surveyor <b>${h}</b>`, langLabel:"日本語",
