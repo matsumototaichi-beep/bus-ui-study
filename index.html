@@ -65,6 +65,12 @@
   .posture.unset{border-color:#f59e0b;}
   .pz{border:none; background:transparent; color:var(--muted); padding:6px 11px; font-size:12px; font-weight:700; font-family:inherit;}
   .pz.on{background:#2563eb; color:#fff;}
+  /* 練習モード：切り忘れが最悪なので、オンの間は必ず目に入る色にする */
+  .prac{border:1px solid var(--line); background:var(--bg); color:var(--muted); border-radius:9px; padding:6px 10px; font-size:12px; font-family:inherit; white-space:nowrap;}
+  .prac.on{background:#f59e0b; border-color:#f59e0b; color:#1f2937; font-weight:800;}
+  .pbanner{display:block; width:100%; max-width:300px; margin:0 auto 6px; border:none; border-radius:10px;
+           background:#f59e0b; color:#1f2937; padding:8px 10px; font-size:12.5px; font-weight:800;
+           line-height:1.35; text-align:center; font-family:inherit;}
   .card{
     border:none; border-radius:12px; color:#fff; font-family:inherit; padding:0 16px; min-height:56px;
     display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:14px;
@@ -253,7 +259,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.6";
+const APP_VERSION = "uiStudy-0.7";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -268,9 +274,10 @@ const UI_CONDS = [
   { input:"stepper", count_init:"median" },
   { input:"numpad",  count_init:"none"   },
 ];
-const UISTUDY_KEY = "uistudy_sessions_v1";         // 未送信セッションの退避
-const UISTUDY_SEQ = "uistudy_seq_v1";              // 条件割当の通し番号
-const UISTUDY_OFF = "uistudy_offset_v1";           // 被験者ごとの開始位置（順序効果の相殺）
+const UISTUDY_KEY  = "uistudy_sessions_v1";        // 未送信セッションの退避
+const UISTUDY_SEQ  = "uistudy_seq_v1";             // 条件割当の通し番号（本番）
+const UISTUDY_PSEQ = "uistudy_pseq_v1";            // 同（練習用）。本番の順番を練習で進めないため
+const UISTUDY_OFF  = "uistudy_offset_v1";          // 被験者ごとの開始位置（順序効果の相殺）
 
 // 端末ごとに違う位置から回し始める。全員が同じ順なら順序効果と条件が区別できないため。
 // ※参加者番号が未設定のときのフォールバック（下見・パイロット・単独テスト用）
@@ -293,14 +300,18 @@ function assignOffset(){
   return { off: condOffset(), src: "random", pid: null };
 }
 function nextVariant(){
+  // 練習は専用カウンタを使う。本番のカウンタを進めてしまうと、練習回数が人によって違うぶん
+  // 本番データの開始条件がずれ、せっかくのラテン方格が崩れる
+  const prac = isPractice();
+  const key  = prac ? UISTUDY_PSEQ : UISTUDY_SEQ;
   let n = 0;
-  try{ n = parseInt(localStorage.getItem(UISTUDY_SEQ) || "0", 10) || 0; }catch(e){}
-  try{ localStorage.setItem(UISTUDY_SEQ, String(n + 1)); }catch(e){}
+  try{ n = parseInt(localStorage.getItem(key) || "0", 10) || 0; }catch(e){}
+  try{ localStorage.setItem(key, String(n + 1)); }catch(e){}
   const a = assignOffset();
   const c = UI_CONDS[(n + a.off) % UI_CONDS.length];
   // offset_src は解析時に「ラテン方格が実際に効いていたか」を判別するために必ず残す
   return { input: c.input, count_init: c.count_init, seq: n,
-           offset: a.off, offset_src: a.src, participant: a.pid };
+           offset: a.off, offset_src: a.src, participant: a.pid, practice: prac };
 }
 
 let LOG = null;          // 進行中のセッション
@@ -313,7 +324,11 @@ const POSTURE_KEY  = "uistudy_posture_v1";
 // ★UI研究: 参加者番号。実験者が参加者ごとに 1,2,3… を入れる＝条件の開始位置になる（assignOffset）。
 // 実験コードと同じく日付で失効させる（前日の番号が残ったまま別人に使われるのを防ぐ）
 const PID_KEY      = "uistudy_pid_v1";
+// ★UI研究: 練習モード。オンの間の回答は practice:true で記録し、分析から外す。
+// 日付で失効させるのは他と同じ（前日オンのまま本番が始まるのを防ぐ）
+const PRACTICE_KEY = "uistudy_practice_v1";
 let expEditing = null;   // null | "code" | "pid"（同時に1つだけ編集）
+function isPractice(){ return getDaily(PRACTICE_KEY) === "1"; }
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
 function getDaily(k){
   let raw=null; try{ raw=localStorage.getItem(k); }catch(e){}
@@ -336,11 +351,27 @@ function expBarInner(t, keep){
   const pidPart = (expEditing==="pid")
     ? `<span class="expedit"><input id="expInput" class="expinput" inputmode="numeric" autocomplete="off" maxlength="2" value="${keep!=null?keep:(pid||"")}" placeholder="${t.pid_ph}"><button id="expOk" class="expok">${t.exp_ok}</button></span>`
     : `<button id="pidBtn" class="expcode${pid?"":" unset"}">${t.pid} <b>${pid||t.exp_unset}</b></button>`;
+  const pracOn = isPractice();
   return codePart + pidPart +
-    `<div class="posture${pos?"":" unset"}"><button class="pz${pos==="sit"?" on":""}" data-p="sit">${t.sit}</button><button class="pz${pos==="stand"?" on":""}" data-p="stand">${t.stand}</button></div>`;
+    `<div class="posture${pos?"":" unset"}"><button class="pz${pos==="sit"?" on":""}" data-p="sit">${t.sit}</button><button class="pz${pos==="stand"?" on":""}" data-p="stand">${t.stand}</button></div>` +
+    `<button id="pracBtn" class="prac${pracOn?" on":""}">${t.prac}</button>`;
+}
+// 練習中は画面の先頭に大きく出す（実験バーの小さなボタンだけだと切り忘れる）
+function pracBanner(t){
+  return isPractice() ? `<button id="pracBanner" class="pbanner">${t.prac_banner}</button>` : "";
 }
 // バーだけ描き直す（renderMainを呼ぶとクラス選択画面の表示時刻 pickerShownAt がリセットされ t_class が狂うため）
-function renderExpBar(){ const el=$("expbar"); if(!el) return; el.innerHTML=expBarInner(T[lang], curExpKeep()); wireExpBar(); }
+function renderExpBar(){
+  const el=$("expbar"); if(!el) return;
+  el.innerHTML=expBarInner(T[lang], curExpKeep()); wireExpBar(); renderPracBanner();
+}
+// バナーは #expbar の外にあるので別に描き直す（renderMain を呼ぶと t_class が狂う）
+function renderPracBanner(){
+  const el=$("pracwrap"); if(!el) return;
+  el.innerHTML = pracBanner(T[lang]);
+  const b=$("pracBanner");
+  if(b) b.onclick=()=>{ setDaily(PRACTICE_KEY, null); renderExpBar(); };
+}
 function wireExpBar(){
   const btn=$("expCodeBtn");
   if(btn) btn.onclick=()=>{ expEditing="code"; renderExpBar(); const i=$("expInput"); if(i) i.focus(); };
@@ -352,9 +383,9 @@ function wireExpBar(){
       if(expEditing==="pid"){
         const v=cleanPid(inp.value)||null, prev=getDaily(PID_KEY);
         setDaily(PID_KEY, v);
-        // 参加者が変わったら試行カウンタを0に戻す。
+        // 参加者が変わったら試行カウンタを0に戻す（練習用も同時に）。
         // これを残すと「何回目の回答か」（計画書§3.2-3の統制変数）に前の参加者の回数が混ざる
-        if(v !== prev){ try{ localStorage.setItem(UISTUDY_SEQ, "0"); }catch(e){} }
+        if(v !== prev){ try{ localStorage.setItem(UISTUDY_SEQ, "0"); localStorage.setItem(UISTUDY_PSEQ, "0"); }catch(e){} }
       }else{
         setDaily(EXP_CODE_KEY, cleanCode(inp.value)||null);
       }
@@ -364,6 +395,8 @@ function wireExpBar(){
     inp.onkeydown=(e)=>{ if(e.key==="Enter"){ e.preventDefault(); commit(); } };
   }
   document.querySelectorAll("#expbar .pz").forEach(b=>{ b.onclick=()=>{ setDaily(POSTURE_KEY, b.dataset.p); renderExpBar(); }; });
+  const pr=$("pracBtn");
+  if(pr) pr.onclick=()=>{ setDaily(PRACTICE_KEY, isPractice()?null:"1"); renderExpBar(); };
 }
 // 人数画面で最初に値を操作した時刻（＝考えていた時間の目安）
 function markFirst(){
@@ -375,7 +408,8 @@ function logStart(cls, variant){
           variant: variant, events: [], taps: 0, taps_value: 0, corrections: 0,
           t_class: null, t_count: null, t_first: null, count_view_at: null, t_stop: 0, stop_focus_at: null,
           exp_code: getDaily(EXP_CODE_KEY), posture: getDaily(POSTURE_KEY),
-          participant: variant.participant };   // 数値で統一（variant側と型を揃える）
+          participant: variant.participant,   // 数値で統一（variant側と型を揃える）
+          practice: variant.practice };
   logEvent("session_start", { congestion_class: cls,
     since_picker_ms: pickerShownAt ? Math.round(performance.now() - pickerShownAt) : null });
 }
@@ -405,6 +439,7 @@ function finishSession(outcome, extra){
       lang: lang, app_version: APP_VERSION,
       exp_code: LOG.exp_code, posture: LOG.posture,   // セッション開始時点の値
       participant: LOG.participant,                   // 参加者番号（＝条件の開始位置の根拠）
+      practice: LOG.practice,                         // true なら練習＝分析から外す
       response_cid: pending ? pending.cid : null
     }, extra || {}),
     summary: {
@@ -522,6 +557,7 @@ const T = {
     st_ok:"送信済", st_pend:"未送信", st_rec:"記録中", log_head:"送信状況",
     exp_code:"実験コード", exp_unset:"未設定", exp_ph:"例 0312", exp_ok:"設定", sit:"着席", stand:"立席",
     pid:"参加者", pid_ph:"例 3",
+    prac:"練習", prac_banner:"練習モード｜この回答は分析に使いません（タップで終了）",
     gpsOn:"位置情報 取得中…", gpsOk:"位置情報 OK", gpsNo:"位置情報が取得できません（許可が必要）",
     gpsSlow:"位置情報を取得中…（少し時間がかかっています）",
     who:(h)=>`調査員 <b>${h}</b>`, langLabel:"EN",
@@ -571,6 +607,7 @@ const T = {
     st_ok:"Sent", st_pend:"Not sent", st_rec:"Recording", log_head:"Status",
     exp_code:"Trial code", exp_unset:"not set", exp_ph:"e.g. 0312", exp_ok:"Set", sit:"Seated", stand:"Standing",
     pid:"P no.", pid_ph:"e.g. 3",
+    prac:"Practice", prac_banner:"PRACTICE MODE — not used in analysis (tap to end)",
     gpsOn:"Getting location…", gpsOk:"Location OK", gpsNo:"Location unavailable (permission required)",
     gpsSlow:"Getting location… (taking a little while)",
     who:(h)=>`Surveyor <b>${h}</b>`, langLabel:"日本語",
@@ -912,7 +949,8 @@ function buildRec(p){
            board_stop:p.board_stop||null, dest_stop:p.dest_stop||null,
            lat:rp.lat, lng:rp.lng, gps_accuracy:rp.acc, gps_fixed_at:rp.at,   // 代表位置(独立カラム)
            lang:lang, app_version:APP_VERSION,
-           session_id:p.session_id||null, client_id:p.cid };   // ★UI研究: ui_sessions と結合
+           session_id:p.session_id||null, client_id:p.cid,     // ★UI研究: ui_sessions と結合
+           practice:!!(p.variant && p.variant.practice) };     // 回答側にも持たせる（結合せず除外できるように）
 }
 function syncPendingToOutbox(ready){
   if(!pending) return;
@@ -1004,12 +1042,13 @@ function renderMain(){
     });
   }
   main.innerHTML = `
-    <div class="picker"><div class="expbar" id="expbar">${expBarInner(t, curExpKeep())}</div><p class="ptitle">${t.pick}</p><div class="grid">${cards}</div></div>
+    <div class="picker"><div id="pracwrap">${pracBanner(t)}</div><div class="expbar" id="expbar">${expBarInner(t, curExpKeep())}</div><p class="ptitle">${t.pick}</p><div class="grid">${cards}</div></div>
     <div class="log">
       <div class="lhead"><span>${t.records} ${logEntries.length}</span><span>${t.log_head}</span></div>
       ${rows}
     </div>`;
   wireExpBar();
+  renderPracBanner();   // バナーのタップ（＝練習終了）を有効にする
   setStatus();
   pickerShownAt = performance.now();   // ★UI研究: クラス選択画面が出た時刻
   startSampling();   // 一覧表示中は測位を回してpreBufferを温める（前倒し）
