@@ -21,10 +21,10 @@
   header{flex:0 0 auto; padding:7px 12px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--line); background:var(--panel);}
   .brand{flex:0 0 auto; font-size:14px; font-weight:800; display:flex; flex-direction:column; line-height:1.15;}
   .brand .staff{font-size:10px; font-weight:600; color:var(--muted);}
-  .nav{flex:1; display:flex; gap:4px; justify-content:center;}
-  .navb{border:none; background:transparent; color:var(--muted); font-family:inherit; font-size:13px; font-weight:700; padding:7px 12px; border-radius:9px;}
+  .nav{flex:1 1 auto; min-width:0; display:flex; gap:4px; justify-content:center;}
+  .navb{flex:0 0 auto; white-space:nowrap; border:none; background:transparent; color:var(--muted); font-family:inherit; font-size:13px; font-weight:700; padding:7px 12px; border-radius:9px;}
   .navb.on{background:var(--bg); color:var(--ink);}
-  .hactions{flex:0 0 auto; display:flex; align-items:center; gap:7px;}
+  .hactions{flex:0 1 auto; min-width:0; display:flex; align-items:center; gap:7px;}
   .sess{min-width:0; font-size:11px; color:var(--muted); line-height:1.2; max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .sess b{color:var(--ink); font-weight:600;}
   .iconbtn{flex:0 0 auto; border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:10px; padding:7px 10px; font-size:13px; font-weight:600;}
@@ -213,6 +213,15 @@
     .row.actions{flex-direction:row;}
     #sendBtn{flex:2;} #skipBtn{flex:1;}
   }
+  /* 320px級ではナビ「データ一覧」が切れるので、優先度の低いログイン名を落として幅を譲る */
+  @media (max-width:360px){ .sess{display:none;} }
+  @media (max-width:400px){
+    header{gap:7px; padding:7px 9px;}
+    .brand{font-size:13px;}
+    .navb{font-size:12px; padding:6px 9px;}
+    .sess{max-width:70px; font-size:10px;}
+    .iconbtn{padding:6px 8px; font-size:12px;}
+  }
   @media (max-width:360px){
     .brand{font-size:13px;}
     .navb{font-size:12px; padding:6px 9px;}
@@ -259,7 +268,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.7";
+const APP_VERSION = "uiStudy-0.7.1";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -647,6 +656,8 @@ function setStatus(msg,warn){
   const s=$("status"); const n=outbox().length;
   let base = msg||"";
   if(n>0) base = (base?base+" · ":"") + T[lang].pendingN(n);
+  // 版番号を常に表示する。実験中にどの版を使っていたかを端末側でも確認できるように
+  base = (base?base+" · ":"") + APP_VERSION;
   s.textContent = base;
   s.className = "statusbar" + (warn?" warn":"");
 }
@@ -825,8 +836,13 @@ function renderCount(){
   // ★UI研究: 人数入力の初期値を条件で切替（none=未入力 / min=下限 / median=中央値）
   const initMode  = (pending.variant && pending.variant.count_init) || "none";
   const inputMode = (pending.variant && pending.variant.input) || "stepper";
-  let n = (initMode==="min") ? lo : (initMode==="median") ? Math.round((lo+hi)/2) : null;
-  const nInit = n;                // 初期値（触ったかの判定に使う）
+  const nInit = (initMode==="min") ? lo : (initMode==="median") ? Math.round((lo+hi)/2) : null;
+  // 入力途中の値は pending に持たせる。言語切替やナビで描き直されても失わないため。
+  // 条件(variant)はクラスタップ時に確定済みなので、描き直しても条件は進まない
+  const firstDraw = (pending.n_live===undefined);
+  if(firstDraw){ pending.n_live=nInit; pending.n_fresh=(nInit!==null); }
+  let n = pending.n_live;
+  let fresh = pending.n_fresh;    // テンキー: プリセットが未置換か
   const cls=t.classes[pending.congestion_class-1];
   // 入力方式の条件で人数入力部を差し替える（他の要素は完全に同じにする）
   const ctrlHtml = (inputMode === "numpad") ? `
@@ -876,17 +892,22 @@ function renderCount(){
   wireStopField("destInput","destList","destSel","dest_stop");
   const cval=$("cval");
   const show=()=>{
+    pending.n_live=n; pending.n_fresh=fresh;    // 描き直しに備えて保持
     cval.textContent = (n===null)?"—":((n>=COUNT_MAX)?COUNT_MAX+"+":String(n));
     cval.classList.toggle("noval", n===null);   // 未入力は破線枠で「まだ答えていない」と分かるように
   };
   show();                         // 初期は「—」＝未入力
-  logEvent("screen_view", { screen:"count", input:inputMode, count_init:initMode,
-                            lo:lo, hi:hi, cmin:COUNT_MIN, cmax:COUNT_MAX });
-  if(LOG) LOG.count_view_at = performance.now();
+  // 描き直しは所要時間の計測をやり直させない。回数だけ別種別で残す
+  if(firstDraw){
+    logEvent("screen_view", { screen:"count", input:inputMode, count_init:initMode,
+                              lo:lo, hi:hi, cmin:COUNT_MIN, cmax:COUNT_MAX });
+    if(LOG) LOG.count_view_at = performance.now();
+  } else {
+    logEvent("screen_redraw", { screen:"count", value:n });
+  }
 
   if(inputMode === "numpad"){
-    // プリセット値が入ったままの状態。最初の数字キーで置き換え、以降は追記
-    let fresh = (n !== null);
+    // プリセット値が入ったままの状態。最初の数字キーで置き換え、以降は追記（fresh は上で復元済み）
     main.querySelectorAll(".numpad button").forEach(b=>{ b.onclick=()=>{
       const k = b.dataset.k;
       if(k === "C"){ n = null; fresh = false; if(LOG) LOG.corrections++; }
@@ -1077,7 +1098,13 @@ function setView(v){ if(v==="feed" && !isAdmin()) v="report"; view=v; render(); 
 function render(){
   updateNav();
   if(view==="feed"){ renderFeed(); return; }
-  if(user && authMode!=="newpass"){ renderMain(); }   // 通常のログイン中
+  if(user && authMode!=="newpass"){
+    // 人数入力中にナビや言語切替を押しても、入力中の回答を捨てずに描き直す。
+    // renderMain() に戻すと入力値が消えるうえ pending が残り、次のクラス選択で
+    // 画面ログに出ない行が送信されてしまう（計測セッションも宙に浮く）
+    if(view==="report" && answering && pending) renderCount();
+    else renderMain();
+  }
   else { renderAuth(); }                               // 未ログイン or パスワード再設定中
 }
 
