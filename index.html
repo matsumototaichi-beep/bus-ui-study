@@ -271,7 +271,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.7.2";
+const APP_VERSION = "uiStudy-0.7.3";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -561,7 +561,7 @@ const T = {
     board_label:"乗車バス停（任意）", dest_label:"降車バス停（任意）",
     board_ph:"バス停名を選択（任意）", dest_ph:"バス停名を選択（任意）",
     stop_selected:"選択済み", stop_clear:"取消",
-    stop_source:"バス停データ出典：国土数値情報（国土交通省）",
+    stop_source:"バス停データ出典：国土数値情報 バス停留所データ（国土交通省・大阪府・令和4年度）",
     stop_pick_hint:"候補から選んでください", count_range:"目安",
     send:"送信", skip:"スキップ", ppl:"人",
     saved:"保存しました", queued:"端末に保存（後で自動送信）", finishing:"軌跡を記録中",
@@ -611,7 +611,7 @@ const T = {
     board_label:"Boarding stop (optional)", dest_label:"Alighting stop (optional)",
     board_ph:"Select a stop name (optional)", dest_ph:"Select a stop name (optional)",
     stop_selected:"Selected", stop_clear:"Clear",
-    stop_source:"Bus-stop data: MLIT National Land Numerical Information",
+    stop_source:"Bus-stop data: MLIT National Land Numerical Information (Osaka Pref., FY2022)",
     stop_pick_hint:"Choose one from the list", count_range:"guide",
     send:"Submit", skip:"Skip", ppl:"",
     saved:"Saved", queued:"Saved on your device (will send later)", finishing:"Recording your path",
@@ -769,7 +769,7 @@ function jhav(la1,ln1,la2,ln2){ const R=6371000,r=Math.PI/180;
   return 2*R*Math.asin(Math.sqrt(a)); }
 function userLoc(){ for(let i=preBuffer.length-1;i>=0;i--){ const p=preBuffer[i]; if(p.lat&&p.lng) return [p.lat,p.lng]; } return null; }
 function stopCandidates(q){
-  const S=window.NARA_STOPS||[]; const loc=userLoc(); const ql=(q||"").trim().toLowerCase();
+  const S=window.HANKYU_STOPS||[]; const loc=userLoc(); const ql=(q||"").trim().toLowerCase();
   let arr;
   if(!ql){                               // 空欄: 近い順（GPSがあれば）、無ければ先頭数件
     arr = loc ? S.slice().sort((x,y)=>jhav(loc[0],loc[1],x.a,x.o)-jhav(loc[0],loc[1],y.a,y.o)) : S.slice();
