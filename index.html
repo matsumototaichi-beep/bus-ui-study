@@ -121,7 +121,10 @@
   .selchip .chip{width:24px; height:24px;}
   .selchip .rng{font-size:12px; font-weight:600; color:var(--muted);}
   /* −と＋の間に人数を挿す（ボタンが何を増減させるのか一目で分かるように） */
-  .stepper{display:grid; grid-template-columns:repeat(3,1fr) 1.7fr repeat(3,1fr); gap:5px; align-items:stretch; width:100%; max-width:420px;}
+  /* ±1/±5 の4ボタン。±10 を外したのは、実データ(n=6597)で削減が平均0.03タップ・寄与2.8%しかない一方、
+     7列だとボタン幅が 35.3px(320px端末)/41.7px(375px端末) と全機種で HIG 44pt を割るため（原則A7）。
+     5列なら 49.1/58.1px で基準を満たす */
+  .stepper{display:grid; grid-template-columns:repeat(2,1fr) 1.7fr repeat(2,1fr); gap:5px; align-items:stretch; width:100%; max-width:420px;}
   .stepper button{height:var(--ctlh); padding:0; border-radius:12px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:15px; font-weight:800; font-family:inherit; font-variant-numeric:tabular-nums;}
   /* 人数の表示枠：ここに数字が入ると一目で分かるよう常に囲う。未入力は破線・入力後は青の実線 */
   .count{display:flex; align-items:center; justify-content:center; border-radius:12px;
@@ -268,7 +271,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.7.1";
+const APP_VERSION = "uiStudy-0.7.2";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -856,9 +859,9 @@ function renderCount(){
         </div>
       </div>` : `
       <div class="stepper">
-        <button class="mi" data-d="-10">−10</button><button class="mi" data-d="-5">−5</button><button class="mi" data-d="-1">−1</button>
+        <button class="mi" data-d="-5">−5</button><button class="mi" data-d="-1">−1</button>
         <div class="count noval" id="cval">—</div>
-        <button class="pl" data-d="1">＋1</button><button class="pl" data-d="5">＋5</button><button class="pl" data-d="10">＋10</button>
+        <button class="pl" data-d="1">＋1</button><button class="pl" data-d="5">＋5</button>
       </div>`;
   main.innerHTML = `
     <button class="backbtn" id="backPick">← ${t.back}</button>
@@ -899,8 +902,15 @@ function renderCount(){
   show();                         // 初期は「—」＝未入力
   // 描き直しは所要時間の計測をやり直させない。回数だけ別種別で残す
   if(firstDraw){
+    // 操作ボタンの実寸も残す。ステッパーとテンキーは形が違うぶん標的サイズを完全には
+    // 揃えられない（375pxで面積比1.40倍、320pxで1.82倍）。H2の差が入力方式によるものか
+    // Fittsの法則どおり標的の大きさによるものかを、解析側で切り分けられるようにするため
+    const ctl = main.querySelector(inputMode==="numpad" ? ".numpad button" : ".stepper button");
+    const cr  = ctl ? ctl.getBoundingClientRect() : null;
     logEvent("screen_view", { screen:"count", input:inputMode, count_init:initMode,
-                              lo:lo, hi:hi, cmin:COUNT_MIN, cmax:COUNT_MAX });
+                              lo:lo, hi:hi, cmin:COUNT_MIN, cmax:COUNT_MAX,
+                              ctl_w: cr?Math.round(cr.width):null, ctl_h: cr?Math.round(cr.height):null,
+                              vw: window.innerWidth, vh: window.innerHeight });
     if(LOG) LOG.count_view_at = performance.now();
   } else {
     logEvent("screen_redraw", { screen:"count", value:n });
