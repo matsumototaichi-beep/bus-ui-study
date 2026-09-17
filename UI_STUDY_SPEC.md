@@ -297,7 +297,6 @@ UI_CONDS = [ stepper/none, numpad/median, stepper/median, numpad/none ]
 **2026-09-17 更新**：実施地域は阪急バス（吹田営業所管内）に確定、倫理審査は不要と確認済み（`docs/HANDOFF_hankyu.md`）。
 残る未決定事項：
 
-- **対象系統**（候補A〜C、下見で確定。`EXPERIMENT_PLAN.md` §5）と実施時期・実施日数、1人あたりの乗車回数
+- **対象系統**（候補A〜C、下見で確定。`EXPERIMENT_PLAN.md` §5。候補Aから下見に着手）と実施時期・実施日数、1人あたりの乗車回数
 - 管轄営業所への事前連絡（系統・日程確定後。承諾条件④）
 - 被験者の募集方法と謝礼
-- 大学⇔乗車駅の交通費（`EXPERIMENT_PLAN.md` §6 の A）
