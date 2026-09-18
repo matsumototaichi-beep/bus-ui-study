@@ -271,7 +271,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.7.3";
+const APP_VERSION = "uiStudy-0.7.4";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -311,19 +311,32 @@ function assignOffset(){
   if(p >= 1) return { off: (p - 1) % UI_CONDS.length, src: "participant", pid: p };
   return { off: condOffset(), src: "random", pid: null };
 }
-function nextVariant(){
+// ★2026-09-18: 「割当を覗く(peek)」と「実際に1つ進める(commit)」を分離。
+// 以前は pickClass のたびにカウンタを即座に進めていたため、クラスを選んで「戻る」で
+// キャンセルしても1コマ消費してしまい、ラテン方格の並びが実際の回答数とずれていた。
+// 送信/スキップが確定した時だけ commitVariant() を呼び、キャンセル時は何もしない
+// （＝次に同じコマから配られる）ようにする。
+function peekVariant(){
   // 練習は専用カウンタを使う。本番のカウンタを進めてしまうと、練習回数が人によって違うぶん
   // 本番データの開始条件がずれ、せっかくのラテン方格が崩れる
   const prac = isPractice();
   const key  = prac ? UISTUDY_PSEQ : UISTUDY_SEQ;
   let n = 0;
   try{ n = parseInt(localStorage.getItem(key) || "0", 10) || 0; }catch(e){}
-  try{ localStorage.setItem(key, String(n + 1)); }catch(e){}
   const a = assignOffset();
   const c = UI_CONDS[(n + a.off) % UI_CONDS.length];
   // offset_src は解析時に「ラテン方格が実際に効いていたか」を判別するために必ず残す
   return { input: c.input, count_init: c.count_init, seq: n,
            offset: a.off, offset_src: a.src, participant: a.pid, practice: prac };
+}
+// 送信/スキップが確定した回答についてだけ呼ぶ。カウンタを実際に1つ進める。
+// n===variant.seq のときだけ進めるので、同じ variant を誤って2回コミットしても多重には進まない。
+function commitVariant(variant){
+  if(!variant) return;
+  const key = variant.practice ? UISTUDY_PSEQ : UISTUDY_SEQ;
+  let n = 0;
+  try{ n = parseInt(localStorage.getItem(key) || "0", 10) || 0; }catch(e){}
+  if(n === variant.seq){ try{ localStorage.setItem(key, String(n + 1)); }catch(e){} }
 }
 
 let LOG = null;          // 進行中のセッション
@@ -544,13 +557,17 @@ const T = {
     auth_intro:"バス車内の混み具合を答えていただく卒業研究です。メールアドレスで登録／ログインしてください。回答はクラスと人数だけ、位置と時刻は自動で記録されます。",
     tab_login:"ログイン", tab_signup:"新規登録",
     ph_name:"表示名（調査員名）", ph_email:"メールアドレス", ph_pass:"パスワード（8文字以上）",
+    ph_pid:"参加者番号（実験者の指示どおりに入力）",
     do_login:"ログイン", do_signup:"登録してはじめる", signing:"処理中…",
     sent_title:"確認メールを送信しました",
     sent_desc:(e)=>`${e} 宛に確認メールを送りました。<b>同じ端末のこのブラウザ</b>でメール内のリンクを開くと、ここに戻って自動でログインします。`,
     resend:"確認メールを再送", to_login:"ログインへ戻る", resent:"再送しました",
     err_login:"メールまたはパスワードが違います", err_unconfirmed:"メール確認が未完了です。受信した確認メールのリンクを開いてください。",
     err_pass:"パスワードは8文字以上にしてください", err_email:"メールアドレスを入力してください", err_name:"表示名を入力してください",
+    err_pid:"参加者番号を入力してください", err_code:"実験コードを入力してください",
     login_wait:"処理中…",
+    gate_title:"回答を始める前に", gate_desc:"実験者の指示に従って、以下を入力してください。",
+    gate_pid_label:"参加者番号", gate_code_label:"実験コード", gate_start:"設定して回答を始める",
     pick:"混雑度を選択", records:"記録", none:"まだ記録がありません",
     classes:[
       {lbl:"ガラガラ", rng:"0〜5人"},{lbl:"やや空き", rng:"6〜15人"},{lbl:"席が埋まる", rng:"16〜25人"},
@@ -594,13 +611,17 @@ const T = {
     auth_intro:"Data collection for a graduation research study on bus crowding reports. Register or sign in with your email. You only choose the crowding level and count — your location and time are recorded automatically.",
     tab_login:"Sign in", tab_signup:"Sign up",
     ph_name:"Display name (surveyor)", ph_email:"Email address", ph_pass:"Password (8+ characters)",
+    ph_pid:"Participant number (as instructed by the experimenter)",
     do_login:"Sign in", do_signup:"Register & start", signing:"Processing…",
     sent_title:"Confirmation email sent",
     sent_desc:(e)=>`We sent a confirmation email to ${e}. Open the link <b>in this same browser</b> to return here signed in.`,
     resend:"Resend confirmation email", to_login:"Back to sign in", resent:"Resent",
     err_login:"Incorrect email or password", err_unconfirmed:"Your email isn't confirmed yet. Open the link in the confirmation email.",
     err_pass:"Password must be at least 8 characters", err_email:"Please enter your email", err_name:"Please enter a display name",
+    err_pid:"Please enter your participant number", err_code:"Please enter the trial code",
     login_wait:"Processing…",
+    gate_title:"Before you start", gate_desc:"Please enter the following as instructed by the experimenter.",
+    gate_pid_label:"Participant number", gate_code_label:"Trial code", gate_start:"Set and start answering",
     pick:"Select the crowding level", records:"Records", none:"No records yet",
     classes:[
       {lbl:"Empty", rng:"0–5"},{lbl:"Fairly empty", rng:"6–15"},{lbl:"Seats filling up", rng:"16–25"},
@@ -726,9 +747,9 @@ function stopSampling(){ if(watchId!=null){ navigator.geolocation.clearWatch(wat
 
 /* ---------------- 回答フロー ---------------- */
 function pickClass(cls){
-  // 直前の回答が確定待ちなら即確定
-  if(pending) finalizeNow(true);
-  const variant = nextVariant();       // ★UI研究: この回答に使う条件を割当
+  // 直前の回答が確定待ちなら即確定（★未コミットならここで確実にコマを消費させる）
+  if(pending){ commitVariant(pending.variant); finalizeNow(true); }
+  const variant = peekVariant();       // ★UI研究: この回答に使う条件（確定はsubmit()でcommit）
   logStart(cls, variant);
   LOG.t_class = LOG.events[0] ? LOG.events[0].since_picker_ms : null;
   logTap("class_" + cls);
@@ -989,6 +1010,7 @@ function syncPendingToOutbox(ready){
 }
 
 function submit(){
+  commitVariant(pending.variant);   // ★UI研究: 送信/スキップが確定したのでローテーションを1つ進める
   // 画面ログに「記録中」で追加
   const entry={ cid:pending.cid, congestion_class:pending.congestion_class,
                 exact_count:pending.exact_count, answered_at:pending.answered_at, state:"rec" };
@@ -1099,12 +1121,16 @@ function updateNav(){
   const adminOK = isAdmin();
   $("navReport").classList.toggle("solo", !adminOK);   // 管理者以外は「報告」だけ
   $("navFeed").style.display = adminOK ? "" : "none";
-  // パスワード再設定中はナビを隠して画面に集中させる
-  const focus = (view==="report" && (authMode==="reset" || authMode==="newpass"));
+  // パスワード再設定中／実験コード確認中はナビを隠して画面に集中させる
+  const focus = (view==="report" && (authMode==="reset" || authMode==="newpass" || needsPrepGate()));
   $("navReport").style.visibility = focus ? "hidden" : "";
   $("navFeed").style.visibility  = (focus||!adminOK) ? "hidden" : "";
 }
 function setView(v){ if(v==="feed" && !isAdmin()) v="report"; view=v; render(); }
+// ★UI研究: 参加者番号(新規登録で確定するはずだが、旧アカウント救済のため一応チェック)か
+// 実験コード(便が変わるたびに要る)が未設定なら、回答画面より前にこのゲートを通す。
+// 管理者アカウントは動作確認用なのでゲートの対象外にする。
+function needsPrepGate(){ return !isAdmin() && (!getDaily(PID_KEY) || !getDaily(EXP_CODE_KEY)); }
 function render(){
   updateNav();
   if(view==="feed"){ renderFeed(); return; }
@@ -1113,6 +1139,7 @@ function render(){
     // renderMain() に戻すと入力値が消えるうえ pending が残り、次のクラス選択で
     // 画面ログに出ない行が送信されてしまう（計測セッションも宙に浮く）
     if(view==="report" && answering && pending) renderCount();
+    else if(view==="report" && needsPrepGate()) renderPrepGate();
     else renderMain();
   }
   else { renderAuth(); }                               // 未ログイン or パスワード再設定中
@@ -1174,9 +1201,49 @@ async function loadFeed(){
   el.innerHTML=`<div style="font-size:12px;color:var(--muted);padding:6px 2px 8px">${t.feed_count(data.length)}</div>${rows}`;
 }
 
+/* ---------------- UI研究: 回答前の確認ゲート（参加者番号・実験コード） ---------------- */
+// ログイン画面ではなく、回答画面に入る直前に毎回チェックする。
+// 参加者番号は新規登録で確定済みのはずだが、実験コードは便が変わるたびに未設定へ戻るため
+// （EXP_CODE_KEY は日付が変わるとリセットされる。便ごとの再設定は実験バーの小さいボタンから）。
+function renderPrepGate(){
+  const t=T[lang];
+  updateNav();
+  const pid=getDaily(PID_KEY), code=getDaily(EXP_CODE_KEY);
+  const needPid=!pid, needCode=!code;
+  main.innerHTML = `
+    <div class="login">
+      <h1>${t.gate_title}</h1>
+      <p>${t.gate_desc}</p>
+      <div class="authform">
+        ${needPid?`<input class="afield" id="gatePid" type="text" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="${t.gate_pid_label}">`:``}
+        ${needCode?`<input class="afield" id="gateCode" type="text" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="${t.gate_code_label}">`:``}
+        <button class="btn primary" id="gateBtn">${t.gate_start}</button>
+        <p class="hint" id="gateNote"></p>
+      </div>
+    </div>`;
+  const submit=()=>{
+    const pidVal  = needPid  ? cleanPid(($("gatePid")||{}).value)  : pid;
+    const codeVal = needCode ? cleanCode(($("gateCode")||{}).value) : code;
+    if(needPid && !pidVal){ authNote2(t.err_pid); return; }
+    if(needCode && !codeVal){ authNote2(t.err_code); return; }
+    if(needPid){
+      setDaily(PID_KEY, pidVal);
+      // 参加者が変わったのでラテン方格の通し番号も0から（実験バーの既存ロジックと同じ）
+      try{ localStorage.setItem(UISTUDY_SEQ,"0"); localStorage.setItem(UISTUDY_PSEQ,"0"); }catch(e){}
+    }
+    if(needCode) setDaily(EXP_CODE_KEY, codeVal);
+    renderMain();
+  };
+  function authNote2(msg){ const n=$("gateNote"); if(n) n.textContent=msg||""; }
+  $("gateBtn").onclick=submit;
+  main.querySelectorAll(".afield").forEach(inp=>{
+    inp.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); submit(); } });
+  });
+}
+
 /* ---------------- 認証（メール＋パスワード） ---------------- */
 let authMode = "login";   // login | signup | sent
-let authForm = { email:"", pass:"", name:"", sentEmail:"" };
+let authForm = { email:"", pass:"", name:"", pid:"", sentEmail:"" };
 
 function renderAuth(){
   const t=T[lang];
@@ -1266,6 +1333,7 @@ function renderAuth(){
       </div>
       <div class="authform">
         ${isSignup?`<input class="afield" id="fName" type="text" placeholder="${t.ph_name}" autocomplete="name" value="${authForm.name||''}">`:``}
+        ${isSignup?`<input class="afield" id="fPid" type="text" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="${t.ph_pid}" value="${authForm.pid||''}">`:``}
         <input class="afield" id="fEmail" type="email" inputmode="email" autocapitalize="none" autocomplete="email" placeholder="${t.ph_email}" value="${authForm.email||''}">
         <input class="afield" id="fPass" type="password" autocomplete="${isSignup?'new-password':'current-password'}" placeholder="${t.ph_pass}" value="${authForm.pass||''}">
         <button class="btn primary" id="authBtn">${isSignup?t.do_signup:t.do_login}</button>
@@ -1283,6 +1351,7 @@ function grabAuth(){
   if($("fEmail")) authForm.email=$("fEmail").value.trim();
   if($("fPass"))  authForm.pass=$("fPass").value;
   if($("fName"))  authForm.name=$("fName").value.trim();
+  if($("fPid"))   authForm.pid=$("fPid").value.trim();
 }
 function authNote(msg){ const n=$("authNote"); if(n) n.textContent=msg||""; }
 async function submitAuth(){
@@ -1296,6 +1365,10 @@ async function submitAuth(){
   try{
     if(authMode==="signup"){
       if(!authForm.name){ authNote(t.err_name); return; }
+      // ★UI研究: 参加者番号はここで一度だけ確定させる（アプリに入ってから探して打つ手間を省く）。
+      // EXPERIMENT_PLAN.md 上、参加者は1日だけの参加なので新規登録時に一度取れば足りる。
+      const pidVal = cleanPid(authForm.pid);
+      if(!pidVal){ authNote(t.err_pid); return; }
       const { data, error } = await sb.auth.signUp({ email, password:pass,
         options:{ emailRedirectTo: location.origin+location.pathname, data:{ display_name:authForm.name } } });
       if(error) throw error;
@@ -1304,6 +1377,10 @@ async function submitAuth(){
       if(data.user && Array.isArray(data.user.identities) && data.user.identities.length===0){
         authForm.email=email; authMode="login"; renderAuth(); authNote(t.already_registered); return;
       }
+      // localStorageの値なのでSupabase側の確認メール待ちとは無関係にここで確定できる。
+      // 新規参加者なのでラテン方格の通し番号も0から始める。
+      setDaily(PID_KEY, pidVal);
+      try{ localStorage.setItem(UISTUDY_SEQ,"0"); localStorage.setItem(UISTUDY_PSEQ,"0"); }catch(e){}
       if(data.session){ /* 確認OFF環境: 即ログイン(onAuthStateChangeが処理) */ }
       else { authForm.sentEmail=email; authMode="sent"; renderAuth(); return; }
     } else {
