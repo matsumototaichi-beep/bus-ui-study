@@ -271,7 +271,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.7.5";
+const APP_VERSION = "uiStudy-0.7.6";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -286,30 +286,34 @@ const UI_CONDS = [
   { input:"stepper", count_init:"median" },
   { input:"numpad",  count_init:"none"   },
 ];
+// ★2026-09-18: URLのクエリパラメータで条件を固定できるようにする
+// （例 ?input=stepper 、?input=stepper&init=median）。
+// 「入力方式ごとに別URLのアプリを配布し、実験者が渡すURLで条件を決める」運用のため。
+// 指定した軸は固定、指定しない軸は今までどおりアプリ内でローテーションする
+// （2本に分ける／4本に分けるのどちらでも同じコードで対応できる）。
+const URL_QS = new URLSearchParams(location.search);
+const FIXED_INPUT = (()=>{ const v=(URL_QS.get("input")||"").toLowerCase(); return (v==="stepper"||v==="numpad") ? v : null; })();
+const FIXED_INIT  = (()=>{ const v=(URL_QS.get("init") ||"").toLowerCase(); return (v==="none"||v==="median") ? v : null; })();
+function activeConds(){
+  const c = UI_CONDS.filter(x =>
+    (FIXED_INPUT===null || x.input===FIXED_INPUT) && (FIXED_INIT===null || x.count_init===FIXED_INIT));
+  return c.length ? c : UI_CONDS;   // 該当が0件（あり得ないURL指定）なら全条件にフォールバック
+}
 const UISTUDY_KEY  = "uistudy_sessions_v1";        // 未送信セッションの退避
 const UISTUDY_SEQ  = "uistudy_seq_v1";             // 条件割当の通し番号（本番）
 const UISTUDY_PSEQ = "uistudy_pseq_v1";            // 同（練習用）。本番の順番を練習で進めないため
-const UISTUDY_OFF  = "uistudy_offset_v1";          // 被験者ごとの開始位置（順序効果の相殺）
+const UISTUDY_OFF  = "uistudy_offset_v1";          // 端末ごとの開始位置（順序効果の相殺）
 
 // 端末ごとに違う位置から回し始める。全員が同じ順なら順序効果と条件が区別できないため。
-// ※参加者番号が未設定のときのフォールバック（下見・パイロット・単独テスト用）
-function condOffset(){
+// mod: そのとき実際にローテーションする条件数（activeConds().length）
+function condOffset(mod){
   let o = null;
   try{ o = localStorage.getItem(UISTUDY_OFF); }catch(e){}
   if(o === null){
-    o = String(Math.floor(Math.random() * UI_CONDS.length));
+    o = String(Math.floor(Math.random() * mod));
     try{ localStorage.setItem(UISTUDY_OFF, o); }catch(e){}
   }
   return parseInt(o, 10) || 0;
-}
-// 条件の開始位置を決める。実験者が参加者番号(1,2,3…)を入れていれば
-// 開始位置 =(番号-1) mod 4 となり、同じ便に乗った参加者が同じ瞬間に別々の条件になる
-// （＝EXPERIMENT_PLAN.md §3.1 のラテン方格）。未設定なら端末ごとのランダムに落ちる。
-// ※PID_KEY は下の「実験バー」ブロックで定義（呼び出しは回答時なので初期化済み）
-function assignOffset(){
-  const p = parseInt(getDaily(PID_KEY) || "", 10);
-  if(p >= 1) return { off: (p - 1) % UI_CONDS.length, src: "participant", pid: p };
-  return { off: condOffset(), src: "random", pid: null };
 }
 // ★2026-09-18: 「割当を覗く(peek)」と「実際に1つ進める(commit)」を分離。
 // 以前は pickClass のたびにカウンタを即座に進めていたため、クラスを選んで「戻る」で
@@ -323,11 +327,12 @@ function peekVariant(){
   const key  = prac ? UISTUDY_PSEQ : UISTUDY_SEQ;
   let n = 0;
   try{ n = parseInt(localStorage.getItem(key) || "0", 10) || 0; }catch(e){}
-  const a = assignOffset();
-  const c = UI_CONDS[(n + a.off) % UI_CONDS.length];
-  // offset_src は解析時に「ラテン方格が実際に効いていたか」を判別するために必ず残す
-  return { input: c.input, count_init: c.count_init, seq: n,
-           offset: a.off, offset_src: a.src, participant: a.pid, practice: prac };
+  const conds = activeConds();
+  const off = condOffset(conds.length);
+  const c = conds[(n + off) % conds.length];
+  return { input: c.input, count_init: c.count_init, seq: n, offset: off,
+           url_fixed: { input: FIXED_INPUT, count_init: FIXED_INIT },   // ★どの軸がURLで固定されていたか
+           practice: prac };
 }
 // 送信/スキップが確定した回答についてだけ呼ぶ。カウンタを実際に1つ進める。
 // n===variant.seq のときだけ進めるので、同じ variant を誤って2回コミットしても多重には進まない。
@@ -342,17 +347,14 @@ function commitVariant(variant){
 let LOG = null;          // 進行中のセッション
 let pickerShownAt = 0;
 
-// ★UI研究: 実験コード（＝同じ便に乗った人を紐づける識別子）と着席/立席。
-// 日付つきで保存し、日付が変わったら未設定に戻す（前日のコードのまま別の便と誤って紐づくのを防ぐ）
-const EXP_CODE_KEY = "uistudy_expcode_v1";
+// ★UI研究: 着席/立席。日付つきで保存し、日付が変わったら未設定に戻す（前日の値の持ち越し防止）。
+// ログアウト時にも明示的にクリアする（uiStudy-0.7.5、outBtnハンドラ参照）。
+// 2026-09-18: 実験コード・参加者番号は廃止（識別はログインアカウント、条件はURLで決めるため。
+// docs/HANDOFF_hankyu.md 参照）
 const POSTURE_KEY  = "uistudy_posture_v1";
-// ★UI研究: 参加者番号。実験者が参加者ごとに 1,2,3… を入れる＝条件の開始位置になる（assignOffset）。
-// 実験コードと同じく日付で失効させる（前日の番号が残ったまま別人に使われるのを防ぐ）
-const PID_KEY      = "uistudy_pid_v1";
 // ★UI研究: 練習モード。オンの間の回答は practice:true で記録し、分析から外す。
 // 日付で失効させるのは他と同じ（前日オンのまま本番が始まるのを防ぐ）
 const PRACTICE_KEY = "uistudy_practice_v1";
-let expEditing = null;   // null | "code" | "pid"（同時に1つだけ編集）
 function isPractice(){ return getDaily(PRACTICE_KEY) === "1"; }
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
 function getDaily(k){
@@ -362,23 +364,10 @@ function getDaily(k){
   return (i>0 && raw.slice(i+1)===todayStr()) ? raw.slice(0,i) : null;
 }
 function setDaily(k,v){ try{ if(v) localStorage.setItem(k, v+"|"+todayStr()); else localStorage.removeItem(k); }catch(e){} }
-function cleanCode(v){ return (v||"").replace(/[^0-9A-Za-z-]/g,"").slice(0,8); }
-function cleanPid(v){ return (v||"").replace(/[^0-9]/g,"").slice(0,2).replace(/^0+/,""); }
-function curExpKeep(){
-  const i=$("expInput"); if(!expEditing || !i) return null;
-  return (expEditing==="pid") ? cleanPid(i.value) : cleanCode(i.value);
-}
-function expBarInner(t, keep){
-  const code=getDaily(EXP_CODE_KEY), pos=getDaily(POSTURE_KEY), pid=getDaily(PID_KEY);
-  const codePart = (expEditing==="code")
-    ? `<span class="expedit"><input id="expInput" class="expinput" inputmode="numeric" autocomplete="off" maxlength="8" value="${keep!=null?keep:(code||"")}" placeholder="${t.exp_ph}"><button id="expOk" class="expok">${t.exp_ok}</button></span>`
-    : `<button id="expCodeBtn" class="expcode${code?"":" unset"}">${t.exp_code} <b>${code||t.exp_unset}</b></button>`;
-  const pidPart = (expEditing==="pid")
-    ? `<span class="expedit"><input id="expInput" class="expinput" inputmode="numeric" autocomplete="off" maxlength="2" value="${keep!=null?keep:(pid||"")}" placeholder="${t.pid_ph}"><button id="expOk" class="expok">${t.exp_ok}</button></span>`
-    : `<button id="pidBtn" class="expcode${pid?"":" unset"}">${t.pid} <b>${pid||t.exp_unset}</b></button>`;
+function expBarInner(t){
+  const pos=getDaily(POSTURE_KEY);
   const pracOn = isPractice();
-  return codePart + pidPart +
-    `<div class="posture${pos?"":" unset"}"><button class="pz${pos==="sit"?" on":""}" data-p="sit">${t.sit}</button><button class="pz${pos==="stand"?" on":""}" data-p="stand">${t.stand}</button></div>` +
+  return `<div class="posture${pos?"":" unset"}"><button class="pz${pos==="sit"?" on":""}" data-p="sit">${t.sit}</button><button class="pz${pos==="stand"?" on":""}" data-p="stand">${t.stand}</button></div>` +
     `<button id="pracBtn" class="prac${pracOn?" on":""}">${t.prac}</button>`;
 }
 // 練習中は画面の先頭に大きく出す（実験バーの小さなボタンだけだと切り忘れる）
@@ -388,7 +377,7 @@ function pracBanner(t){
 // バーだけ描き直す（renderMainを呼ぶとクラス選択画面の表示時刻 pickerShownAt がリセットされ t_class が狂うため）
 function renderExpBar(){
   const el=$("expbar"); if(!el) return;
-  el.innerHTML=expBarInner(T[lang], curExpKeep()); wireExpBar(); renderPracBanner();
+  el.innerHTML=expBarInner(T[lang]); wireExpBar(); renderPracBanner();
 }
 // バナーは #expbar の外にあるので別に描き直す（renderMain を呼ぶと t_class が狂う）
 function renderPracBanner(){
@@ -398,27 +387,6 @@ function renderPracBanner(){
   if(b) b.onclick=()=>{ setDaily(PRACTICE_KEY, null); renderExpBar(); };
 }
 function wireExpBar(){
-  const btn=$("expCodeBtn");
-  if(btn) btn.onclick=()=>{ expEditing="code"; renderExpBar(); const i=$("expInput"); if(i) i.focus(); };
-  const pbtn=$("pidBtn");
-  if(pbtn) pbtn.onclick=()=>{ expEditing="pid"; renderExpBar(); const i=$("expInput"); if(i) i.focus(); };
-  const ok=$("expOk"), inp=$("expInput");
-  if(ok && inp){
-    const commit=()=>{
-      if(expEditing==="pid"){
-        const v=cleanPid(inp.value)||null, prev=getDaily(PID_KEY);
-        setDaily(PID_KEY, v);
-        // 参加者が変わったら試行カウンタを0に戻す（練習用も同時に）。
-        // これを残すと「何回目の回答か」（計画書§3.2-3の統制変数）に前の参加者の回数が混ざる
-        if(v !== prev){ try{ localStorage.setItem(UISTUDY_SEQ, "0"); localStorage.setItem(UISTUDY_PSEQ, "0"); }catch(e){} }
-      }else{
-        setDaily(EXP_CODE_KEY, cleanCode(inp.value)||null);
-      }
-      expEditing=null; renderExpBar();
-    };
-    ok.onclick=commit;
-    inp.onkeydown=(e)=>{ if(e.key==="Enter"){ e.preventDefault(); commit(); } };
-  }
   document.querySelectorAll("#expbar .pz").forEach(b=>{ b.onclick=()=>{ setDaily(POSTURE_KEY, b.dataset.p); renderExpBar(); }; });
   const pr=$("pracBtn");
   if(pr) pr.onclick=()=>{ setDaily(PRACTICE_KEY, isPractice()?null:"1"); renderExpBar(); };
@@ -432,8 +400,7 @@ function logStart(cls, variant){
   LOG = { session_id: uuid(), started_at: new Date().toISOString(), t0: performance.now(),
           variant: variant, events: [], taps: 0, taps_value: 0, corrections: 0,
           t_class: null, t_count: null, t_first: null, count_view_at: null, t_stop: 0, stop_focus_at: null,
-          exp_code: getDaily(EXP_CODE_KEY), posture: getDaily(POSTURE_KEY),
-          participant: variant.participant,   // 数値で統一（variant側と型を揃える）
+          posture: getDaily(POSTURE_KEY),
           practice: variant.practice };
   logEvent("session_start", { congestion_class: cls,
     since_picker_ms: pickerShownAt ? Math.round(performance.now() - pickerShownAt) : null });
@@ -462,8 +429,7 @@ function finishSession(outcome, extra){
       gps_points: (pending && pending.trajectory) ? pending.trajectory.length : 0,
       screen_w: window.innerWidth, screen_h: window.innerHeight,
       lang: lang, app_version: APP_VERSION,
-      exp_code: LOG.exp_code, posture: LOG.posture,   // セッション開始時点の値
-      participant: LOG.participant,                   // 参加者番号（＝条件の開始位置の根拠）
+      posture: LOG.posture,                           // セッション開始時点の値
       practice: LOG.practice,                         // true なら練習＝分析から外す
       response_cid: pending ? pending.cid : null
     }, extra || {}),
@@ -557,17 +523,13 @@ const T = {
     auth_intro:"バス車内の混み具合を答えていただく卒業研究です。メールアドレスで登録／ログインしてください。回答はクラスと人数だけ、位置と時刻は自動で記録されます。",
     tab_login:"ログイン", tab_signup:"新規登録",
     ph_name:"表示名（調査員名）", ph_email:"メールアドレス", ph_pass:"パスワード（8文字以上）",
-    ph_pid:"参加者番号（実験者の指示どおりに入力）",
     do_login:"ログイン", do_signup:"登録してはじめる", signing:"処理中…",
     sent_title:"確認メールを送信しました",
     sent_desc:(e)=>`${e} 宛に確認メールを送りました。<b>同じ端末のこのブラウザ</b>でメール内のリンクを開くと、ここに戻って自動でログインします。`,
     resend:"確認メールを再送", to_login:"ログインへ戻る", resent:"再送しました",
     err_login:"メールまたはパスワードが違います", err_unconfirmed:"メール確認が未完了です。受信した確認メールのリンクを開いてください。",
     err_pass:"パスワードは8文字以上にしてください", err_email:"メールアドレスを入力してください", err_name:"表示名を入力してください",
-    err_pid:"参加者番号を入力してください", err_code:"実験コードを入力してください",
     login_wait:"処理中…",
-    gate_title:"回答を始める前に", gate_desc:"実験者の指示に従って、以下を入力してください。",
-    gate_pid_label:"参加者番号", gate_code_label:"実験コード", gate_start:"設定して回答を始める",
     pick:"混雑度を選択", records:"記録", none:"まだ記録がありません",
     classes:[
       {lbl:"ガラガラ", rng:"0〜5人"},{lbl:"やや空き", rng:"6〜15人"},{lbl:"席が埋まる", rng:"16〜25人"},
@@ -584,8 +546,7 @@ const T = {
     saved:"保存しました", queued:"端末に保存（後で自動送信）", finishing:"軌跡を記録中",
     saveNow:"今すぐ保存", recording:"記録中", pendingN:(n)=>`未送信 ${n}件`,
     st_ok:"送信済", st_pend:"未送信", st_rec:"記録中", log_head:"送信状況",
-    exp_code:"実験コード", exp_unset:"未設定", exp_ph:"例 0312", exp_ok:"設定", sit:"着席", stand:"立席",
-    pid:"参加者", pid_ph:"例 3",
+    sit:"着席", stand:"立席",
     prac:"練習", prac_banner:"練習モード｜この回答は分析に使いません（タップで終了）",
     gpsOn:"位置情報 取得中…", gpsOk:"位置情報 OK", gpsNo:"位置情報が取得できません（許可が必要）",
     gpsSlow:"位置情報を取得中…（少し時間がかかっています）",
@@ -611,17 +572,13 @@ const T = {
     auth_intro:"Data collection for a graduation research study on bus crowding reports. Register or sign in with your email. You only choose the crowding level and count — your location and time are recorded automatically.",
     tab_login:"Sign in", tab_signup:"Sign up",
     ph_name:"Display name (surveyor)", ph_email:"Email address", ph_pass:"Password (8+ characters)",
-    ph_pid:"Participant number (as instructed by the experimenter)",
     do_login:"Sign in", do_signup:"Register & start", signing:"Processing…",
     sent_title:"Confirmation email sent",
     sent_desc:(e)=>`We sent a confirmation email to ${e}. Open the link <b>in this same browser</b> to return here signed in.`,
     resend:"Resend confirmation email", to_login:"Back to sign in", resent:"Resent",
     err_login:"Incorrect email or password", err_unconfirmed:"Your email isn't confirmed yet. Open the link in the confirmation email.",
     err_pass:"Password must be at least 8 characters", err_email:"Please enter your email", err_name:"Please enter a display name",
-    err_pid:"Please enter your participant number", err_code:"Please enter the trial code",
     login_wait:"Processing…",
-    gate_title:"Before you start", gate_desc:"Please enter the following as instructed by the experimenter.",
-    gate_pid_label:"Participant number", gate_code_label:"Trial code", gate_start:"Set and start answering",
     pick:"Select the crowding level", records:"Records", none:"No records yet",
     classes:[
       {lbl:"Empty", rng:"0–5"},{lbl:"Fairly empty", rng:"6–15"},{lbl:"Seats filling up", rng:"16–25"},
@@ -638,8 +595,7 @@ const T = {
     saved:"Saved", queued:"Saved on your device (will send later)", finishing:"Recording your path",
     saveNow:"Save now", recording:"Recording", pendingN:(n)=>`${n} unsent`,
     st_ok:"Sent", st_pend:"Not sent", st_rec:"Recording", log_head:"Status",
-    exp_code:"Trial code", exp_unset:"not set", exp_ph:"e.g. 0312", exp_ok:"Set", sit:"Seated", stand:"Standing",
-    pid:"P no.", pid_ph:"e.g. 3",
+    sit:"Seated", stand:"Standing",
     prac:"Practice", prac_banner:"PRACTICE MODE — not used in analysis (tap to end)",
     gpsOn:"Getting location…", gpsOk:"Location OK", gpsNo:"Location unavailable (permission required)",
     gpsSlow:"Getting location… (taking a little while)",
@@ -1095,7 +1051,7 @@ function renderMain(){
     });
   }
   main.innerHTML = `
-    <div class="picker"><div id="pracwrap">${pracBanner(t)}</div><div class="expbar" id="expbar">${expBarInner(t, curExpKeep())}</div><p class="ptitle">${t.pick}</p><div class="grid">${cards}</div></div>
+    <div class="picker"><div id="pracwrap">${pracBanner(t)}</div><div class="expbar" id="expbar">${expBarInner(t)}</div><p class="ptitle">${t.pick}</p><div class="grid">${cards}</div></div>
     <div class="log">
       <div class="lhead"><span>${t.records} ${logEntries.length}</span><span>${t.log_head}</span></div>
       ${rows}
@@ -1121,16 +1077,12 @@ function updateNav(){
   const adminOK = isAdmin();
   $("navReport").classList.toggle("solo", !adminOK);   // 管理者以外は「報告」だけ
   $("navFeed").style.display = adminOK ? "" : "none";
-  // パスワード再設定中／実験コード確認中はナビを隠して画面に集中させる
-  const focus = (view==="report" && (authMode==="reset" || authMode==="newpass" || needsPrepGate()));
+  // パスワード再設定中はナビを隠して画面に集中させる
+  const focus = (view==="report" && (authMode==="reset" || authMode==="newpass"));
   $("navReport").style.visibility = focus ? "hidden" : "";
   $("navFeed").style.visibility  = (focus||!adminOK) ? "hidden" : "";
 }
 function setView(v){ if(v==="feed" && !isAdmin()) v="report"; view=v; render(); }
-// ★UI研究: 参加者番号(新規登録で確定するはずだが、旧アカウント救済のため一応チェック)か
-// 実験コード(便が変わるたびに要る)が未設定なら、回答画面より前にこのゲートを通す。
-// 管理者アカウントは動作確認用なのでゲートの対象外にする。
-function needsPrepGate(){ return !isAdmin() && (!getDaily(PID_KEY) || !getDaily(EXP_CODE_KEY)); }
 function render(){
   updateNav();
   if(view==="feed"){ renderFeed(); return; }
@@ -1139,7 +1091,6 @@ function render(){
     // renderMain() に戻すと入力値が消えるうえ pending が残り、次のクラス選択で
     // 画面ログに出ない行が送信されてしまう（計測セッションも宙に浮く）
     if(view==="report" && answering && pending) renderCount();
-    else if(view==="report" && needsPrepGate()) renderPrepGate();
     else renderMain();
   }
   else { renderAuth(); }                               // 未ログイン or パスワード再設定中
@@ -1201,49 +1152,9 @@ async function loadFeed(){
   el.innerHTML=`<div style="font-size:12px;color:var(--muted);padding:6px 2px 8px">${t.feed_count(data.length)}</div>${rows}`;
 }
 
-/* ---------------- UI研究: 回答前の確認ゲート（参加者番号・実験コード） ---------------- */
-// ログイン画面ではなく、回答画面に入る直前に毎回チェックする。
-// 参加者番号は新規登録で確定済みのはずだが、実験コードは便が変わるたびに未設定へ戻るため
-// （EXP_CODE_KEY は日付が変わるとリセットされる。便ごとの再設定は実験バーの小さいボタンから）。
-function renderPrepGate(){
-  const t=T[lang];
-  updateNav();
-  const pid=getDaily(PID_KEY), code=getDaily(EXP_CODE_KEY);
-  const needPid=!pid, needCode=!code;
-  main.innerHTML = `
-    <div class="login">
-      <h1>${t.gate_title}</h1>
-      <p>${t.gate_desc}</p>
-      <div class="authform">
-        ${needPid?`<input class="afield" id="gatePid" type="text" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="${t.gate_pid_label}">`:``}
-        ${needCode?`<input class="afield" id="gateCode" type="text" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="${t.gate_code_label}">`:``}
-        <button class="btn primary" id="gateBtn">${t.gate_start}</button>
-        <p class="hint" id="gateNote"></p>
-      </div>
-    </div>`;
-  const submit=()=>{
-    const pidVal  = needPid  ? cleanPid(($("gatePid")||{}).value)  : pid;
-    const codeVal = needCode ? cleanCode(($("gateCode")||{}).value) : code;
-    if(needPid && !pidVal){ authNote2(t.err_pid); return; }
-    if(needCode && !codeVal){ authNote2(t.err_code); return; }
-    if(needPid){
-      setDaily(PID_KEY, pidVal);
-      // 参加者が変わったのでラテン方格の通し番号も0から（実験バーの既存ロジックと同じ）
-      try{ localStorage.setItem(UISTUDY_SEQ,"0"); localStorage.setItem(UISTUDY_PSEQ,"0"); }catch(e){}
-    }
-    if(needCode) setDaily(EXP_CODE_KEY, codeVal);
-    renderMain();
-  };
-  function authNote2(msg){ const n=$("gateNote"); if(n) n.textContent=msg||""; }
-  $("gateBtn").onclick=submit;
-  main.querySelectorAll(".afield").forEach(inp=>{
-    inp.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); submit(); } });
-  });
-}
-
 /* ---------------- 認証（メール＋パスワード） ---------------- */
 let authMode = "login";   // login | signup | sent
-let authForm = { email:"", pass:"", name:"", pid:"", sentEmail:"" };
+let authForm = { email:"", pass:"", name:"", sentEmail:"" };
 
 function renderAuth(){
   const t=T[lang];
@@ -1333,7 +1244,6 @@ function renderAuth(){
       </div>
       <div class="authform">
         ${isSignup?`<input class="afield" id="fName" type="text" placeholder="${t.ph_name}" autocomplete="name" value="${authForm.name||''}">`:``}
-        ${isSignup?`<input class="afield" id="fPid" type="text" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="${t.ph_pid}" value="${authForm.pid||''}">`:``}
         <input class="afield" id="fEmail" type="email" inputmode="email" autocapitalize="none" autocomplete="email" placeholder="${t.ph_email}" value="${authForm.email||''}">
         <input class="afield" id="fPass" type="password" autocomplete="${isSignup?'new-password':'current-password'}" placeholder="${t.ph_pass}" value="${authForm.pass||''}">
         <button class="btn primary" id="authBtn">${isSignup?t.do_signup:t.do_login}</button>
@@ -1351,7 +1261,6 @@ function grabAuth(){
   if($("fEmail")) authForm.email=$("fEmail").value.trim();
   if($("fPass"))  authForm.pass=$("fPass").value;
   if($("fName"))  authForm.name=$("fName").value.trim();
-  if($("fPid"))   authForm.pid=$("fPid").value.trim();
 }
 function authNote(msg){ const n=$("authNote"); if(n) n.textContent=msg||""; }
 async function submitAuth(){
@@ -1365,10 +1274,6 @@ async function submitAuth(){
   try{
     if(authMode==="signup"){
       if(!authForm.name){ authNote(t.err_name); return; }
-      // ★UI研究: 参加者番号はここで一度だけ確定させる（アプリに入ってから探して打つ手間を省く）。
-      // EXPERIMENT_PLAN.md 上、参加者は1日だけの参加なので新規登録時に一度取れば足りる。
-      const pidVal = cleanPid(authForm.pid);
-      if(!pidVal){ authNote(t.err_pid); return; }
       const { data, error } = await sb.auth.signUp({ email, password:pass,
         options:{ emailRedirectTo: location.origin+location.pathname, data:{ display_name:authForm.name } } });
       if(error) throw error;
@@ -1377,10 +1282,6 @@ async function submitAuth(){
       if(data.user && Array.isArray(data.user.identities) && data.user.identities.length===0){
         authForm.email=email; authMode="login"; renderAuth(); authNote(t.already_registered); return;
       }
-      // localStorageの値なのでSupabase側の確認メール待ちとは無関係にここで確定できる。
-      // 新規参加者なのでラテン方格の通し番号も0から始める。
-      setDaily(PID_KEY, pidVal);
-      try{ localStorage.setItem(UISTUDY_SEQ,"0"); localStorage.setItem(UISTUDY_PSEQ,"0"); }catch(e){}
       if(data.session){ /* 確認OFF環境: 即ログイン(onAuthStateChangeが処理) */ }
       else { authForm.sentEmail=email; authMode="sent"; renderAuth(); return; }
     } else {
@@ -1403,9 +1304,7 @@ async function boot(){
   $("langBtn").onclick=()=>{ lang=(lang==="ja")?"en":"ja"; render(); };
   $("outBtn").onclick=async()=>{
     if(sb){ await sb.auth.signOut(); }
-    // ★UI研究: 着席/立席・練習モードはその時々の状態なので、ログアウトのたびにリセットする。
-    // （実験コード・参加者番号は同じ参加者が再ログインするだけなら変わらないので、あえて残す。
-    //  参加者が変わる場合は新規登録になるのでPIDは自動的に入り直す）
+    // ★UI研究: 着席/立席・練習モードはその時々の状態なので、ログアウトのたびにリセットする
     setDaily(POSTURE_KEY, null); setDaily(PRACTICE_KEY, null);
     user=null; authMode="login"; view="report"; render();
   };
