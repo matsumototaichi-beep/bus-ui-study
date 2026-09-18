@@ -271,7 +271,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.7.4";
+const APP_VERSION = "uiStudy-0.7.5";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -1401,7 +1401,14 @@ async function submitAuth(){
 
 async function boot(){
   $("langBtn").onclick=()=>{ lang=(lang==="ja")?"en":"ja"; render(); };
-  $("outBtn").onclick=async()=>{ if(sb){ await sb.auth.signOut(); } user=null; authMode="login"; view="report"; render(); };
+  $("outBtn").onclick=async()=>{
+    if(sb){ await sb.auth.signOut(); }
+    // ★UI研究: 着席/立席・練習モードはその時々の状態なので、ログアウトのたびにリセットする。
+    // （実験コード・参加者番号は同じ参加者が再ログインするだけなら変わらないので、あえて残す。
+    //  参加者が変わる場合は新規登録になるのでPIDは自動的に入り直す）
+    setDaily(POSTURE_KEY, null); setDaily(PRACTICE_KEY, null);
+    user=null; authMode="login"; view="report"; render();
+  };
   $("navReport").onclick=()=>setView("report");
   $("navFeed").onclick=()=>setView("feed");
 
