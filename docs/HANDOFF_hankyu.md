@@ -12,8 +12,8 @@
 
 | | NAIST アプリ | 卒業研究 |
 |---|---|---|
-| リポジトリ | `★アプリケーション/naist-bus-congestion`（GitHub 公開中） | `bus-ui-study`（ローカルのみ・リモート無し） |
-| 版 | `phaseA-1.7` | `uiStudy-0.7.2` |
+| リポジトリ | `★アプリケーション/naist-bus-congestion`（GitHub 公開中） | `bus-ui-study`（**2026-09-18 GitHub Pages公開**：https://matsumototaichi-beep.github.io/bus-ui-study/ ） |
+| 版 | `phaseA-1.7` | `uiStudy-0.7.3` |
 | 目的 | **人数を回答するアプリを作り、正確な車内人数を集めて BLE 研究に使う** | **そのアプリを使うときの人間の心理**（UI が回答値をどう動かすか） |
 | 相手 | NAIST の先生・Aさん・Bさん | 大学のゼミ教授、阪急バス |
 | 成果物 | 収集データそのもの | UI 条件間の差の分析 |
@@ -78,7 +78,9 @@
 
 ## 3. アプリの現状（`bus-ui-study`）
 
-`uiStudy-0.7.2`。動く。ローカルのみ（GitHub リモート無し）。
+`uiStudy-0.7.3`。動く。**2026-09-18 に public リポジトリ化＋GitHub Pagesで公開済み**
+（https://matsumototaichi-beep.github.io/bus-ui-study/ 、HTTPS）。
+Supabase（`ui_responses`/`ui_sessions`）も同日にテーブル作成し、テスト送信で保存を確認済み。
 
 **入っているもの**：4条件の割当（参加者番号ベースのラテン方格）、練習モード、
 操作ログ（所要時間・タップ数・訂正回数・ボタン実寸）、バス停オートコンプリート、
@@ -103,8 +105,12 @@ GPS 軌跡、送信キュー。
 - ~~バス停辞書の再生成~~ → **2026-09-17 実施済み**。国土数値情報 P11 大阪府(27)・**令和4年度版**（2010年版より新しい）
   から事業者名「阪急バス」を含む735件を抽出し `stops.js`（`window.HANKYU_STOPS`）を差し替えた。
   系統確定後、対象系統の停留所名は阪急バス公式サイトで照合する（令和4年度時点データなので現行と食い違う可能性は残る）
-- **Supabase**：`ui_responses.sql` / `ui_sessions.sql` が**未実行**。今はデータが端末の localStorage にしか残らない
-- **ホスティング**：参加者のスマホから HTTPS で開ける URL が必要（位置情報は HTTPS 必須）
+- ~~Supabase：`ui_responses.sql` / `ui_sessions.sql` が未実行~~ → **2026-09-18 実施済み**。
+  3ファイル（`ui_responses.sql`/`ui_sessions.sql`/`ui_report_feed.sql`）を Supabase SQL Editor で実行し、
+  テスト送信でデータが `ui_responses` に保存されることを確認済み
+- ~~ホスティング：参加者のスマホから HTTPS で開ける URL が必要~~ → **2026-09-18 実施済み**。
+  新規 public リポジトリ（`matsumototaichi-beep/bus-ui-study`）を作成し GitHub Pages で公開。
+  公開URL：https://matsumototaichi-beep.github.io/bus-ui-study/ （HTTPS、動作確認済み）
 - **`rich_labeled_bus_data.csv`（研究室の BLE 実測データ）を卒研の判断材料に使ってよいか未確認**
 - **クラスの区切りの計算内訳が未記録**。座席数と最大乗車数からの概算（松本の記憶）だが
   数字が書かれていない。`median` 条件のプリセット値がこれに依存するので、書き起こしが要る
@@ -216,7 +222,7 @@ Cは通勤流動が期待できる反面、便数と停留所数で他の2つに
 - **ファイルを変更したら必ずコミットする**
 - **`.gitignore` は変更しない**
 - **デプロイ・push など外部に反映する操作は、実行前に必ず確認を取る**
-  （`bus-ui-study` は現在リモート無し。NAIST アプリの push は本番公開）
+  （`bus-ui-study` は2026-09-18に public リポジトリ化・GitHub Pages公開済み。以後の push も本番反映なので確認は継続。NAIST アプリの push も本番公開）
 - **外部データを使うときは出典・整備主体・年次を必ず明示する**
 - **アプリの入力（位置情報・人数・バス停）はすべて任意。強制しない設計**
 - **同時に複数のチャットで同じリポジトリを編集しない。切り替える前に必ずコミットする**

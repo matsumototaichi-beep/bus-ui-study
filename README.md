@@ -24,7 +24,8 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 
 > Supabaseの接続先（URL/キー）は元アプリと同じままです。**テーブルが別なので混ざりません**が、
 > 完全分離したい場合は「別のSupabaseプロジェクトを作る」のが最も安全です（未決定）。
-> `ui_responses` はまだ作成していないため、現状このアプリで送信すると**保存は失敗します**（＝元データは汚れない安全側）。
+> **2026-09-18 に `ui_responses` / `ui_sessions` / `ui_report_feed` を作成済み**。
+> テスト送信で `ui_responses` に保存されることを確認済み。
 
 ## 構成
 - `index.html` … アプリ本体（UI条件の切替と操作ログをこれから実装）
@@ -42,17 +43,20 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 - `docs/log/` … 打ち合わせ・作業ごとの要点ログ
 
 ## これからやること（順序）
-1. **Supabaseにテーブル作成**：`ui_responses` ＋ 操作ログ用 `ui_sessions` / `ui_events`
+1. ~~Supabaseにテーブル作成~~ → **2026-09-18 完了**（`ui_responses` / `ui_sessions` / `ui_report_feed`）
 2. **ログ計装**：操作イベント（タップ・所要時間・訂正回数など）の記録
 3. **UI条件（バリアント）の割当**：セッションごとに自動で条件を切替・記録
 4. **エクスポートと分析**：JSON出力 → Python(pandas)で条件間比較
 
+## 公開URL
+**2026-09-18 に公開**：https://matsumototaichi-beep.github.io/bus-ui-study/（GitHub Pages・HTTPS）
+
 ## Git運用
-このリポジトリは**ローカルgit管理**（リモート未設定）。
-元アプリのリモートには**絶対にpushしない**ため、意図的にリモートを設定していません。
-公開が必要になったら、**新しい別リポジトリ**を作って接続してください。
+元アプリ（`naist-bus-congestion`）とは**別の新規リポジトリ**（`matsumototaichi-beep/bus-ui-study`、public）
+として2026-09-18に公開。元アプリのリモートには**絶対にpushしない**（別リポジトリなので誤って混ざる心配はない）。
 
 ```bash
 git log --oneline -5   # 作業開始時：前回までの変更を確認
 git add -A && git commit -m "変更内容"   # 作業終了時：必ずコミット
+git push origin master # 公開先(GitHub Pages)に反映。実行前に必ず確認を取ること
 ```
