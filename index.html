@@ -280,32 +280,42 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.7.7";
+const APP_VERSION = "uiStudy-0.7.8";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
    - 1回答 = 1セッション。開始からの相対ms(dt)で記録（端末時計のズレに非依存）
    - 条件はセッションごとに順番に割当（カウンターバランス）
    ========================================================== */
-// UI条件：入力方式 × 初期値 の2要因（各2水準＝4条件）。
-// 連続で同じ方式が続かない順に並べてある
+// UI条件：要因A＝入力方式（ステッパー／テンキー）、要因B＝「わからない」ボタンの有無。2×2＝4条件。
+//
+// ★2026-09-19: 初期値あり(count_init:"median")の条件を廃止した。人数欄は常に「—」から始まる。
+// 廃止の理由は2つある。
+// (1) ステッパーの初回タップはクラス下限(lo)から始まるため、「初期値なし」条件でも
+//     ステッパーには下限アンカーが効いてしまう。つまり「アンカーあり/なし」の対比が
+//     入力方式によって意味が変わる。ステッパーは起点なしには成立しないので、
+//     これは取り除ける交絡ではなく入力方式の性質そのもの。
+// (2) 初期値が入った状態から「わからない」に戻す手段が、テンキー(Cあり)とステッパー(なし)で
+//     非対称だった。先行実験(2026-09-18)で、数えられないときにステッパーでは0まで下げて
+//     送るしかなく、「わからない」が「0人」として記録された。
+// 代わりに「わからない」ボタンの有無を第2要因に据える。どちらの水準もボタンを置くか置かないかの
+// 違いだけなので、入力方式による意味のズレが起きない。
 const UI_CONDS = [
-  { input:"stepper", count_init:"none"   },
-  { input:"numpad",  count_init:"median" },
-  { input:"stepper", count_init:"median" },
-  { input:"numpad",  count_init:"none"   },
+  { input:"stepper", count_init:"none" },
+  { input:"numpad",  count_init:"none" },
 ];
-// ★2026-09-18: URLのクエリパラメータで条件を固定できるようにする
-// （例 ?input=stepper 、?input=stepper&init=median）。
-// 「入力方式ごとに別URLのアプリを配布し、実験者が渡すURLで条件を決める」運用のため。
-// 指定した軸は固定、指定しない軸は今までどおりアプリ内でローテーションする
-// （2本に分ける／4本に分けるのどちらでも同じコードで対応できる）。
+// ★2026-09-18: URLのクエリパラメータで条件を固定できるようにする（例 ?input=stepper、?unknown=off）。
+// 「条件ごとに別URLのアプリを配布し、実験者が渡すURLで条件を決める」運用のため。
+// 指定しない軸は今までどおりアプリ内でローテーションする。
 const URL_QS = new URLSearchParams(location.search);
 const FIXED_INPUT = (()=>{ const v=(URL_QS.get("input")||"").toLowerCase(); return (v==="stepper"||v==="numpad") ? v : null; })();
-const FIXED_INIT  = (()=>{ const v=(URL_QS.get("init") ||"").toLowerCase(); return (v==="none"||v==="median") ? v : null; })();
+// ★2026-09-19:「わからない」ボタンの有無（要因B）。?unknown=off で非表示、既定は表示。
+// 「逃げ道があると人は逃げるのか」＝ボタンがあると人数の欠損が増えるのかを見る。
+// これはアプリ内ではローテーションさせない。ボタンが出たり消えたりするのは参加者に気づかれ、
+// 条件そのものへの反応（要求特性）を生むため、便ごとに配布URLで固定する。
+const SHOW_UNKNOWN = (URL_QS.get("unknown")||"").toLowerCase() !== "off";
 function activeConds(){
-  const c = UI_CONDS.filter(x =>
-    (FIXED_INPUT===null || x.input===FIXED_INPUT) && (FIXED_INIT===null || x.count_init===FIXED_INIT));
+  const c = UI_CONDS.filter(x => FIXED_INPUT===null || x.input===FIXED_INPUT);
   return c.length ? c : UI_CONDS;   // 該当が0件（あり得ないURL指定）なら全条件にフォールバック
 }
 const UISTUDY_KEY  = "uistudy_sessions_v1";        // 未送信セッションの退避
@@ -340,7 +350,8 @@ function peekVariant(){
   const off = condOffset(conds.length);
   const c = conds[(n + off) % conds.length];
   return { input: c.input, count_init: c.count_init, seq: n, offset: off,
-           url_fixed: { input: FIXED_INPUT, count_init: FIXED_INIT },   // ★どの軸がURLで固定されていたか
+           unknown_ui: SHOW_UNKNOWN,          // ★要因B：「わからない」ボタンを出したか
+           url_fixed: { input: FIXED_INPUT }, // ★入力方式がURLで固定されていたか
            practice: prac };
 }
 // 送信/スキップが確定した回答についてだけ呼ぶ。カウンタを実際に1つ進める。
@@ -824,16 +835,13 @@ const COUNT_MIN=0, COUNT_MAX=99;
 function renderCount(){
   const t=T[lang];
   const [lo,hi]=COUNT_RANGES[pending.congestion_class-1];
-  // ★UI研究: 人数入力の初期値を条件で切替（none=未入力 / min=下限 / median=中央値）
-  const initMode  = (pending.variant && pending.variant.count_init) || "none";
+  // ★UI研究: 人数は常に未入力（「—」）から始める。初期値あり条件は廃止した（経緯は UI_CONDS のコメント）
   const inputMode = (pending.variant && pending.variant.input) || "stepper";
-  const nInit = (initMode==="min") ? lo : (initMode==="median") ? Math.round((lo+hi)/2) : null;
   // 入力途中の値は pending に持たせる。言語切替やナビで描き直されても失わないため。
   // 条件(variant)はクラスタップ時に確定済みなので、描き直しても条件は進まない
   const firstDraw = (pending.n_live===undefined);
-  if(firstDraw){ pending.n_live=nInit; pending.n_fresh=(nInit!==null); pending.n_unknown=false; }
+  if(firstDraw){ pending.n_live=null; pending.n_unknown=false; }
   let n = pending.n_live;
-  let fresh = pending.n_fresh;    // テンキー: プリセットが未置換か
   const cls=t.classes[pending.congestion_class-1];
   // 入力方式の条件で人数入力部を差し替える（他の要素は完全に同じにする）
   const ctrlHtml = (inputMode === "numpad") ? `
@@ -858,9 +866,9 @@ function renderCount(){
       <h2>${t.countTitle}</h2>
       <p class="hint">${t.countHint}</p>
       ${ctrlHtml}
-      <div class="unknownrow">
+      ${SHOW_UNKNOWN ? `<div class="unknownrow">
         <button type="button" id="unknownBtn">${t.unknown}</button>
-      </div>
+      </div>` : ``}
       <div class="stopwrap">
         <div class="stopfield">
           <label>${t.board_label}</label>
@@ -886,7 +894,7 @@ function renderCount(){
   wireStopField("destInput","destList","destSel","dest_stop");
   const cval=$("cval");
   const show=()=>{
-    pending.n_live=n; pending.n_fresh=fresh;    // 描き直しに備えて保持
+    pending.n_live=n;               // 描き直しに備えて保持
     cval.textContent = (n===null)?"—":((n>=COUNT_MAX)?COUNT_MAX+"+":String(n));
     cval.classList.toggle("noval", n===null);   // 未入力は破線枠で「まだ答えていない」と分かるように
   };
@@ -894,10 +902,10 @@ function renderCount(){
   // ★UI研究:「わからない」の明示。値を消すだけの C(クリア) とは別物として扱う。
   // 「一度も触っていない未入力」「触ったが消した」「数えられないと明言した」を
   // 解析で区別できるようにするため、専用のイベントとフラグで残す
-  const unknownBtn = $("unknownBtn");
-  const showUnknown = ()=>{ unknownBtn.classList.toggle("on", !!pending.n_unknown); };
+  const unknownBtn = SHOW_UNKNOWN ? $("unknownBtn") : null;
+  const showUnknown = ()=>{ if(unknownBtn) unknownBtn.classList.toggle("on", !!pending.n_unknown); };
   showUnknown();
-  unknownBtn.onclick=()=>{
+  if(unknownBtn) unknownBtn.onclick=()=>{
     const before = n;
     n = null; pending.n_unknown = true;
     show(); showUnknown();
@@ -913,7 +921,7 @@ function renderCount(){
     // Fittsの法則どおり標的の大きさによるものかを、解析側で切り分けられるようにするため
     const ctl = main.querySelector(inputMode==="numpad" ? ".numpad button" : ".stepper button");
     const cr  = ctl ? ctl.getBoundingClientRect() : null;
-    logEvent("screen_view", { screen:"count", input:inputMode, count_init:initMode,
+    logEvent("screen_view", { screen:"count", input:inputMode, count_init:"none", unknown_ui:SHOW_UNKNOWN,
                               lo:lo, hi:hi, cmin:COUNT_MIN, cmax:COUNT_MAX,
                               ctl_w: cr?Math.round(cr.width):null, ctl_h: cr?Math.round(cr.height):null,
                               vw: window.innerWidth, vh: window.innerHeight });
@@ -923,14 +931,12 @@ function renderCount(){
   }
 
   if(inputMode === "numpad"){
-    // プリセット値が入ったままの状態。最初の数字キーで置き換え、以降は追記（fresh は上で復元済み）
     main.querySelectorAll(".numpad button").forEach(b=>{ b.onclick=()=>{
       const k = b.dataset.k;
-      if(k === "C"){ n = null; fresh = false; if(LOG) LOG.corrections++; }
-      else if(k === "B"){ n = (n === null || n < 10) ? null : Math.floor(n/10); fresh = false; }
+      if(k === "C"){ n = null; if(LOG) LOG.corrections++; }
+      else if(k === "B"){ n = (n === null || n < 10) ? null : Math.floor(n/10); }
       else {
-        const cur = fresh ? "" : (n === null ? "" : String(n));
-        fresh = false;
+        const cur = (n === null) ? "" : String(n);
         if(cur.length >= 2){                       // 2桁上限。無反応だと不安なので枠を光らせる
           cval.classList.add("full");
           setTimeout(()=>cval.classList.remove("full"), 200);
@@ -957,7 +963,7 @@ function renderCount(){
     }; });
   }
   $("sendBtn").onclick=()=>{ answering=false; pending.exact_count=n;
-    logTap("send"); finishSession("submit", { count_touched: n!==nInit, exact_count:n,
+    logTap("send"); finishSession("submit", { count_touched: n!==null, exact_count:n,
                                               count_unknown: !!pending.n_unknown }); submit(); };
   $("skipBtn").onclick=()=>{ answering=false; pending.exact_count=null;
     logTap("skip"); finishSession("skip", { count_touched:false, exact_count:null,
