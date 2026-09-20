@@ -280,7 +280,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.7.8";
+const APP_VERSION = "uiStudy-0.7.9";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -444,8 +444,7 @@ function finishSession(outcome, extra){
     variant: LOG.variant,
     context: Object.assign({
       congestion_class: pending ? pending.congestion_class : null,
-      board_stop: pending ? (pending.board_stop || null) : null,
-      dest_stop:  pending ? (pending.dest_stop  || null) : null,
+      next_stop: pending ? (pending.next_stop || null) : null,
       gps_points: (pending && pending.trajectory) ? pending.trajectory.length : 0,
       screen_w: window.innerWidth, screen_h: window.innerHeight,
       lang: lang, app_version: APP_VERSION,
@@ -552,14 +551,14 @@ const T = {
     login_wait:"処理中…",
     pick:"混雑度を選択", records:"記録", none:"まだ記録がありません",
     classes:[
-      {lbl:"ガラガラ", rng:"0〜5人"},{lbl:"やや空き", rng:"6〜15人"},{lbl:"席が埋まる", rng:"16〜25人"},
-      {lbl:"立ち客", rng:"26〜40人"},{lbl:"混雑", rng:"41〜55人"},{lbl:"満員近い", rng:"56人〜"},
+      {lbl:"ガラガラ", rng:"0〜5人"},{lbl:"やや空き", rng:"6〜15人"},{lbl:"席が埋まる", rng:"16〜30人"},
+      {lbl:"立ち客", rng:"31〜45人"},{lbl:"混雑", rng:"46〜60人"},{lbl:"満員近い", rng:"61人〜"},
     ],
     countTitle:"正確な人数（任意）", countHint:"数えられれば入力（目安外の人数でもOK）",
     unknown:"わからない",
     back:"戻る", already_registered:"このメールは登録済みです。「ログイン」から入ってください。",
-    board_label:"乗車バス停（任意）", dest_label:"降車バス停（任意）",
-    board_ph:"バス停名を選択（任意）", dest_ph:"バス停名を選択（任意）",
+    next_label:"次に停まるバス停（任意）",
+    next_ph:"バス停名を選択（任意）",
     stop_selected:"選択済み", stop_clear:"取消",
     stop_source:"バス停データ出典：国土数値情報 バス停留所データ（国土交通省・大阪府・令和4年度）",
     stop_pick_hint:"候補から選んでください", count_range:"目安",
@@ -602,14 +601,14 @@ const T = {
     login_wait:"Processing…",
     pick:"Select the crowding level", records:"Records", none:"No records yet",
     classes:[
-      {lbl:"Empty", rng:"0–5"},{lbl:"Fairly empty", rng:"6–15"},{lbl:"Seats filling up", rng:"16–25"},
-      {lbl:"Some standing", rng:"26–40"},{lbl:"Crowded", rng:"41–55"},{lbl:"Nearly full", rng:"56+"},
+      {lbl:"Empty", rng:"0–5"},{lbl:"Fairly empty", rng:"6–15"},{lbl:"Seats filling up", rng:"16–30"},
+      {lbl:"Some standing", rng:"31–45"},{lbl:"Crowded", rng:"46–60"},{lbl:"Nearly full", rng:"61+"},
     ],
     countTitle:"Exact count (optional)", countHint:"Enter it only if you actually counted (any number is fine)",
     unknown:"Don't know",
     back:"Back", already_registered:"This email is already registered. Please sign in instead.",
-    board_label:"Boarding stop (optional)", dest_label:"Alighting stop (optional)",
-    board_ph:"Select a stop name (optional)", dest_ph:"Select a stop name (optional)",
+    next_label:"Next stop (optional)",
+    next_ph:"Select a stop name (optional)",
     stop_selected:"Selected", stop_clear:"Clear",
     stop_source:"Bus-stop data: MLIT National Land Numerical Information (Osaka Pref., FY2022)",
     stop_pick_hint:"Choose one from the list", count_range:"guide",
@@ -829,7 +828,17 @@ function wireStopField(inputId, listId, selId, field){
 }
 
 // クラスごとの人数レンジ。**入力の制限ではなく「目安」と初期値の基準**として使う。
-const COUNT_RANGES=[[0,5],[6,15],[16,25],[26,40],[41,55],[56,99]];
+// ★2026-09-20 改訂：阪急バスの実車に合わせて上半分をずらした。
+// 旧 [[0,5],[6,15],[16,25],[26,40],[41,55],[56,99]] は座席25席前後の中型車を想定した値だったが、
+// 吹田市内線（2系統・10系統）で通常使われるのは大型車（いすゞエルガ／日野ブルーリボン、座席24〜34席、
+// 法定定員76〜89人）で、中型車（エルガミオ／レインボー、座席20〜28席）はごく稀。
+// ラベルが「席が埋まる」「立ち客」と座席数を基準にした状態を指しているので、
+// クラス3の上限を大型車の座席数(約30)に合わせ、以降を繰り上げた。
+// 先行実験(2026-09-18)では旧しきい値でクラス4「立ち客」とクラス5「混雑」がどちらも36〜39人で
+// 使われており、数字とラベルが対応していなかった。
+// ※法定定員の立席分は床面積からの計算値で、体感の「満員」はそれよりかなり早い。
+//   クラス6の下限61人はその前提で置いている（先行実験の最大は約39人で未検証）。
+const COUNT_RANGES=[[0,5],[6,15],[16,30],[31,45],[46,60],[61,99]];
 // 実際に入力できる範囲：クラスに関係なく共通
 const COUNT_MIN=0, COUNT_MAX=99;
 function renderCount(){
@@ -871,16 +880,10 @@ function renderCount(){
       </div>` : ``}
       <div class="stopwrap">
         <div class="stopfield">
-          <label>${t.board_label}</label>
-          <input class="afield stopinput" id="boardInput" type="text" autocomplete="off" placeholder="${t.board_ph}">
-          <div class="stoplist" id="boardList"></div>
-          <div class="stopsel" id="boardSel"></div>
-        </div>
-        <div class="stopfield">
-          <label>${t.dest_label}</label>
-          <input class="afield stopinput" id="destInput" type="text" autocomplete="off" placeholder="${t.dest_ph}">
-          <div class="stoplist" id="destList"></div>
-          <div class="stopsel" id="destSel"></div>
+          <label>${t.next_label}</label>
+          <input class="afield stopinput" id="nextInput" type="text" autocomplete="off" placeholder="${t.next_ph}">
+          <div class="stoplist" id="nextList"></div>
+          <div class="stopsel" id="nextSel"></div>
         </div>
         <div class="stopsrc">${t.stop_source}</div>
       </div>
@@ -890,8 +893,7 @@ function renderCount(){
       </div>
     </div>`;
   answering = true;             // 人数入力画面を表示中（背景の再描画から保護）
-  wireStopField("boardInput","boardList","boardSel","board_stop");
-  wireStopField("destInput","destList","destSel","dest_stop");
+  wireStopField("nextInput","nextList","nextSel","next_stop");
   const cval=$("cval");
   const show=()=>{
     pending.n_live=n;               // 描き直しに備えて保持
@@ -993,7 +995,7 @@ function buildRec(p){
   const rp=repPoint(p);
   return { answered_at:p.answered_at, congestion_class:p.congestion_class,
            exact_count:p.exact_count, trajectory:p.trajectory,
-           board_stop:p.board_stop||null, dest_stop:p.dest_stop||null,
+           next_stop:p.next_stop||null,
            lat:rp.lat, lng:rp.lng, gps_accuracy:rp.acc, gps_fixed_at:rp.at,   // 代表位置(独立カラム)
            lang:lang, app_version:APP_VERSION,
            session_id:p.session_id||null, client_id:p.cid,     // ★UI研究: ui_sessions と結合

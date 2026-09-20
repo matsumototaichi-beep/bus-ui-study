@@ -13,8 +13,9 @@ create table if not exists public.ui_responses (
   congestion_class smallint    not null,                       -- 1〜6
   exact_count      integer,                                    -- 実測人数(任意, null可)
   trajectory       jsonb,                                      -- 回答中〜直後の短い軌跡 [{t,lat,lng,acc},...]
-  board_stop       jsonb,                                      -- 乗車バス停 {name,lat,lng}(任意)
-  dest_stop        jsonb,                                      -- 行先バス停 {name,lat,lng}(任意)
+  next_stop        jsonb,                                      -- ★次に停まるバス停 {name,lat,lng}(任意)
+  board_stop       jsonb,                                      -- 【廃止】乗車バス停。2026-09-20以降は書き込まれない
+  dest_stop        jsonb,                                      -- 【廃止】行先バス停。同上
   lat              double precision,                           -- 代表位置(緯度) answered_at最寄りの軌跡点
   lng              double precision,                           -- 代表位置(経度)
   gps_accuracy     real,                                       -- 代表位置の精度(m)
@@ -30,6 +31,13 @@ create table if not exists public.ui_responses (
 );
 
 -- 既存テーブルに後から列を足す場合（冪等）:
+-- ★2026-09-20：next_stop を追加。乗車/降車バス停（board_stop/dest_stop）の入力は廃止した。
+--   理由：あの2項目はNAIST側の目的（BLEセンサーの位置情報紐づけ。バスターミナルなど多数のバスが
+--   重なる地点でスマホのGPSだけでは便を識別できないため）のための項目で、BLEセンサーを設置していない
+--   阪急バスでは意味を持たない。代わりに「次に停まるバス停」を聞き、
+--   自己申告とGPS位置の一致度から**位置情報がどれだけ当てになるか**を測る。
+-- 旧2列は 2026-09-18 の先行実験データが入っているので **drop しない**。
+alter table public.ui_responses add column if not exists next_stop  jsonb;
 alter table public.ui_responses add column if not exists board_stop jsonb;
 alter table public.ui_responses add column if not exists dest_stop  jsonb;
 alter table public.ui_responses add column if not exists lat double precision;
