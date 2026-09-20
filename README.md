@@ -20,7 +20,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | 回答テーブル | `responses` | **`ui_responses`** |
 | 一覧ビュー | `report_feed` | **`ui_report_feed`** |
 | ローカル退避キー | `bus_outbox_v1` | **`uistudy_outbox_v1`** |
-| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.1`** |
+| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.7.9`**（2026-09-20時点） |
 
 > Supabaseの接続先（URL/キー）は元アプリと同じままです。**テーブルが別なので混ざりません**が、
 > 完全分離したい場合は「別のSupabaseプロジェクトを作る」のが最も安全です（未決定）。
@@ -28,8 +28,8 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 > テスト送信で `ui_responses` に保存されることを確認済み。
 
 ## 構成
-- `index.html` … アプリ本体（UI条件の切替と操作ログをこれから実装）
-- `stops.js` … バス停辞書735件・阪急バス（大阪府内、`window.HANKYU_STOPS`）
+- `index.html` … アプリ本体（**UI条件の切替・操作ログとも実装済み**）
+- `stops.js` … バス停辞書736件・阪急バス（大阪府内、`window.HANKYU_STOPS`）
   （出典：国土数値情報 バス停留所データ P11／国土交通省・大阪府・令和4年度〈2022年〉・PDL1.0＝出典明記で編集加工可。
   2026-09-17 に奈良県+京都府版〈平成22年・非商用〉から差し替え。実施事業者が阪急バスに変わったため）
 - `ui_responses.sql` / `ui_report_feed.sql` … Supabaseスキーマ（テーブル名を分離済み）

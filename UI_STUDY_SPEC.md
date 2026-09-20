@@ -298,15 +298,15 @@ SHOW_UNKNOWN = URLで決まる                     ← 要因B。そのURLの間
                "url_fixed": { "input": "numpad" }, "practice": false },
   "context": {
     "congestion_class": 4, "exact_count": 31, "count_touched": true, "count_unknown": false,
-    "board_stop": "...", "dest_stop": "...", "gps_points": 12,
-    "screen_w": 375, "screen_h": 667, "lang": "ja", "app_version": "uiStudy-0.7.8",
+    "next_stop": { "name": "五月が丘", "lat": 34.787456, "lng": 135.526811 }, "gps_points": 12,
+    "screen_w": 375, "screen_h": 667, "lang": "ja", "app_version": "uiStudy-0.7.9",
     "posture": "stand", "practice": false, "response_cid": "uuid"
   },
   "summary": { "t_total": 18420, "t_class": 3110, "t_count": 15300, "t_first": 2100, "t_stop": 5200,
                "taps_total": 9, "taps_value": 5, "corrections": 1 },
   "events": [
     { "dt": 0,    "type": "screen_view", "screen": "count", "input": "numpad", "count_init": "none",
-      "unknown_ui": true, "lo": 26, "hi": 40, "ctl_w": 93, "ctl_h": 48, "vw": 375, "vh": 812 },
+      "unknown_ui": true, "lo": 31, "hi": 45, "ctl_w": 93, "ctl_h": 48, "vw": 375, "vh": 812 },
     { "dt": 1240, "type": "numkey", "key": "3", "value": 3 },
     { "dt": 1880, "type": "numkey", "key": "8", "value": 38 },
     { "dt": 3010, "type": "tap", "target": "send" },
@@ -447,7 +447,8 @@ SHOW_UNKNOWN = URLで決まる                     ← 要因B。そのURLの間
 **2026-09-17 更新**：実施地域は阪急バス（吹田営業所管内）に確定、倫理審査は不要と確認済み（`docs/HANDOFF_hankyu.md`）。
 残る未決定事項：
 
-- **対象系統**（候補A〜C、下見で確定。`EXPERIMENT_PLAN.md` §5。候補Aから下見に着手）と実施時期・実施日数、1人あたりの乗車回数
+- ~~**対象系統**~~ → **2026-09-18 確定**：吹田市内線 **10系統**（JR吹田駅南口→桃山台駅）と **2系統**（桃山台駅→JR吹田駅北口）。
+  残るのは**実施時期・実施日数・1人あたりの乗車回数**
 - 管轄営業所への事前連絡（系統・日程確定後。承諾条件④）
 - 被験者の募集方法と謝礼
 - ~~**配布URLを何本に分けるか**~~ → **2026-09-19 決定**。要因Bをボタンの有無にしたので、

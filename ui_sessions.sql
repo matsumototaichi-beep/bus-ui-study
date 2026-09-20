@@ -12,9 +12,14 @@ create table if not exists public.ui_sessions (
   started_at          timestamptz,                           -- セッション開始(端末時刻)
   client_submitted_at timestamptz,                           -- 実送信時の端末時刻
   outcome             text,                                  -- submit | skip | abandon
-  variant             jsonb,                                 -- 割り当てたUI条件 {input, count_init, seq, offset}
-  context             jsonb,                                 -- 回答内容・画面サイズ・exp_code・posture・response_cid 等
-  summary             jsonb,                                 -- t_total/t_class/t_count/t_first/t_stop/taps/corrections
+  variant             jsonb,                                 -- 割り当てたUI条件 {input, count_init, unknown_ui, seq, offset, url_fixed, practice}
+                                                             --   input=要因A(stepper/numpad) / unknown_ui=要因B(「わからない」ボタンの有無)
+                                                             --   count_init は2026-09-19に要因から外れ、以降は常に "none"（それ以前は "median" が混在）
+  context             jsonb,                                 -- congestion_class / exact_count / count_touched / count_unknown /
+                                                             --   next_stop / gps_points / screen_w / screen_h / lang / app_version /
+                                                             --   posture / practice / response_cid
+                                                             --   （exp_code は2026-09-18、board_stop/dest_stop は2026-09-20に廃止）
+  summary             jsonb,                                 -- t_total/t_class/t_count/t_first/t_stop/taps_total/taps_value/corrections
   events              jsonb                                  -- 操作イベント列 [{dt,type,...}]
 );
 

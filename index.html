@@ -411,10 +411,10 @@ function wireExpBar(){
   const pr=$("pracBtn");
   if(pr) pr.onclick=()=>{ setDaily(PRACTICE_KEY, isPractice()?null:"1"); renderExpBar(); };
 }
-// 人数画面で最初に値を操作した時刻（＝考えていた時間の目安）
+// 人数画面を開いてから最初に値を操作するまでの時間（＝考えていた時間の目安）を1回だけ記録する
 function markFirst(){
   if(LOG && LOG.t_first==null && LOG.count_view_at!=null) LOG.t_first=Math.round(performance.now()-LOG.count_view_at);
-}   // クラス選択画面が表示された時刻（熟考時間の参考値）
+}
 
 function logStart(cls, variant){
   LOG = { session_id: uuid(), started_at: new Date().toISOString(), t0: performance.now(),
