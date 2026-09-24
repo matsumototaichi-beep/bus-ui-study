@@ -272,7 +272,7 @@
 <script>
 /* ==========================================================
    バス混雑度 HITL 収集アプリ (Phase A)
-   - メール＋パスワードで登録/ログイン(Supabase Auth)
+   - ID＋パスワードで登録/ログイン(Supabase Auth。ID は内部で <id>@id.local に変換)
    - 回答者が押すのは「クラス＋人数」だけ
    - 軌跡(約2.5秒間隔・回答前後 約20秒／方位・速度も)/時刻/surveyor_id は自動付与
    - 保存先: Supabase responses（失敗時は端末に退避して再送）
@@ -280,7 +280,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.7.9";
+const APP_VERSION = "uiStudy-0.8.0";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -539,15 +539,18 @@ const logEntries = [];      // 画面表示用(新しい順)
 const T = {
   ja:{
     auth_title:"バス混雑度 計測",
-    auth_intro:"バス車内の混み具合を答えていただく卒業研究です。メールアドレスで登録／ログインしてください。回答はクラスと人数だけ、位置と時刻は自動で記録されます。",
+    auth_intro:"バス車内の混み具合を答えていただく卒業研究です。<b>好きなIDとパスワード</b>を決めて登録してください（メールアドレスは使いません）。回答はクラスと人数だけ、位置と時刻は自動で記録されます。",
     tab_login:"ログイン", tab_signup:"新規登録",
-    ph_name:"表示名（調査員名）", ph_email:"メールアドレス", ph_pass:"パスワード（8文字以上）",
+    ph_id:"ID（半角英数 3〜20文字）", ph_email:"メールアドレス", ph_pass:"パスワード（6文字以上）",
+    id_hint:"IDとパスワードは当日もう一度使います。メモしておいてください。",
     do_login:"ログイン", do_signup:"登録してはじめる", signing:"処理中…",
     sent_title:"確認メールを送信しました",
     sent_desc:(e)=>`${e} 宛に確認メールを送りました。<b>同じ端末のこのブラウザ</b>でメール内のリンクを開くと、ここに戻って自動でログインします。`,
     resend:"確認メールを再送", to_login:"ログインへ戻る", resent:"再送しました",
-    err_login:"メールまたはパスワードが違います", err_unconfirmed:"メール確認が未完了です。受信した確認メールのリンクを開いてください。",
-    err_pass:"パスワードは8文字以上にしてください", err_email:"メールアドレスを入力してください", err_name:"表示名を入力してください",
+    err_login:"IDまたはパスワードが違います", err_unconfirmed:"このアカウントはまだ有効になっていません。実験者に伝えてください。",
+    err_pass:"パスワードは6文字以上にしてください", err_email:"IDを入力してください",
+    err_id_format:"IDは半角英数・ハイフン・アンダースコアで3〜20文字にしてください",
+    err_confirm_on:"登録はできましたが、サーバー側でメール確認が必要な設定のままです。実験者に伝えてください。",
     login_wait:"処理中…",
     pick:"混雑度を選択", records:"記録", none:"まだ記録がありません",
     classes:[
@@ -556,7 +559,7 @@ const T = {
     ],
     countTitle:"正確な人数（任意）", countHint:"数えられれば入力（目安外の人数でもOK）",
     unknown:"わからない",
-    back:"戻る", already_registered:"このメールは登録済みです。「ログイン」から入ってください。",
+    back:"戻る", already_registered:"このIDは使われています。別のIDにしてください。",
     next_label:"次に停まるバス停（任意）",
     next_ph:"バス停名を選択（任意）",
     stop_selected:"選択済み", stop_clear:"取消",
@@ -584,20 +587,23 @@ const T = {
     reset_title:"パスワード再設定", reset_desc:"登録したメールアドレスに、再設定用リンクを送ります。",
     reset_send:"再設定メールを送る", reset_sent:"再設定メールを送信しました。同じ端末のこのブラウザでメール内のリンクを開いてください。",
     newpass_title:"パスワードの再設定", newpass_desc:"新しいパスワードを入力してください。設定するとそのままログインします（追加の確認メールは届きません）。",
-    newpass_ph:"新しいパスワード（8文字以上）", newpass_save:"パスワードを更新", newpass_done:"パスワードを更新しました",
+    newpass_ph:"新しいパスワード（6文字以上）", newpass_save:"パスワードを更新", newpass_done:"パスワードを更新しました",
     newpass_done_desc:"新しいパスワードでログインしました。", go_app:"アプリへ進む",
   },
   en:{
     auth_title:"Bus Crowding Survey",
-    auth_intro:"Data collection for a graduation research study on bus crowding reports. Register or sign in with your email. You only choose the crowding level and count — your location and time are recorded automatically.",
+    auth_intro:"Data collection for a graduation research study on bus crowding reports. Pick <b>any ID and password</b> to register (no email needed). You only choose the crowding level and count — your location and time are recorded automatically.",
     tab_login:"Sign in", tab_signup:"Sign up",
-    ph_name:"Display name (surveyor)", ph_email:"Email address", ph_pass:"Password (8+ characters)",
+    ph_id:"ID (3-20 letters/digits)", ph_email:"Email address", ph_pass:"Password (6+ characters)",
+    id_hint:"You will need this ID and password again later today. Write them down.",
     do_login:"Sign in", do_signup:"Register & start", signing:"Processing…",
     sent_title:"Confirmation email sent",
     sent_desc:(e)=>`We sent a confirmation email to ${e}. Open the link <b>in this same browser</b> to return here signed in.`,
     resend:"Resend confirmation email", to_login:"Back to sign in", resent:"Resent",
-    err_login:"Incorrect email or password", err_unconfirmed:"Your email isn't confirmed yet. Open the link in the confirmation email.",
-    err_pass:"Password must be at least 8 characters", err_email:"Please enter your email", err_name:"Please enter a display name",
+    err_login:"Incorrect ID or password", err_unconfirmed:"This account is not active yet. Please tell the experimenter.",
+    err_pass:"Password must be at least 6 characters", err_email:"Please enter an ID",
+    err_id_format:"Use 3-20 letters, digits, hyphens or underscores",
+    err_confirm_on:"Registered, but the server still requires email confirmation. Please tell the experimenter.",
     login_wait:"Processing…",
     pick:"Select the crowding level", records:"Records", none:"No records yet",
     classes:[
@@ -606,7 +612,7 @@ const T = {
     ],
     countTitle:"Exact count (optional)", countHint:"Enter it only if you actually counted (any number is fine)",
     unknown:"Don't know",
-    back:"Back", already_registered:"This email is already registered. Please sign in instead.",
+    back:"Back", already_registered:"That ID is taken. Please choose another one.",
     next_label:"Next stop (optional)",
     next_ph:"Select a stop name (optional)",
     stop_selected:"Selected", stop_clear:"Clear",
@@ -634,7 +640,7 @@ const T = {
     reset_title:"Reset password", reset_desc:"We'll email a reset link to your registered address.",
     reset_send:"Send reset email", reset_sent:"Reset email sent. Open the link in this same browser.",
     newpass_title:"Set a new password", newpass_desc:"Enter a new password. You'll be signed in as soon as it's set (no extra confirmation email).",
-    newpass_ph:"New password (8+ characters)", newpass_save:"Update password", newpass_done:"Password updated",
+    newpass_ph:"New password (6+ characters)", newpass_save:"Update password", newpass_done:"Password updated",
     newpass_done_desc:"You're signed in with your new password.", go_app:"Go to the app",
   }
 };
@@ -1193,9 +1199,15 @@ async function loadFeed(){
   el.innerHTML=`<div style="font-size:12px;color:var(--muted);padding:6px 2px 8px">${t.feed_count(data.length)}</div>${rows}`;
 }
 
-/* ---------------- 認証（メール＋パスワード） ---------------- */
+/* ---------------- 認証（ID＋パスワード。uiStudy-0.8.0 でメール登録を廃止） ----------------
+   参加者はその場で任意のID（半角英数3〜20字）とパスワード（6字以上）を決めるだけ。
+   normLogin() が "@" を含まない入力に ID_DOMAIN を補うので、Supabase 側は従来どおり
+   メール＋パスワードのまま動く。**Supabase の Authentication → Confirm email を OFF にすること**
+   （ON のままだと @id.local 宛に確認メールが飛び、参加者は永久にログインできない）。
+   「パスワードを忘れた方」はメール前提なので画面から外した（reset/newpass のコードは残置）。 */
 let authMode = "login";   // login | signup | sent
-let authForm = { email:"", pass:"", name:"", sentEmail:"" };
+let authForm = { email:"", pass:"", sentEmail:"" };   // email には「ID」もそのまま入る（normLoginで固定ドメインを補う）
+const ID_RE = /^[A-Za-z0-9_-]{3,20}$/;
 
 function renderAuth(){
   const t=T[lang];
@@ -1258,7 +1270,7 @@ function renderAuth(){
       </div>`;
     const submit=async()=>{
       const pass=$("fNewPass").value||"";
-      if(pass.length<8){ authNote(t.err_pass); return; }
+      if(pass.length<6){ authNote(t.err_pass); return; }
       const b=$("npBtn"); b.disabled=true; b.textContent=t.signing;
       try{
         const { error }=await sb.auth.updateUser({ password:pass }); if(error) throw error;
@@ -1284,39 +1296,38 @@ function renderAuth(){
         <button class="atab ${isSignup?'on':''}" id="tabSignup">${t.tab_signup}</button>
       </div>
       <div class="authform">
-        ${isSignup?`<input class="afield" id="fName" type="text" placeholder="${t.ph_name}" autocomplete="name" value="${authForm.name||''}">`:``}
-        <input class="afield" id="fEmail" type="email" inputmode="email" autocapitalize="none" autocomplete="email" placeholder="${t.ph_email}" value="${authForm.email||''}">
+        <input class="afield" id="fEmail" type="text" inputmode="latin" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="${t.ph_id}" value="${authForm.email||''}">
         <input class="afield" id="fPass" type="password" autocomplete="${isSignup?'new-password':'current-password'}" placeholder="${t.ph_pass}" value="${authForm.pass||''}">
         <button class="btn primary" id="authBtn">${isSignup?t.do_signup:t.do_login}</button>
         <p class="hint" id="authNote"></p>
-        ${!isSignup?`<button class="atab" id="forgotBtn" style="border:none;color:var(--muted);font-weight:600">${t.forgot}</button>`:``}
+        ${isSignup?`<p class="hint">${t.id_hint}</p>`:``}
       </div>
     </div>`;
   $("tabLogin").onclick=()=>{ grabAuth(); authMode="login"; renderAuth(); };
   $("tabSignup").onclick=()=>{ grabAuth(); authMode="signup"; renderAuth(); };
   $("authBtn").onclick=submitAuth;
-  if($("forgotBtn")) $("forgotBtn").onclick=()=>{ grabAuth(); authMode="reset"; renderAuth(); };
   setStatus(configured?"":T[lang].notconf, !configured);
 }
 function grabAuth(){
   if($("fEmail")) authForm.email=$("fEmail").value.trim();
   if($("fPass"))  authForm.pass=$("fPass").value;
-  if($("fName"))  authForm.name=$("fName").value.trim();
 }
 function authNote(msg){ const n=$("authNote"); if(n) n.textContent=msg||""; }
 async function submitAuth(){
   const t=T[lang];
   if(!configured){ toast(t.notconf,"#dc2626"); return; }
   grabAuth();
-  const email=normLogin(authForm.email), pass=authForm.pass;   // ID入力なら固定ドメイン付与
+  const rawId=(authForm.email||"").trim();
+  const email=normLogin(rawId), pass=authForm.pass;   // ID入力なら固定ドメイン付与
   if(!email){ authNote(t.err_email); return; }
-  if(!pass || pass.length<8){ authNote(t.err_pass); return; }
+  // "@"を含まない＝ID方式。書式をここで弾き、Supabase側の分かりにくいエラーを participants に見せない
+  if(!rawId.includes("@") && !ID_RE.test(rawId)){ authNote(t.err_id_format); return; }
+  if(!pass || pass.length<6){ authNote(t.err_pass); return; }
   const btn=$("authBtn"); if(btn){ btn.disabled=true; btn.textContent=t.signing; }
   try{
     if(authMode==="signup"){
-      if(!authForm.name){ authNote(t.err_name); return; }
       const { data, error } = await sb.auth.signUp({ email, password:pass,
-        options:{ emailRedirectTo: location.origin+location.pathname, data:{ display_name:authForm.name } } });
+        options:{ emailRedirectTo: location.origin+location.pathname, data:{ display_name:rawId } } });
       if(error) throw error;
       // 既登録メールの検知: Supabaseはユーザー列挙対策で、登録済みメールでも
       // エラーを返さず identities:[] の“ダミー”userを返す。これを弾いてログインへ誘導。
@@ -1324,6 +1335,9 @@ async function submitAuth(){
         authForm.email=email; authMode="login"; renderAuth(); authNote(t.already_registered); return;
       }
       if(data.session){ /* 確認OFF環境: 即ログイン(onAuthStateChangeが処理) */ }
+      // ID方式は @id.local 宛なので確認メールは永久に届かない。Supabase の Confirm email が
+      // ONのままだとここに来る（＝設定漏れ）。参加者をバス停で立ち往生させないための分岐。
+      else if(!rawId.includes("@")){ authNote(t.err_confirm_on); return; }
       else { authForm.sentEmail=email; authMode="sent"; renderAuth(); return; }
     } else {
       const { error } = await sb.auth.signInWithPassword({ email, password:pass });

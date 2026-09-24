@@ -13,7 +13,7 @@
 | | NAIST アプリ | 卒業研究 |
 |---|---|---|
 | リポジトリ | `★アプリケーション/naist-bus-congestion`（GitHub 公開中） | `bus-ui-study`（**2026-09-18 GitHub Pages公開**：https://matsumototaichi-beep.github.io/bus-ui-study/ ） |
-| 版 | `phaseA-1.7` | `uiStudy-0.7.9` |
+| 版 | `phaseA-1.7` | `uiStudy-0.8.0` |
 | 目的 | **人数を回答するアプリを作り、正確な車内人数を集めて BLE 研究に使う** | **そのアプリを使うときの人間の心理**（UI が回答値をどう動かすか） |
 | 相手 | NAIST の先生・Aさん・Bさん | 大学のゼミ教授、阪急バス |
 | 成果物 | 収集データそのもの | UI 条件間の差の分析 |
@@ -80,7 +80,7 @@
 
 ## 3. アプリの現状（`bus-ui-study`）
 
-`uiStudy-0.7.9`。動く。**2026-09-18 に public リポジトリ化＋GitHub Pagesで公開済み**
+`uiStudy-0.8.0`。動く。**2026-09-18 に public リポジトリ化＋GitHub Pagesで公開済み**
 （https://matsumototaichi-beep.github.io/bus-ui-study/ 、HTTPS）。
 Supabase（`ui_responses`/`ui_sessions`）も同日にテーブル作成し、テスト送信で保存を確認済み。
 **2026-09-18 に先行実験（下見乗車）を実施し、39件の実データを取得**（`docs/log/2026-09-19_hankyu.md`）。
@@ -314,7 +314,7 @@ C:\Users\taichi\Desktop\研究\bus-ui-study\
   HANDOFF.md              旧引き継ぎ（決まっていないこと一覧が有用）
   LITERATURE.md           文献
   QUESTIONNAIRE.md        事後アンケート案
-  index.html              実験用アプリ（uiStudy-0.7.9）
+  index.html              実験用アプリ（uiStudy-0.8.0）
   docs/log/               日付ごとの作業ログ
   docs/senpai_feedback.md NAIST 先輩のフィードバック台帳（※NAIST 側の話）
 ```

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>乗降計数 記録用紙</title>
+<style>
+  /* A4 片面1枚／1便1枚。ブラウザで開いて Ctrl+P →「用紙:A4」「余白:なし or 既定」「背景のグラフィック:ON」 */
+  @page { size: A4 portrait; margin: 10mm; }
+
+  :root{
+    --ink:#000; --line:#333; --thin:#999; --tint:#eee; --note:#444;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:#f4f4f5; color:var(--ink);
+    font-family:"Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; }
+
+  .sheet{
+    width:190mm; min-height:277mm; margin:8mm auto; padding:0;
+    background:#fff; box-shadow:0 1px 6px rgba(0,0,0,.25);
+  }
+  .sheet + .sheet{ page-break-before:always; }
+
+  h1{ font-size:13pt; margin:0 0 1.5mm; letter-spacing:.04em; }
+  .sub{ font-size:8pt; color:var(--note); margin:0 0 2.5mm; }
+
+  table{ border-collapse:collapse; width:100%; }
+  th,td{ border:.35mm solid var(--line); padding:0 1.2mm; font-size:9pt; }
+
+  /* --- 見出し欄 --- */
+  .head th{ background:var(--tint); width:16mm; font-size:8pt; font-weight:700; text-align:center; }
+  .head td{ height:7mm; }
+  .head .wide{ width:auto; }
+  .circle{ font-size:10pt; letter-spacing:.35em; }
+
+  /* --- 本表 --- */
+  .log{ margin-top:2.5mm; }
+  .log th{ background:var(--tint); font-size:8pt; height:7mm; text-align:center; }
+  .log td{ height:7.3mm; }
+  .log .no{ width:8mm; text-align:center; font-size:8pt; color:var(--note); }
+  .log .stop{ width:52mm; font-size:9pt; }
+  .log .time{ width:20mm; }
+  .log .tally{ width:auto; background:
+      repeating-linear-gradient(to right, transparent 0 7mm, #e8e8e8 7mm 7.2mm); }
+  .log .num{ width:16mm; text-align:center; }
+  .log tr:last-child td{ border-bottom:.7mm solid var(--line); }
+  .log .term td{ background:#f6f6f6; font-weight:700; }
+  .blankstop{ background:repeating-linear-gradient(to bottom, transparent 0 6.9mm, #ddd 6.9mm 7.1mm); }
+
+  /* --- 合計・点検 --- */
+  .foot{ margin-top:2mm; display:flex; gap:3mm; }
+  .foot .box{ border:.35mm solid var(--line); padding:2mm; font-size:8pt; }
+  .total{ width:62mm; }
+  .total .big{ font-size:11pt; letter-spacing:.1em; display:block; margin-top:2mm; }
+  .check{ flex:1; }
+  .check b{ display:block; margin-bottom:1mm; font-size:8.5pt; }
+  .check li{ margin:0 0 .8mm; }
+  ul{ margin:0; padding-left:4mm; }
+
+  .rules{ margin-top:2mm; border:.35mm solid var(--thin); padding:2mm 2mm 2mm 2mm; font-size:7.6pt; color:var(--note); }
+  .rules b{ color:var(--ink); }
+  .rules ul{ columns:2; column-gap:5mm; padding-left:4mm; }
+  .rules li{ break-inside:avoid; margin-bottom:.6mm; }
+
+  .warn{ margin-top:1.5mm; font-size:7.2pt; border:.35mm dashed #b45309; color:#7c2d12; padding:1.6mm 2mm; background:#fffbeb; }
+
+  @media print{
+    html,body{ background:#fff; }
+    .sheet{ margin:0; box-shadow:none; width:auto; min-height:0; }
+    .screenonly{ display:none; }
+  }
+  .screenonly{ max-width:190mm; margin:8mm auto 0; font-size:12px; color:#3f3f46;
+    background:#fff; border:1px solid #d4d4d8; border-radius:6px; padding:10px 14px; }
+</style>
+</head>
+<body>
+
+<div class="screenonly">
+  <b>印刷のしかた</b>：Ctrl+P（Macは ⌘P）→ 用紙 <b>A4・縦</b>、倍率 <b>100%</b>、<b>両面印刷はオフ</b>、
+  「背景のグラフィック」を<b>オン</b>。1便につき1枚。<b>乗車係・降車係それぞれに1枚ずつ</b>配ってください。
+  2枚目（JR吹田駅北口 → 桃山台駅 方面）は停留所名が空欄です。印刷前に公式時刻表で確認して書き込むか、手書きで埋めてください。
+</div>
+
+<!-- ================= 1枚目：桃山台駅 → JR吹田駅（北口） ================= -->
+<section class="sheet">
+  <h1>乗降計数 記録用紙 ― 阪急バス 吹田市内線 2系統</h1>
+  <p class="sub">方向：<b>桃山台駅 → ＪＲ吹田駅（北口）</b>　／　この用紙1枚で1便。<b>乗車係と降車係で別の用紙を使う。</b></p>
+
+  <table class="head">
+    <tr>
+      <th>日付</th><td class="wide"></td>
+      <th>氏名</th><td class="wide"></td>
+      <th>担当</th><td style="width:34mm" class="circle">乗車　・　降車</td>
+    </tr>
+    <tr>
+      <th>便</th><td class="circle" style="width:34mm">1本目　・　2本目</td>
+      <th>発車時刻</th><td style="width:30mm"></td>
+      <th>車両</th><td class="circle">大型　・　中型</td>
+    </tr>
+  </table>
+
+  <table class="log">
+    <tr>
+      <th class="no">#</th><th class="stop">停留所名</th><th class="time">通過時刻</th>
+      <th class="tally">正の字（1画＝1人）</th><th class="num">人数</th>
+    </tr>
+    <tr><td class="no">0</td><td class="stop"><b>桃山台駅</b>（始発）</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">1</td><td class="stop">桃山台二丁目</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">2</td><td class="stop">阪急南千里駅</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">3</td><td class="stop">佐竹台診療所前</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">4</td><td class="stop">高野台中学校前</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">5</td><td class="stop">佐竹台五丁目</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">6</td><td class="stop">佐竹台六丁目</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">7</td><td class="stop">亥子谷</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">8</td><td class="stop">五月が丘</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">9</td><td class="stop">佐井寺北</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">10</td><td class="stop">佐井寺</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">11</td><td class="stop">竹谷</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">12</td><td class="stop">総合運動場前</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">13</td><td class="stop">佐井寺南が丘</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">14</td><td class="stop">上山手町</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">15</td><td class="stop">朝日が丘町名神下</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">16</td><td class="stop">片山小学校前</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr class="term"><td class="no">17</td><td class="stop">ＪＲ吹田駅（北口）（終点）</td><td></td><td class="tally"></td><td class="num"></td></tr>
+  </table>
+
+  <div class="foot">
+    <div class="box total">
+      合計（この用紙の人数欄の総和）
+      <span class="big">　　　　　　　　人</span>
+    </div>
+    <div class="box check">
+      <b>終点での突き合わせ（2人で必ず行う）</b>
+      <ul>
+        <li>乗車係の合計 −　降車係の合計 ＝ <b>0</b> になるはず</li>
+        <li>0 にならなければ <b>その便は基準値なし</b>として扱う。無理に数を合わせない</li>
+        <li>途中で「車内人数がマイナス」になる区間があれば、そこが数え間違い</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="rules">
+    <b>数え方の取り決め（両係 共通）</b>
+    <ul>
+      <li><b>自分の担当だけ</b>を数える。乗車係は降りた人を数えない／降車係は乗った人を数えない</li>
+      <li><b>運転士は含めない。</b>計数役と参加者は含める</li>
+      <li>ベビーカー・車椅子・抱っこされた子どもも <b>1人</b></li>
+      <li>数え落としたら、その行の人数欄に <b>「？」</b> を書いて先へ進む。<b>あとから直さない</b></li>
+      <li>通過（誰も乗り降りしない）は <b>0</b> と書く。空欄にしない</li>
+      <li>参加者に話しかけない。<b>別々に乗車</b>し、関わらない</li>
+      <li>スマホは使わない（回答者と間違われるため）。<b>紙とペンのみ</b></li>
+      <li>車両が中型（座席20〜28席）だった場合は上の「車両」欄に必ず○</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= 2枚目：ＪＲ吹田駅（北口） → 桃山台駅 ================= -->
+<section class="sheet">
+  <h1>乗降計数 記録用紙 ― 阪急バス 吹田市内線 2系統</h1>
+  <p class="sub">方向：<b>ＪＲ吹田駅（北口） → 桃山台駅</b>　／　この用紙1枚で1便。<b>乗車係と降車係で別の用紙を使う。</b></p>
+
+  <table class="head">
+    <tr>
+      <th>日付</th><td class="wide"></td>
+      <th>氏名</th><td class="wide"></td>
+      <th>担当</th><td style="width:34mm" class="circle">乗車　・　降車</td>
+    </tr>
+    <tr>
+      <th>便</th><td class="circle" style="width:34mm">1本目　・　2本目</td>
+      <th>発車時刻</th><td style="width:30mm"></td>
+      <th>車両</th><td class="circle">大型　・　中型</td>
+    </tr>
+  </table>
+
+  <div class="warn">
+    <b>停留所名は未記入です。</b>この方向の停留所順は下見（2026-09-18）で実地確認できていません。
+    印刷する前に阪急バス公式の停留所時刻表で並びを確認し、記入してから複製してください。
+    確認できていない並びをそのまま刷ると、計数役が行をずらして記録します。
+  </div>
+
+  <table class="log">
+    <tr>
+      <th class="no">#</th><th class="stop">停留所名</th><th class="time">通過時刻</th>
+      <th class="tally">正の字（1画＝1人）</th><th class="num">人数</th>
+    </tr>
+    <tr><td class="no">0</td><td class="stop"><b>ＪＲ吹田駅（北口）</b>（始発）</td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">1</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">2</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">3</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">4</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">5</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">6</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">7</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">8</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">9</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">10</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">11</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">12</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">13</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">14</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">15</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr><td class="no">16</td><td class="stop blankstop"></td><td></td><td class="tally"></td><td class="num"></td></tr>
+    <tr class="term"><td class="no">17</td><td class="stop"><b>桃山台駅</b>（終点）</td><td></td><td class="tally"></td><td class="num"></td></tr>
+  </table>
+
+  <div class="foot">
+    <div class="box total">
+      合計（この用紙の人数欄の総和）
+      <span class="big">　　　　　　　　人</span>
+    </div>
+    <div class="box check">
+      <b>終点での突き合わせ（2人で必ず行う）</b>
+      <ul>
+        <li>乗車係の合計 −　降車係の合計 ＝ <b>0</b> になるはず</li>
+        <li>0 にならなければ <b>その便は基準値なし</b>として扱う。無理に数を合わせない</li>
+        <li>途中で「車内人数がマイナス」になる区間があれば、そこが数え間違い</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="rules">
+    <b>数え方の取り決め（両係 共通）</b>
+    <ul>
+      <li><b>自分の担当だけ</b>を数える。乗車係は降りた人を数えない／降車係は乗った人を数えない</li>
+      <li><b>運転士は含めない。</b>計数役と参加者は含める</li>
+      <li>ベビーカー・車椅子・抱っこされた子どもも <b>1人</b></li>
+      <li>数え落としたら、その行の人数欄に <b>「？」</b> を書いて先へ進む。<b>あとから直さない</b></li>
+      <li>通過（誰も乗り降りしない）は <b>0</b> と書く。空欄にしない</li>
+      <li>参加者に話しかけない。<b>別々に乗車</b>し、関わらない</li>
+      <li>スマホは使わない（回答者と間違われるため）。<b>紙とペンのみ</b></li>
+      <li>車両が中型（座席20〜28席）だった場合は上の「車両」欄に必ず○</li>
+    </ul>
+  </div>
+</section>
+
+</body>
+</html>

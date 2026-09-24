@@ -20,7 +20,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | 回答テーブル | `responses` | **`ui_responses`** |
 | 一覧ビュー | `report_feed` | **`ui_report_feed`** |
 | ローカル退避キー | `bus_outbox_v1` | **`uistudy_outbox_v1`** |
-| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.7.9`**（2026-09-20時点） |
+| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.8.0`**（2026-09-21時点） |
 
 > Supabaseの接続先（URL/キー）は元アプリと同じままです。**テーブルが別なので混ざりません**が、
 > 完全分離したい場合は「別のSupabaseプロジェクトを作る」のが最も安全です（未決定）。
