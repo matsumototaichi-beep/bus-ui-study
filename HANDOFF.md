@@ -237,7 +237,7 @@
 3. ~~実験者が参加者ごとに条件の開始位置を指定できるようにする~~ → **廃止**（参加者番号ごと 2026-09-18 に廃止。条件は配布URLで決める）
 4. ~~実験版アプリの公開~~ → **2026-09-18 実施済み**（GitHub Pages）
 5. ~~バス停辞書を実施路線に絞る~~ → **2026-09-19 実施済み**（阪急バス736件）
-6. **Supabase の Authentication → Confirm email を OFF にする**（`uiStudy-0.8.0` のID方式に必須。未対応だと参加者がログインできない）
+6. ~~**Supabase の Authentication → Confirm email を OFF にする**~~ → **2026-09-25 確認済み**。`/auth/v1/settings` の `mailer_autoconfirm` が true、`disable_signup` が false。ID方式でそのままログインできる
 7. **`uiStudy-0.8`：停留所ID割当表による条件割当**（改修凍結は10月上旬）
 8. 事後アンケートを Google Forms で作る（`QUESTIONNAIRE.md` v2.0 の**4版**＋画面4枚の撮影）
 9. 分析スクリプト（CSV/JSON → pandas、混合効果モデル・ICC）

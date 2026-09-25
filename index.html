@@ -1202,7 +1202,8 @@ async function loadFeed(){
 /* ---------------- 認証（ID＋パスワード。uiStudy-0.8.0 でメール登録を廃止） ----------------
    参加者はその場で任意のID（半角英数3〜20字）とパスワード（6字以上）を決めるだけ。
    normLogin() が "@" を含まない入力に ID_DOMAIN を補うので、Supabase 側は従来どおり
-   メール＋パスワードのまま動く。**Supabase の Authentication → Confirm email を OFF にすること**
+   メール＋パスワードのまま動く。**Supabase の Authentication → Confirm email は OFF であること**
+   （2026-09-25 確認済み：`/auth/v1/settings` の `mailer_autoconfirm` が true）
    （ON のままだと @id.local 宛に確認メールが飛び、参加者は永久にログインできない）。
    「パスワードを忘れた方」はメール前提なので画面から外した（reset/newpass のコードは残置）。 */
 let authMode = "login";   // login | signup | sent
