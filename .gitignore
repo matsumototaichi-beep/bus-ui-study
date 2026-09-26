@@ -12,3 +12,12 @@ Thumbs.db
 .DS_Store
 __pycache__/
 *.pyc
+
+# 参加者アカウント（IDとパスワードが入る。このリポジトリは public なので絶対に入れない）
+accounts*.csv
+accounts*.html
+.env
+
+# 参加者名簿・スケジュール（氏名や連絡先が入る）
+schedule*.xlsx
+*_名簿*.xlsx
