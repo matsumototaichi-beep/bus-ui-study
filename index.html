@@ -65,6 +65,9 @@
   .posture.unset{border-color:#f59e0b;}
   .pz{border:none; background:transparent; color:var(--muted); padding:6px 11px; font-size:12px; font-weight:700; font-family:inherit;}
   .pz.on{background:#2563eb; color:#fff;}
+  /* ★uiStudy-0.8.1: パスワード表示チェックボックス */
+  .pwshow{ display:flex; align-items:center; gap:.5em; margin:-.2em 0 .2em; cursor:pointer; }
+  .pwshow input{ width:1.1em; height:1.1em; }
   /* 練習モード：切り忘れが最悪なので、オンの間は必ず目に入る色にする */
   .prac{border:1px solid var(--line); background:var(--bg); color:var(--muted); border-radius:9px; padding:6px 10px; font-size:12px; font-family:inherit; white-space:nowrap;}
   .prac.on{background:#f59e0b; border-color:#f59e0b; color:#1f2937; font-weight:800;}
@@ -280,7 +283,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://qhfegbptgkgccwdnrnas.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SZKczNkJSCrilMnACZ4Xnw_CV5UeZWN";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.8.0";
+const APP_VERSION = "uiStudy-0.8.1";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -509,6 +512,13 @@ function isAdmin(){ return !!(user && ADMIN_EMAILS.map(s=>s.toLowerCase()).inclu
    → 先輩/先方と共有する管理者アカウントを ID＋パスワードだけでログインできる。 */
 const ID_DOMAIN = "id.local";
 function normLogin(v){ v=(v||"").trim(); return (v && !v.includes("@")) ? v.toLowerCase()+"@"+ID_DOMAIN : v; }
+// ★uiStudy-0.8.1: 全角英数を半角に直す。スマホのキーボードが日本語入力のままだと
+// 参加者は「ｔａｒｏ０１」のように全角で打ってしまい、ID書式エラーで足止めされる。
+// 当日バス停で直し方を説明する時間はないので、こちらで吸収する。ID欄にだけ効かせる。
+function toHalf(v){
+  return (v||"").replace(/[！-～]/g, function(c){ return String.fromCharCode(c.charCodeAt(0)-0xFEE0); })
+                .replace(/　/g, " ").trim();
+}
 
 /* 軌跡サンプリング設定 */
 const SAMPLE_MS = 2500;   // サンプル間隔(約2.5秒)
@@ -542,7 +552,9 @@ const T = {
     auth_intro:"バス車内の混み具合を答えていただく卒業研究です。<b>好きなIDとパスワード</b>を決めて登録してください（メールアドレスは使いません）。回答はクラスと人数だけ、位置と時刻は自動で記録されます。",
     tab_login:"ログイン", tab_signup:"新規登録",
     ph_id:"ID（半角英数 3〜20文字）", ph_email:"メールアドレス", ph_pass:"パスワード（6文字以上）",
-    id_hint:"IDとパスワードは当日もう一度使います。メモしておいてください。",
+    id_hint:"このIDとパスワードは、別の日にもう一度使います。配布カードに必ず書いてください。",
+    show_pass:"パスワードを表示して確かめる",
+    confirm_logout:"ログアウトします。次に使うときはIDとパスワードの入力が必要です。よろしいですか？",
     do_login:"ログイン", do_signup:"登録してはじめる", signing:"処理中…",
     sent_title:"確認メールを送信しました",
     sent_desc:(e)=>`${e} 宛に確認メールを送りました。<b>同じ端末のこのブラウザ</b>でメール内のリンクを開くと、ここに戻って自動でログインします。`,
@@ -595,7 +607,9 @@ const T = {
     auth_intro:"Data collection for a graduation research study on bus crowding reports. Pick <b>any ID and password</b> to register (no email needed). You only choose the crowding level and count — your location and time are recorded automatically.",
     tab_login:"Sign in", tab_signup:"Sign up",
     ph_id:"ID (3-20 letters/digits)", ph_email:"Email address", ph_pass:"Password (6+ characters)",
-    id_hint:"You will need this ID and password again later today. Write them down.",
+    id_hint:"You will need this ID and password again on another day. Write them on your card.",
+    show_pass:"Show password",
+    confirm_logout:"Sign out? You will need your ID and password to get back in.",
     do_login:"Sign in", do_signup:"Register & start", signing:"Processing…",
     sent_title:"Confirmation email sent",
     sent_desc:(e)=>`We sent a confirmation email to ${e}. Open the link <b>in this same browser</b> to return here signed in.`,
@@ -1299,6 +1313,7 @@ function renderAuth(){
       <div class="authform">
         <input class="afield" id="fEmail" type="text" inputmode="latin" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="${t.ph_id}" value="${authForm.email||''}">
         <input class="afield" id="fPass" type="password" autocomplete="${isSignup?'new-password':'current-password'}" placeholder="${t.ph_pass}" value="${authForm.pass||''}">
+        <label class="hint pwshow"><input type="checkbox" id="fShow"> ${t.show_pass}</label>
         <button class="btn primary" id="authBtn">${isSignup?t.do_signup:t.do_login}</button>
         <p class="hint" id="authNote"></p>
         ${isSignup?`<p class="hint">${t.id_hint}</p>`:``}
@@ -1306,11 +1321,17 @@ function renderAuth(){
     </div>`;
   $("tabLogin").onclick=()=>{ grabAuth(); authMode="login"; renderAuth(); };
   $("tabSignup").onclick=()=>{ grabAuth(); authMode="signup"; renderAuth(); };
+  // ★uiStudy-0.8.1: 伏せ字のままだと打ち間違いに気づけない。2日目の再ログインで効く。
+  $("fShow").onchange=(e)=>{ $("fPass").type = e.target.checked ? "text" : "password"; };
+  $("fEmail").addEventListener("blur", ()=>{ $("fEmail").value = toHalf($("fEmail").value); });
   $("authBtn").onclick=submitAuth;
   setStatus(configured?"":T[lang].notconf, !configured);
 }
 function grabAuth(){
-  if($("fEmail")) authForm.email=$("fEmail").value.trim();
+  // ★uiStudy-0.8.1: 全角で打たれたIDは半角に直し、直した結果を入力欄にも戻す
+  // （黙って変換すると「打った字と違う」と混乱するため、見える形にする）。
+  // パスワードは本人が決めた文字列そのものなので触らない。代わりに「表示」で確認できるようにした。
+  if($("fEmail")){ var v=toHalf($("fEmail").value); $("fEmail").value=v; authForm.email=v; }
   if($("fPass"))  authForm.pass=$("fPass").value;
 }
 function authNote(msg){ const n=$("authNote"); if(n) n.textContent=msg||""; }
@@ -1359,6 +1380,9 @@ async function submitAuth(){
 async function boot(){
   $("langBtn").onclick=()=>{ lang=(lang==="ja")?"en":"ja"; render(); };
   $("outBtn").onclick=async()=>{
+    // ★uiStudy-0.8.1: 乗車中の誤タップ対策。ここで落ちると電波の悪い車内で
+    // 再ログインする羽目になり、その便の回答が丸ごと飛ぶ。
+    if(!confirm(T[lang].confirm_logout)) return;
     if(sb){ await sb.auth.signOut(); }
     // ★UI研究: 着席/立席・練習モードはその時々の状態なので、ログアウトのたびにリセットする
     setDaily(POSTURE_KEY, null); setDaily(PRACTICE_KEY, null);
