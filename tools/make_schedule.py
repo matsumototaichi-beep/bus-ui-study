@@ -186,16 +186,18 @@ def sheet_dayflow(wb):
 
 def sheet_conditions(wb):
     ws = wb.create_sheet("便と条件")
-    ws["A1"] = "どの便でどちらのURLを配るか"
+    ws["A1"] = "どの便でどのQRポスターを掲げるか"
     ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = "同じ便に乗る3名は必ず同じ群にすること。群を混ぜると、同じバスの中でボタンが出る人と出ない人が並びます。"
+    ws["A2"] = "同じ便に乗る3名は必ず同じ群にすること。群を混ぜると、同じバスの中で画面が違う人が並びます。"
     ws["A2"].font = Font(size=9, color="C00000")
-    widths(ws, [12, 22, 22, 22, 22])
+    ws["A3"] = "入力方式は実施日ごとに固定（群1は昼＝ステッパー／夕方＝テンキー、群2はその逆）。ボタンの有無は便ごと。"
+    ws["A3"].font = Font(size=9, color="555555")
+    widths(ws, [16, 24, 24, 24, 24])
 
     header(ws, 4, ["", "昼の日 1本目（12:49）", "昼の日 2本目（13:48）",
                    "夕方の日 1本目（16:20）", "夕方の日 2本目（17:18）"])
-    data = [("群1（組1・組3）", "A（あり）", "B（なし）", "B（なし）", "A（あり）"),
-            ("群2（組2・組4）", "B（なし）", "A（あり）", "A（あり）", "B（なし）")]
+    data = [("群1（組1・組3）", "A", "B", "D", "C"),
+            ("群2（組2・組4）", "D", "C", "A", "B")]
     for i, row in enumerate(data, start=5):
         for c, v in enumerate(row, start=1):
             cell = ws.cell(row=i, column=c, value=v)
@@ -204,20 +206,25 @@ def sheet_conditions(wb):
             if c == 1:
                 cell.font = Font(bold=True)
 
-    ws["A8"] = "QRポスターと配布URL（docs/qr_posters.html をA4に2枚印刷）"
+    ws["A8"] = "QRポスターと配布URL（docs/qr_posters.html をA4に4枚印刷。1日に使うのは2枚）"
     ws["A8"].font = Font(bold=True)
-    ws["A9"] = "ポスター A"
-    ws["B9"] = "「わからない」ボタン あり"
-    ws["C9"] = "https://matsumototaichi-beep.github.io/bus-ui-study/"
-    ws["A10"] = "ポスター B"
-    ws["B10"] = "「わからない」ボタン なし"
-    ws["C10"] = "https://matsumototaichi-beep.github.io/bus-ui-study/?unknown=off"
-    ws["A12"] = ("※ ポスターには「あり／なし」と書いていません。右上の A / B だけで見分けます。"
+    base = "https://matsumototaichi-beep.github.io/bus-ui-study/"
+    posters = [("A", "ステッパー ＋ ボタンあり", "?input=stepper"),
+               ("B", "ステッパー ＋ ボタンなし", "?input=stepper&unknown=off"),
+               ("C", "テンキー ＋ ボタンあり",   "?input=numpad"),
+               ("D", "テンキー ＋ ボタンなし",   "?input=numpad&unknown=off")]
+    for i, (mark, cond, qs) in enumerate(posters, start=9):
+        ws.cell(row=i, column=1, value="ポスター " + mark).font = Font(bold=True)
+        ws.cell(row=i, column=2, value=cond)
+        ws.cell(row=i, column=3, value=base + qs)
+    ws["A14"] = ("※ ポスターには条件の中身を書いていません。右上の A / B / C / D だけで見分けます。"
                  "条件の存在を参加者に気づかれると、条件そのものへの反応（要求特性）が入るためです。")
-    ws["A12"].font = Font(size=9, color="C00000")
-    ws["A13"] = ("※ 配布カードに刷ってあるQRは素のURL（＝A）です。"
-                 "Bの便では必ずポスターBのQRを読ませてください。")
-    ws["A13"].font = Font(size=9, color="C00000")
+    ws["A14"].font = Font(size=9, color="C00000")
+    ws["A15"] = ("※ 配布カードに刷ってあるQRはパラメータなしの素のURLです。"
+                 "条件が付かないので、乗車時は必ずポスターのQRを読ませてください。")
+    ws["A15"].font = Font(size=9, color="C00000")
+    ws["A17"] = "この割り付けで、どの参加者も4乗車で「入力方式2 × ボタン2」の4通りを1回ずつ経験します。"
+    ws["A17"].font = Font(size=9, color="555555")
     return ws
 
 

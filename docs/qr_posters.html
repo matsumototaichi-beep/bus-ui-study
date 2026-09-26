@@ -1,17 +1,24 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
-<title>QRポスター（A4・2枚）</title>
+<title>QRポスター（A4・4枚）</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!--
-  便ごとに松本が掲げる掲示。A4縦で2枚刷る。
+  便ごとに松本が掲げる掲示。A4縦で4枚刷る。1日に使うのは2枚だけ（その日の入力方式のぶん）。
 
-  ★ ポスターに「わからないボタンあり／なし」とは書かない。
+  ★ ポスターに条件の中身は書かない。
      参加者に条件の存在を気づかれると、条件そのものへの反応（要求特性）が入る。
-     見分けは右上の A / B だけ。どちらをどの便で使うかは schedule.xlsx の
-     「便と条件」シート、または docs/operation_plan.md §4 を見ること。
+     見分けは右上の A / B / C / D だけ。
 
-       A … 「わからない」ボタン あり（素のURL）
-       B … 「わからない」ボタン なし（?unknown=off）
+       A … ステッパー ＋「わからない」ボタン あり   ?input=stepper
+       B … ステッパー ＋「わからない」ボタン なし   ?input=stepper&unknown=off
+       C … テンキー   ＋「わからない」ボタン あり   ?input=numpad
+       D … テンキー   ＋「わからない」ボタン なし   ?input=numpad&unknown=off
+
+     どれをどの便で使うか（docs/operation_plan.md §4／schedule.xlsx「便と条件」）
+
+                昼1本目  昼2本目  夕1本目  夕2本目
+       群1        A        B        D        C
+       群2        D        C        A        B
 -->
 <style>
   @page { size: A4 portrait; margin: 12mm; }
@@ -27,7 +34,7 @@
   .sub { font-size: 12pt; color: #444; text-align: center; margin: 0 0 6mm; }
   .qr { width: 115mm; height: 115mm; }
   .qr img, .qr canvas { width: 115mm !important; height: 115mm !important; display: block; }
-  .url { font-family: Consolas, "Courier New", monospace; font-size: 10.5pt;
+  .url { font-family: Consolas, "Courier New", monospace; font-size: 10pt;
          margin-top: 6mm; color: #333; word-break: break-all; text-align: center; }
   .steps { margin-top: auto; width: 100%; border-top: 0.3mm solid #bbb; padding-top: 5mm; }
   .steps h2 { font-size: 13pt; margin: 0 0 3mm; }
@@ -37,47 +44,37 @@
   @media screen { body { background: #eee; padding: 10mm; }
                   .poster { background: #fff; margin: 0 auto 10mm; } }
 </style></head><body>
-
-<div class="poster">
-  <div class="mark">A</div>
-  <h1>このQRを読み取ってください</h1>
-  <p class="sub">スマホの<b>カメラアプリ</b>で読み取ってください</p>
-  <div class="qr" data-url="https://matsumototaichi-beep.github.io/bus-ui-study/"></div>
-  <div class="url">https://matsumototaichi-beep.github.io/bus-ui-study/</div>
-  <div class="steps">
-    <h2>開いたらすること</h2>
-    <ol>
-      <li><b>「ログイン」</b>タブを選ぶ（「新規登録」ではありません）</li>
-      <li>配布カードの <b>ID</b> と <b>パスワード</b> を入力</li>
-      <li>うまくいかないときは<b>「パスワードを表示して確かめる」</b>にチェック</li>
-      <li>ログインできたら実験者に見せてください</li>
-    </ol>
-    <p class="warn">※ LINE や Discord の中のブラウザでは開かないでください。カメラアプリから開いてください。</p>
-  </div>
-</div>
-
-<div class="poster">
-  <div class="mark">B</div>
-  <h1>このQRを読み取ってください</h1>
-  <p class="sub">スマホの<b>カメラアプリ</b>で読み取ってください</p>
-  <div class="qr" data-url="https://matsumototaichi-beep.github.io/bus-ui-study/?unknown=off"></div>
-  <div class="url">https://matsumototaichi-beep.github.io/bus-ui-study/?unknown=off</div>
-  <div class="steps">
-    <h2>開いたらすること</h2>
-    <ol>
-      <li><b>「ログイン」</b>タブを選ぶ（「新規登録」ではありません）</li>
-      <li>配布カードの <b>ID</b> と <b>パスワード</b> を入力</li>
-      <li>うまくいかないときは<b>「パスワードを表示して確かめる」</b>にチェック</li>
-      <li>ログインできたら実験者に見せてください</li>
-    </ol>
-    <p class="warn">※ LINE や Discord の中のブラウザでは開かないでください。カメラアプリから開いてください。</p>
-  </div>
-</div>
-
+<div id="sheet"></div>
 <script>
-  document.querySelectorAll('.qr').forEach(function(el){
-    new QRCode(el, { text: el.dataset.url, width: 520, height: 520,
-                     correctLevel: QRCode.CorrectLevel.M });
+  const BASE = "https://matsumototaichi-beep.github.io/bus-ui-study/";
+  // 中身（ステッパー/テンキー・ボタンあり/なし）はポスターに書かない。記号だけで見分ける。
+  const POSTERS = [
+    { mark: "A", qs: "?input=stepper" },
+    { mark: "B", qs: "?input=stepper&unknown=off" },
+    { mark: "C", qs: "?input=numpad" },
+    { mark: "D", qs: "?input=numpad&unknown=off" },
+  ];
+  const sheet = document.getElementById("sheet");
+  POSTERS.forEach(function(po){
+    const url = BASE + po.qs;
+    const el = document.createElement("div");
+    el.className = "poster";
+    el.innerHTML =
+      '<div class="mark">' + po.mark + '</div>' +
+      '<h1>このQRを読み取ってください</h1>' +
+      '<p class="sub">スマホの<b>カメラアプリ</b>で読み取ってください</p>' +
+      '<div class="qr"></div>' +
+      '<div class="url">' + url + '</div>' +
+      '<div class="steps"><h2>開いたらすること</h2><ol>' +
+        '<li><b>「ログイン」</b>タブを選ぶ（「新規登録」ではありません）</li>' +
+        '<li>配布カードの <b>ID</b> と <b>パスワード</b> を入力</li>' +
+        '<li>うまくいかないときは<b>「パスワードを表示して確かめる」</b>にチェック</li>' +
+        '<li>ログインできたら実験者に見せてください</li>' +
+      '</ol><p class="warn">※ LINE や Discord の中のブラウザでは開かないでください。' +
+      'カメラアプリから開いてください。</p></div>';
+    sheet.appendChild(el);
+    new QRCode(el.querySelector(".qr"),
+      { text: url, width: 520, height: 520, correctLevel: QRCode.CorrectLevel.M });
   });
 </script>
 </body></html>

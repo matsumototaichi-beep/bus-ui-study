@@ -8,8 +8,10 @@
     python tools/make_questionnaire.py
 
   docs/questionnaire/アンケート用紙_v1.docx 〜 _v4.docx が出来る。
-  **Word なので、あとから自由に書き換えられる。** 画面の写真も、
-  「ここに貼る」と書いた枠に Word 上で貼り込めばよい。
+  **Word なので、あとから自由に書き換えられる。**
+
+★2026-09-26：**画面の写真は使わない。** 入力方式を実施日ごとの固定に変えたので、
+参加者は「その日ずっと使っていた方式」として思い出せる。文章で説明すれば足りる。
 
 Google Forms を作るときも、この用紙をそのまま写せば設問の抜けが出ない。
 """
@@ -32,10 +34,12 @@ VERSIONS = {
     "v4": {"s2": ["A-2", "A-1"], "s4": ["B-2", "B-1"]},
 }
 SCREENS = {
-    "A-1": ("ステッパー", "「−5 −1 [値] +1 +5」が横に並んだ画面"),
-    "A-2": ("テンキー",   "数字キー12個が画面内に固定表示された画面"),
-    "B-1": ("「わからない」ボタン あり", "人数表示のすぐ下に「わからない」ボタンがある画面"),
-    "B-2": ("「わからない」ボタン なし", "同じ位置に何も無い画面"),
+    "A-1": ("ステッパー方式",
+            "「−5」「−1」「＋1」「＋5」のボタンで、数を増やしたり減らしたりして合わせる"),
+    "A-2": ("テンキー方式",
+            "数字のキーを押して、人数を直接入力する"),
+    "B-1": ("「わからない」ボタン あり", ""),
+    "B-2": ("「わからない」ボタン なし", ""),
 }
 
 LIKERT = "1  まったくそう思わない ・ 2 ・ 3  どちらとも言えない ・ 4 ・ 5  とてもそう思う"
@@ -95,32 +99,34 @@ def lines(doc, n=2):
         p(doc, "　" + "＿" * 44, size=10, color=(0x99, 0x99, 0x99), space_after=5)
 
 
-def screen_box(doc, key):
-    """画面の写真を貼る枠。Word 上で画像を貼り込めるように空けてある。"""
+def method_box(doc, key):
+    """入力方式を文章で示す枠。写真は使わない（2026-09-26）。"""
     label, desc = SCREENS[key]
     t = doc.add_table(rows=1, cols=1)
     t.style = "Table Grid"
     t.alignment = WD_TABLE_ALIGNMENT.LEFT
     cell = t.cell(0, 0)
-    cell.width = Mm(90)
+    cell.width = Mm(174)
     cp = cell.paragraphs[0]
-    cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = cp.add_run("【%s：%s】\n%s\n\n（ここに画面の写真を貼る）\n\n" % (key, label, desc))
-    r.font.size = Pt(9)
-    r.font.name = FONT
-    r._element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
-    r.font.color.rgb = RGBColor(0x77, 0x77, 0x77)
+    r1 = cp.add_run("【%s】　" % label)
+    r1.bold = True
+    r1.font.size = Pt(12)
+    r2 = cp.add_run(desc)
+    r2.font.size = Pt(10)
+    for r in (r1, r2):
+        r.font.name = FONT
+        r._element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
     p(doc, "", size=4, space_after=2)
     return label
 
 
 def likert_block(doc, label):
-    p(doc, "上の【%s】について、それぞれ当てはまる数字に○をつけてください。" % label,
+    p(doc, "【%s】について、それぞれ当てはまる数字に○をつけてください。" % label,
       size=9.5, space_before=2, space_after=2)
-    for no, text in [("2-1", "このUIは押しやすかった"),
-                     ("2-2", "このUIは素早く答えられた"),
-                     ("2-3", "このUIでは自分が思った通りの人数を入力できた"),
-                     ("2-4", "このUIは頭を使う・疲れると感じた")]:
+    for no, text in [("2-1", "この方式は押しやすかった"),
+                     ("2-2", "この方式は素早く答えられた"),
+                     ("2-3", "この方式では自分が思った通りの人数を入力できた"),
+                     ("2-4", "この方式は頭を使う・疲れると感じた")]:
         p(doc, "　%s  %s" % (no, text), size=10, space_after=0)
         p(doc, "　　　1 ・ 2 ・ 3 ・ 4 ・ 5", size=10, space_after=3)
 
@@ -165,10 +171,14 @@ def build(version):
     # ---- S2
     doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
     section(doc, "S2. 2つの入力方式について",
-            "乗車中、人数の入れ方が2種類ありました。それぞれについてお答えください。")
+            "2日間で、人数の入れ方が日によって違いました。次の2つです。")
     first, second = v["s2"]
+    question(doc, "2-0", "1日目に使ったのはどちらの方式でしたか", bold_text=True)
+    choices(doc, [SCREENS["A-1"][0], SCREENS["A-2"][0], "覚えていない"])
+    p(doc, "※ 思い出せる範囲で構いません。分からなければ「覚えていない」を選んでください。",
+      size=8.5, color=(0x55, 0x55, 0x55), space_after=6)
     for key in (first, second):
-        label = screen_box(doc, key)
+        label = method_box(doc, key)
         likert_block(doc, label)
 
     lbl1, lbl2 = SCREENS[first][0], SCREENS[second][0]
@@ -216,12 +226,24 @@ def build(version):
     # ---- S4
     doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
     section(doc, "S4. 「わからない」ボタンについて",
-            "1本目と2本目で、画面に少し違いがありました。")
-    question(doc, "4-1", "1本目と2本目で、人数の入れ方に違いがあったことに気づきましたか")
+            "同じ日の1本目と2本目で、画面に1か所だけ違いがありました。")
+    question(doc, "4-1", "同じ日の1本目と2本目で、画面に違いがあったことに気づきましたか")
     choices(doc, ["はっきり気づいた", "なんとなく気づいた", "気づかなかった"])
-    p(doc, "違いはこの2つです。", size=9.5, space_before=4, space_after=3)
+    p(doc, "違いはここです。人数を入れる欄のすぐ下に――", size=9.5, space_before=4, space_after=3)
     for key in v["s4"]:
-        screen_box(doc, key)
+        label = SCREENS[key][0]
+        t = doc.add_table(rows=1, cols=1)
+        t.style = "Table Grid"
+        t.alignment = WD_TABLE_ALIGNMENT.LEFT
+        cp = t.cell(0, 0).paragraphs[0]
+        body = ("「わからない」というボタンが置かれていた便"
+                if key == "B-1" else "何も置かれていなかった便")
+        r1 = cp.add_run("【%s】　" % label); r1.bold = True; r1.font.size = Pt(11)
+        r2 = cp.add_run(body); r2.font.size = Pt(10)
+        for r in (r1, r2):
+            r.font.name = FONT
+            r._element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
+        p(doc, "", size=4, space_after=2)
     question(doc, "4-2", "「わからない」ボタンがあったほうの乗車を覚えていますか")
     choices(doc, ["1本目", "2本目", "覚えていない"])
     question(doc, "4-3", "「わからない」ボタンがあったとき、数えきれないときはどうしていましたか")
@@ -230,7 +252,10 @@ def build(version):
              bold_text=True)
     choices(doc, ["それらしい数を入れた", "空欄で送った", "クラスだけ選んで送った", "覚えていない"])
     question(doc, "4-5", "どちらのほうが正直に答えられたと感じますか")
-    choices(doc, ["ボタンあり", "ボタンなし", "変わらない"])
+    _b = ["ボタンがあった便", "ボタンがなかった便"]
+    if v["s4"][0] == "B-2":
+        _b.reverse()
+    choices(doc, _b + ["変わらない"])
     question(doc, "4-6", "そう思う理由")
     lines(doc, 2)
     question(doc, "4-7", "「わからない」と答えるのに、抵抗や後ろめたさはありましたか")
@@ -275,7 +300,7 @@ def main():
         path = os.path.join(OUTDIR, "アンケート用紙_%s.docx" % version)
         build(version).save(path)
         print("書き出しました: " + path)
-    print("\nWord で開いて自由に編集できます。画面の写真は「ここに貼る」の枠に貼り込んでください。")
+    print("\nWord で開いて自由に編集できます。画面の写真は使いません（2026-09-26 変更）。")
     print("S4 は S3 を回収してから渡します。印刷はページ範囲を分けてください。")
 
 
