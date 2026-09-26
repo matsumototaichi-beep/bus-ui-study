@@ -120,7 +120,7 @@ def main():
 
     html_path = os.path.join(ROOT, "accounts_cards.html")
     with open(html_path, "w", encoding="utf-8", newline="") as f:
-        f.write(build_cards(rows))
+        f.write(build_cards(rows, sample=dry))
 
     ok = sum(1 for r in rows if r["パスワード"])
     print("\n%d/%d 件そろいました。" % (ok, len(rows)))
@@ -129,12 +129,13 @@ def main():
     print("\n★ この2つは .gitignore 済みです。public リポジトリなので commit しないこと。")
 
 
-def build_cards(rows):
+def build_cards(rows, sample=False):
+    """sample=True（--dry-run）のときは、本番のカードと取り違えないよう札を入れる。"""
     cards = []
     for r in rows:
         cards.append(u"""
       <div class="card">
-        <div class="hd"><span class="no">%(番号)s</span><span class="meta">組%(組)s ／ 群%(群)s ／ アンケート %(アンケート版)s</span></div>
+        <div class="hd"><span class="no">%(番号)s%(sample)s</span><span class="meta">組%(組)s ／ 群%(群)s ／ アンケート %(アンケート版)s</span></div>
         <div class="body">
           <table class="cred">
             <tr><th>ID</th><td class="mono">%(ID)s</td></tr>
@@ -144,7 +145,8 @@ def build_cards(rows):
         </div>
         <p class="note">このIDとパスワードは<b>別の日にもう一度使います。</b>カードを無くさないでください。<br>
         メールアドレスを使わない仕組みなので、<b>忘れると元に戻せません。</b></p>
-      </div>""" % dict(r, url=APP_URL))
+      </div>""" % dict(r, url=APP_URL,
+                        sample=u'<span class="smp">サンプル</span>' if sample else u''))
 
     return u"""<!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
@@ -161,6 +163,8 @@ def build_cards(rows):
   .hd { display: flex; justify-content: space-between; align-items: baseline;
         border-bottom: 0.3mm solid #999; padding-bottom: 1mm; margin-bottom: 2mm; }
   .no { font-size: 15pt; font-weight: 700; letter-spacing: .05em; }
+  .smp { font-size: 8pt; font-weight: 700; color: #fff; background: #c00;
+         border-radius: 1mm; padding: 0.3mm 1.2mm; margin-left: 2mm; vertical-align: 2px; }
   .meta { font-size: 7.5pt; color: #555; }
   /* QRは flex の中では float が効かないので、左右に並べる箱を作る */
   .body { display: flex; align-items: flex-start; gap: 3mm; }

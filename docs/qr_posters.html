@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>QRポスター（A4・2枚）</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!--
+  便ごとに松本が掲げる掲示。A4縦で2枚刷る。
+
+  ★ ポスターに「わからないボタンあり／なし」とは書かない。
+     参加者に条件の存在を気づかれると、条件そのものへの反応（要求特性）が入る。
+     見分けは右上の A / B だけ。どちらをどの便で使うかは schedule.xlsx の
+     「便と条件」シート、または docs/operation_plan.md §4 を見ること。
+
+       A … 「わからない」ボタン あり（素のURL）
+       B … 「わからない」ボタン なし（?unknown=off）
+-->
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Yu Gothic", "游ゴシック", "Meiryo", sans-serif; margin: 0; color: #111; }
+  .poster { width: 186mm; height: 273mm; page-break-after: always;
+            display: flex; flex-direction: column; align-items: center;
+            border: 0.6mm solid #333; border-radius: 3mm; padding: 10mm 8mm; position: relative; }
+  .poster:last-child { page-break-after: auto; }
+  .mark { position: absolute; top: 6mm; right: 8mm; font-size: 30pt; font-weight: 700;
+          color: #333; line-height: 1; }
+  h1 { font-size: 26pt; margin: 4mm 0 2mm; text-align: center; letter-spacing: .04em; }
+  .sub { font-size: 12pt; color: #444; text-align: center; margin: 0 0 6mm; }
+  .qr { width: 115mm; height: 115mm; }
+  .qr img, .qr canvas { width: 115mm !important; height: 115mm !important; display: block; }
+  .url { font-family: Consolas, "Courier New", monospace; font-size: 10.5pt;
+         margin-top: 6mm; color: #333; word-break: break-all; text-align: center; }
+  .steps { margin-top: auto; width: 100%; border-top: 0.3mm solid #bbb; padding-top: 5mm; }
+  .steps h2 { font-size: 13pt; margin: 0 0 3mm; }
+  .steps ol { margin: 0; padding-left: 6mm; font-size: 12pt; line-height: 1.85; }
+  .steps b { background: #fff2a8; padding: 0 .2em; }
+  .warn { font-size: 10.5pt; color: #b00; margin-top: 4mm; }
+  @media screen { body { background: #eee; padding: 10mm; }
+                  .poster { background: #fff; margin: 0 auto 10mm; } }
+</style></head><body>
+
+<div class="poster">
+  <div class="mark">A</div>
+  <h1>このQRを読み取ってください</h1>
+  <p class="sub">スマホの<b>カメラアプリ</b>で読み取ってください</p>
+  <div class="qr" data-url="https://matsumototaichi-beep.github.io/bus-ui-study/"></div>
+  <div class="url">https://matsumototaichi-beep.github.io/bus-ui-study/</div>
+  <div class="steps">
+    <h2>開いたらすること</h2>
+    <ol>
+      <li><b>「ログイン」</b>タブを選ぶ（「新規登録」ではありません）</li>
+      <li>配布カードの <b>ID</b> と <b>パスワード</b> を入力</li>
+      <li>うまくいかないときは<b>「パスワードを表示して確かめる」</b>にチェック</li>
+      <li>ログインできたら実験者に見せてください</li>
+    </ol>
+    <p class="warn">※ LINE や Discord の中のブラウザでは開かないでください。カメラアプリから開いてください。</p>
+  </div>
+</div>
+
+<div class="poster">
+  <div class="mark">B</div>
+  <h1>このQRを読み取ってください</h1>
+  <p class="sub">スマホの<b>カメラアプリ</b>で読み取ってください</p>
+  <div class="qr" data-url="https://matsumototaichi-beep.github.io/bus-ui-study/?unknown=off"></div>
+  <div class="url">https://matsumototaichi-beep.github.io/bus-ui-study/?unknown=off</div>
+  <div class="steps">
+    <h2>開いたらすること</h2>
+    <ol>
+      <li><b>「ログイン」</b>タブを選ぶ（「新規登録」ではありません）</li>
+      <li>配布カードの <b>ID</b> と <b>パスワード</b> を入力</li>
+      <li>うまくいかないときは<b>「パスワードを表示して確かめる」</b>にチェック</li>
+      <li>ログインできたら実験者に見せてください</li>
+    </ol>
+    <p class="warn">※ LINE や Discord の中のブラウザでは開かないでください。カメラアプリから開いてください。</p>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.qr').forEach(function(el){
+    new QRCode(el, { text: el.dataset.url, width: 520, height: 520,
+                     correctLevel: QRCode.CorrectLevel.M });
+  });
+</script>
+</body></html>
