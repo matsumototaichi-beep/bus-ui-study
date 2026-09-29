@@ -21,3 +21,4 @@ accounts*.html
 # 参加者名簿・スケジュール（氏名や連絡先が入る）
 schedule*.xlsx
 *_名簿*.xlsx
+accounts_admin.txt

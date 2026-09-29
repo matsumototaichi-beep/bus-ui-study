@@ -17,6 +17,9 @@
     既にあるアカウントのパスワードを作り直す場合のみ:
     python tools/create_accounts.py --force
 
+    管理者アカウント（ID: admin）だけを作る／パスワードを入れ直す:
+    python tools/create_accounts.py --admin
+
 service_role キーは全権限を持つ。**画面共有・スクショ・コミットに出さないこと。**
 環境変数で渡すだけにして、このファイルにも .env にも書かない。
 """
@@ -69,9 +72,49 @@ def find_user(email):
     return None
 
 
+def admin_account():
+    """管理者アカウント admin@id.local を作る（無ければ作成、あればパスワードを入れ直す）。
+
+    アプリの ADMIN_EMAILS と ui_report_feed.sql の WHERE に
+    'admin@id.local' が入っているので、ID `admin` でログインすれば
+    「データ一覧」タブが開く。**このアカウントが Supabase 側に無いと入れない。**
+    """
+    email  = "admin@" + ID_DOMAIN
+    passwd = gen_password(10)
+    st, body = api("/auth/v1/admin/users", "POST", {
+        "email": email, "password": passwd, "email_confirm": True,
+        "user_metadata": {"display_name": "admin"},
+    })
+    if st in (200, 201):
+        note = "新規作成"
+    else:
+        u = find_user(email)
+        if not u:
+            print("失敗(%d): %s" % (st, body.get("msg") or body.get("message") or body))
+            return
+        st2, _ = api("/auth/v1/admin/users/" + u["id"], "PUT", {"password": passwd})
+        if st2 != 200:
+            print("既存アカウントのパスワード再設定に失敗(%d)" % st2)
+            return
+        note = "既にあったのでパスワードを入れ直した"
+
+    path = os.path.join(ROOT, "accounts_admin.txt")
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write("管理者アカウント（%s）\n\n  ID       : admin\n  パスワード : %s\n\n"
+                "アプリで「ログイン」タブ → 上の2つを入力 → 「データ一覧」タブが出る。\n"
+                % (note, passwd))
+    print("管理者アカウント: %s" % note)
+    print("  ID       : admin")
+    print("  パスワード : %s" % passwd)
+    print("  控え     : " + path + "（.gitignore 済み）")
+
+
 def main():
     force = "--force" in sys.argv
     dry   = "--dry-run" in sys.argv      # Supabase に触らずカードの刷り上がりだけ確認する
+    if "--admin" in sys.argv:            # 管理者アカウントだけ作り直す
+        admin_account()
+        return
     rows = []
     for i in range(1, N_ACCOUNTS + 1):
         pid    = "p%02d" % i                 # そのまま参加者番号になる
