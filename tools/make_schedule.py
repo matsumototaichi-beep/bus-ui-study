@@ -13,6 +13,7 @@
   2. 日程     … 使える平日16日 × 昼枠・夕方枠。便の時刻まで入っている
   3. 当日の流れ … 昼の日・夕方の日のタイムラインと持ち物
   4. 便と条件  … どの便でどちらのURLを配るか（群1/群2）
+  5. 準備チェック … 当日までにやることの一覧（docs/preflight_checklist.md と対）
 
 ★ 氏名や連絡先が入るので .gitignore 済み。public リポジトリなので commit しないこと。
 """
@@ -231,6 +232,85 @@ def sheet_conditions(wb):
     return ws
 
 
+def sheet_preflight(wb):
+    """当日までの準備。詳しい理由は docs/preflight_checklist.md にある。"""
+    ws = wb.create_sheet("準備チェック")
+    ws["A1"] = "実験当日までの準備"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws["A2"] = "最速の実施日は10/13。詳しい理由と中身は docs/preflight_checklist.md を見てください。"
+    ws["A2"].font = Font(size=9, color="555555")
+
+    header(ws, 4, ["#", "区分", "やること", "なぜ要るか／どうやるか", "期限の目安", "状態", "備考"])
+    widths(ws, [5, 14, 30, 52, 16, 10, 24])
+
+    rows = [
+        ("最優先", "参加者12名の確保と日程確定",
+         "名簿と日程シートがまだ空。1便3名×4組、各組が昼と夕方の2日に出る＝実施8日", "今週中"),
+        ("最優先", "参加者への説明・同意書を作る",
+         "★実体がまだ無い。持ち物リストには載っているが文面が存在しない", "今週中"),
+        ("最優先", "回答する8か所を決める",
+         "区間が22停留所に伸びたので決め直し。同じ便の3人が同じ地点で答えないとICCが測れない", "今週中"),
+        ("最優先", "阪急バス吹田営業所へ確定日を連絡",
+         "承諾条件④。営業所から運転士へ連携されるので、実施の1週間前までに", "実施日が決まり次第"),
+        ("最優先", "参加者アカウント24個を作る",
+         "python tools/create_accounts.py（service_role キーが要る）", "1週間前"),
+        ("最優先", "管理者アカウントを作り直す",
+         "python tools/create_accounts.py --admin。いま admin でログインできない件の対処", "1週間前"),
+        ("最優先", "配布カードを印刷",
+         "accounts_cards.html をA4に8面×3枚", "1週間前"),
+        ("最優先", "QRポスターを印刷",
+         "docs/qr_posters.html をA4に4枚（A・B・C・D）。1日に使うのは2枚", "1週間前"),
+        ("最優先", "記録用紙を印刷",
+         "docs/counting_sheet.html を1日4枚。22停留所版", "1週間前"),
+        ("最優先", "計数役2名の確保と事前練習",
+         "★いちばん難しい役。本番前に1便、練習で乗ってもらう。終点で0に閉じる突き合わせまで通す", "1週間前"),
+        ("直後に要る", "事後アンケートの実施方法を決める",
+         "用紙（Word 4版）は作成済み。紙で配るか Google Forms にするかだけ", "随時"),
+        ("直後に要る", "デブリーフィング文を書く",
+         "アンケート後に渡す。「わからない」ボタンを比べていたことをここで明かす", "随時"),
+        ("データが出てから", "分析スクリプト",
+         "骨組みだけ先に作ると取り忘れに気づける。混合効果モデル・ICC・丸め率・欠損率", "随時"),
+        ("待ち", "乗降計測専用アプリ",
+         "★教授の返答待ち。A案（記録用紙に1欄）で足りるなら開発ゼロ。返事まで着手しない", "返答待ち"),
+        ("待ち", "交通費の事務手続き",
+         "謝礼なし・実費精算で確定済み。残るのは費目・証憑・事前申請の確認。総額 約1.8〜2.0万円", "随時"),
+        ("前日", "Supabase の Confirm email を確認",
+         "/auth/v1/settings の mailer_autoconfirm が true であること", "前日"),
+        ("前日", "4つのURLからテスト送信",
+         "松本のアカウントで、当日使うURL全部から実際に1件ずつ送れるか", "前日"),
+        ("前日", "参加者へ事前連絡",
+         "集合はＪＲ吹田駅（南口）。北口ではない。スマホの充電とICカード／小銭を持ってくる", "前日"),
+    ]
+    for i, (cat, what, why, due) in enumerate(rows, start=1):
+        r = 4 + i
+        for c, v in enumerate([i, cat, what, why, due, "", ""], start=1):
+            cell = ws.cell(row=r, column=c, value=v)
+            cell.border = BOX
+            cell.alignment = Alignment(vertical="top", wrap_text=(c in (3, 4, 7)))
+            if c in (1, 2, 5, 6):
+                cell.alignment = Alignment(horizontal="center", vertical="top")
+            if cat == "最優先":
+                cell.font = Font(bold=(c == 3))
+        ws.row_dimensions[r].height = 30
+
+    dv = DataValidation(type="list", formula1='"未着手,着手,完了,不要になった"', allow_blank=True)
+    ws.add_data_validation(dv)
+    dv.add("F5:F%d" % (4 + len(rows)))
+
+    r = 4 + len(rows) + 2
+    ws.cell(row=r, column=1, value="■ 要らなくなったもの（引きずらないこと）").font = Font(bold=True)
+    for j, t in enumerate([
+        "停留所ID割当表 … 要因Aを実施日ごとの固定に変えたので、条件が回答回数に依存しなくなった",
+        "uiStudy-0.8 の条件割当の改修 … 同上。EXPERIMENT_PLAN §3.1 の「アプリの改修が必要」は解消済み",
+        "アンケート用の画面4枚の撮影 … 写真を使わないアンケートに作り替えたため",
+        "事後アンケート用紙の作成 … 作成済み（docs/questionnaire/アンケート用紙_v1〜v4.docx）",
+        "アプリの改修全般 … uiStudy-0.8.1 で凍結。実験の途中で版が変わると条件が揃わない",
+    ], start=1):
+        ws.cell(row=r + j, column=1, value="・" + t).font = Font(size=9, color="555555")
+    ws.freeze_panes = "A5"
+    return ws
+
+
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "schedule.xlsx")
     wb = Workbook()
@@ -239,6 +319,7 @@ def main():
     sheet_dates(wb)
     sheet_dayflow(wb)
     sheet_conditions(wb)
+    sheet_preflight(wb)
     wb.save(out)
     print("書き出しました: " + out)
     print("Excel で開いて自由に編集できます。日程が変わってもこのスクリプトを回し直す必要はありません")
