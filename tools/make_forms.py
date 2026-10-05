@@ -285,6 +285,10 @@ def write_gs():
            "//   2. このファイルの中身をぜんぶ貼り付ける",
            "//   3. 関数 createAll を選んで実行する（初回は権限の確認が出る）",
            "//   4. 実行ログに5つのフォームのURLが出るので控える",
+           "//",
+           "// うまくいかないときは、createAll ではなく下の5つを1つずつ実行してもよい：",
+           "//   makeDaily1 / makeDaily2_AriFirst / makeDaily2_NashiFirst",
+           "//   makeFinal_StepperFirst / makeFinal_NumpadFirst",
            "",
            "function createAll() {",
            "  var urls = [];",
@@ -303,7 +307,7 @@ def write_gs():
         o = ["function %s() {" % fn,
              "  var f = FormApp.create(%s);" % js(name),
              "  f.setDescription(%s);" % js(desc),
-             "  f.setCollectEmail(false);",
+             "  try { f.setCollectEmail(false); } catch (e) {}   // 新しいGoogleフォームでは使えないことがある",
              "  var it;"]
         for row in rows_:
             k = (row[8] or "").strip()

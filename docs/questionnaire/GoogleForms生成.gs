@@ -6,6 +6,10 @@
 //   2. このファイルの中身をぜんぶ貼り付ける
 //   3. 関数 createAll を選んで実行する（初回は権限の確認が出る）
 //   4. 実行ログに5つのフォームのURLが出るので控える
+//
+// うまくいかないときは、createAll ではなく下の5つを1つずつ実行してもよい：
+//   makeDaily1 / makeDaily2_AriFirst / makeDaily2_NashiFirst
+//   makeFinal_StepperFirst / makeFinal_NumpadFirst
 
 function createAll() {
   var urls = [];
@@ -22,7 +26,7 @@ function createAll() {
 function makeDaily1() {
   var f = FormApp.create('バス車内の人数を答えるアプリについて ― 今日の分（前半）');
   f.setDescription('今日の乗車についてお答えください。所要5分ほどです。');
-  f.setCollectEmail(false);
+  try { f.setCollectEmail(false); } catch (e) {}   // 新しいGoogleフォームでは使えないことがある
   var it;
   it = f.addSectionHeaderItem().setTitle('はじめに');
   it.setHelpText('今日の乗車についてお答えください。所要5分ほどです。');
@@ -80,7 +84,7 @@ function makeDaily1() {
 function makeDaily2_AriFirst() {
   var f = FormApp.create('バス車内の人数を答えるアプリについて ― 今日の分（後半）A');
   f.setDescription('前半を送信された方にお渡しするものです。引き続きお答えください。');
-  f.setCollectEmail(false);
+  try { f.setCollectEmail(false); } catch (e) {}   // 新しいGoogleフォームでは使えないことがある
   var it;
   it = f.addTextItem().setTitle('0-1 配布カードに書かれたログインID（p01 など）');
   it.setHelpText('前半と同じIDを入れてください');
@@ -112,7 +116,7 @@ function makeDaily2_AriFirst() {
 function makeDaily2_NashiFirst() {
   var f = FormApp.create('バス車内の人数を答えるアプリについて ― 今日の分（後半）B');
   f.setDescription('前半を送信された方にお渡しするものです。引き続きお答えください。');
-  f.setCollectEmail(false);
+  try { f.setCollectEmail(false); } catch (e) {}   // 新しいGoogleフォームでは使えないことがある
   var it;
   it = f.addTextItem().setTitle('0-1 配布カードに書かれたログインID（p01 など）');
   it.setHelpText('前半と同じIDを入れてください');
@@ -144,7 +148,7 @@ function makeDaily2_NashiFirst() {
 function makeFinal_StepperFirst() {
   var f = FormApp.create('バス車内の人数を答えるアプリについて ― まとめ A');
   f.setDescription('2日間すべての乗車を終えた方にお答えいただきます。所要5分ほどです。');
-  f.setCollectEmail(false);
+  try { f.setCollectEmail(false); } catch (e) {}   // 新しいGoogleフォームでは使えないことがある
   var it;
   it = f.addSectionHeaderItem().setTitle('はじめに');
   it.setHelpText('2日間すべての乗車を終えた方にお答えいただきます。所要5分ほどです。');
@@ -221,7 +225,7 @@ function makeFinal_StepperFirst() {
 function makeFinal_NumpadFirst() {
   var f = FormApp.create('バス車内の人数を答えるアプリについて ― まとめ B');
   f.setDescription('2日間すべての乗車を終えた方にお答えいただきます。所要5分ほどです。');
-  f.setCollectEmail(false);
+  try { f.setCollectEmail(false); } catch (e) {}   // 新しいGoogleフォームでは使えないことがある
   var it;
   it = f.addSectionHeaderItem().setTitle('はじめに');
   it.setHelpText('2日間すべての乗車を終えた方にお答えいただきます。所要5分ほどです。');
