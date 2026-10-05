@@ -14,7 +14,8 @@
   3. 当日の流れ … 昼の日・夕方の日のタイムラインと持ち物
   4. 便と条件  … どの便でどちらのURLを配るか（群1/群2）
   5. 準備チェック … 当日までにやることの一覧（docs/preflight_checklist.md と対）
-  6. アンケートURL … 版ごとにどのGoogleフォームを渡すか
+  6. 実施割当   … 全10日（本実験8＋計数方法2）の中身。日付だけ埋めれば完成
+  7. アンケートURL … 版ごとにどのGoogleフォームを渡すか
      （URLは questionnaire_urls.txt から読む。.gitignore 済み。無ければ「未作成」と出る）
 
 ★ 氏名や連絡先が入るので .gitignore 済み。public リポジトリなので commit しないこと。
@@ -313,6 +314,92 @@ def sheet_preflight(wb):
     return ws
 
 
+def sheet_plan(wb):
+    """全10日の割り当て。日付以外はすべて決まっているので、候補16日から埋めるだけ。
+
+    本実験8日（昼4・夕方4）＋ 計数方法の実験2日。候補16日なので予備が6日残る。
+    条件の組み合わせは docs/operation_plan.md §4 と同じ。
+    """
+    ws = wb.create_sheet("実施割当")
+    ws["A1"] = "実施割当（全10日）"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws["A2"] = ("日付以外はすべて決まっています。候補16日の中から日付を入れてください。"
+                "本実験8日＋計数方法の実験2日で、予備が6日残ります。")
+    ws["A2"].font = Font(size=9, color="555555")
+
+    header(ws, 4, ["回", "区分", "枠", "日付", "組", "群", "入力方式",
+                   "1本目のポスター", "2本目のポスター", "参加者", "状態", "備考"])
+    widths(ws, [5, 14, 16, 11, 7, 7, 12, 15, 15, 20, 9, 22])
+
+    # 組1・組3 は昼＝ステッパー、組2・組4 は昼＝テンキー（入力方式と混雑を釣り合わせる）
+    # ポスター A=ステッパー+あり B=ステッパー+なし C=テンキー+あり D=テンキー+なし
+    main = []
+    for team in (1, 2, 3, 4):
+        gun = 1 if team % 2 == 1 else 2
+        if gun == 1:
+            noon = ("ステッパー", "A", "B")
+            eve = ("テンキー", "D", "C")
+        else:
+            noon = ("テンキー", "D", "C")
+            eve = ("ステッパー", "A", "B")
+        who = "p%02d〜p%02d" % (team * 3 - 2, team * 3)
+        main.append(("本実験", "昼（空いている）", "組%d" % team, "群%d" % gun) + noon + (who,))
+        main.append(("本実験", "夕方（混んでいる）", "組%d" % team, "群%d" % gun) + eve + (who,))
+
+    r = 5
+    for i, row in enumerate(main, start=1):
+        kubun, waku, team, gun, hoshiki, p1, p2, who = row
+        vals = [i, kubun, waku, "", team, gun, hoshiki, p1, p2, who, "", ""]
+        for c, v in enumerate(vals, start=1):
+            cell = ws.cell(row=r, column=c, value=v)
+            cell.border = BOX
+            if c in (1, 3, 5, 6, 7, 8, 9, 11):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            if "夕方" in waku:
+                cell.fill = SUB_FILL
+        r += 1
+
+    for i in (9, 10):
+        vals = [i, "計数方法の実験", "昼＋夕方（4便）", "", "―", "―", "―", "―", "―",
+                "参加者なし・計数役3名", "", "足し引き2名＋数え直し1名。乗降計測アプリを使う"]
+        for c, v in enumerate(vals, start=1):
+            cell = ws.cell(row=r, column=c, value=v)
+            cell.border = BOX
+            cell.fill = PatternFill("solid", fgColor="EAF3EA")
+            if c in (1, 3, 5, 6, 7, 8, 9, 11):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+        r += 1
+
+    dv = DataValidation(type="list", formula1='"未定,候補,確定,実施済,中止"', allow_blank=True)
+    ws.add_data_validation(dv)
+    dv.add("K5:K%d" % (r - 1))
+
+    r += 1
+    for t, col in [
+        ("■ 読み方", "000000"),
+        ("・同じ組の2日（昼と夕方）は、同じ3名が別の日に来ます。間が空いても構いません", "555555"),
+        ("・入力方式は1日を通して変わりません。組1・組3は昼がステッパー、組2・組4は昼がテンキー", "555555"),
+        ("・ポスター A＝ステッパー＋ボタンあり／B＝ステッパー＋ボタンなし／"
+         "C＝テンキー＋ボタンあり／D＝テンキー＋ボタンなし", "555555"),
+        ("・これでどの参加者も4乗車で「入力方式2通り × ボタン2通り」を1回ずつ経験します", "555555"),
+        ("", "555555"),
+        ("■ 日数", "000000"),
+        ("・本実験8日 ＋ 計数方法の実験2日 ＝ 10日。候補16日なので予備が6日", "555555"),
+        ("・混雑時のクラス回答は、全回答でクラスを記録しているので追加の実験日は要りません", "555555"),
+        ("", "555555"),
+        ("■ 1日に昼と夕方の両方を入れることもできます", "000000"),
+        ("・昼は11:35〜14:32、夕方は15:25〜18:03で重なりません。別の組を入れれば1日で2枠こなせます", "555555"),
+        ("・そうすると本実験は4日に縮みますが、計数役2名が1日4便（約6時間半）乗ることになります", "555555"),
+        ("・基準値の質が落ちると研究の土台が崩れるので、1日1枠（8日）を勧めます", "C00000"),
+    ]:
+        c = ws.cell(row=r, column=1, value=t)
+        c.font = Font(size=(10 if t.startswith("■") else 9), bold=t.startswith("■"), color=col)
+        r += 1
+
+    ws.freeze_panes = "A5"
+    return ws
+
+
 def sheet_forms(wb):
     """版ごとに、どのGoogleフォームのURLを渡すか。当日これを見れば迷わない。
 
@@ -394,6 +481,7 @@ def main():
     sheet_dayflow(wb)
     sheet_conditions(wb)
     sheet_preflight(wb)
+    sheet_plan(wb)
     sheet_forms(wb)
     wb.save(out)
     print("書き出しました: " + out)
