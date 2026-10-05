@@ -84,8 +84,8 @@ HTML = """
 <tr><th>時刻</th><th>昼の日</th><th>時刻</th><th>夕方の日</th></tr>
 <tr><td class="c">11:35</td><td>集合・説明・同意取得・カード配布・ログイン確認</td>
     <td class="c">15:25</td><td>集合・説明・カード配布</td></tr>
-<tr><td class="c">11:50</td><td>のりば2へ移動。停車中の車内で練習2回</td>
-    <td class="c">15:42</td><td>のりば2へ移動。停車中の車内で練習2回</td></tr>
+<tr><td class="c">11:50</td><td>のりば2へ移動。のりばで練習2回</td>
+    <td class="c">15:42</td><td>のりば2へ移動。のりばで練習2回</td></tr>
 <tr><td class="c"><b>12:03</b></td><td><b>1本目 発車</b></td>
     <td class="c"><b>15:55</b></td><td><b>1本目 発車</b></td></tr>
 <tr><td class="c">12:48</td><td>桃山台駅着（折り返し60分）</td>

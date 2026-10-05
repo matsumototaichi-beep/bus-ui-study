@@ -184,7 +184,6 @@ def build_cards(rows, sample=False):
             <tr><th>ID</th><td class="mono">%(ID)s</td></tr>
             <tr><th>パスワード</th><td class="mono">%(パスワード)s</td></tr>
           </table>
-          <div class="qr" data-url="%(url)s"></div>
         </div>
         <p class="note">このIDとパスワードは<b>別の日にもう一度使います。</b>カードを無くさないでください。<br>
         メールアドレスを使わない仕組みなので、<b>忘れると元に戻せません。</b></p>
@@ -223,12 +222,6 @@ def build_cards(rows, sample=False):
                   .sheet { background: #fff; padding: 10mm; width: 210mm; margin: 0 auto; } }
 </style></head><body>
 <div class="sheet">__CARDS__</div>
-<script>
-  document.querySelectorAll('.qr').forEach(function(el){
-    new QRCode(el, { text: el.dataset.url, width: 160, height: 160,
-                     correctLevel: QRCode.CorrectLevel.M });
-  });
-</script>
 </body></html>""".replace("__CARDS__", "".join(cards))
 
 
