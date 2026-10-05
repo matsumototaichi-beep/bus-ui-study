@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>乗降計測</title>
+<!--
+  乗降計測専用アプリ（計数役むけ）  counter-1.0.0
+
+  計数方法の比較実験（足し引き vs 数え直し）で使う。紙の記録用紙を置き換える。
+  参加者が使う index.html とは別物で、こちらは計数役の3名だけが使う。
+
+  ★設計の前提
+  ・走行中のバスで片手で使う。揺れる。つかまったまま操作する（阪急バスの承諾条件①）
+  ・通信は当てにしない。すべて端末内に保存し、終わってから書き出す
+  ・ログイン不要。当日のトラブルを減らすため Supabase には繋がない
+  ・タップ1回＝1人。タップの時刻を全部残すので、
+    「1人数えるのにどれくらいかかったか」が後から出せる
+-->
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --line:#334155; --fg:#f1f5f9; --dim:#94a3b8;
+    --accent:#2563eb; --warn:#dc2626; --ok:#16a34a;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    overscroll-behavior:none;}
+  body{display:flex; flex-direction:column; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}
+  .wrap{flex:1; display:flex; flex-direction:column; padding:12px; gap:10px; max-width:560px; margin:0 auto; width:100%;}
+  h1{font-size:17px; margin:2px 0 0;}
+  .sub{font-size:12px; color:var(--dim); margin:0;}
+  label{display:block; font-size:13px; color:var(--dim); margin:10px 0 4px;}
+  select,input{width:100%; padding:13px; font-size:16px; border-radius:10px;
+    border:1px solid var(--line); background:#0b1220; color:var(--fg);}
+  .btn{display:block; width:100%; padding:16px; font-size:17px; font-weight:700;
+    border:0; border-radius:12px; background:var(--accent); color:#fff; cursor:pointer;}
+  .btn.ghost{background:transparent; border:1px solid var(--line); color:var(--fg); font-weight:600;}
+  .btn.warn{background:var(--warn);}
+  .btn:disabled{opacity:.4;}
+  .roles{display:grid; gap:8px;}
+  .role{padding:14px; border:2px solid var(--line); border-radius:12px; cursor:pointer; background:#0b1220;}
+  .role.on{border-color:var(--accent); background:#13213f;}
+  .role b{display:block; font-size:16px;}
+  .role span{font-size:12px; color:var(--dim);}
+
+  /* ---- 計測画面 ---- */
+  .head{background:var(--panel); border-radius:12px; padding:10px 12px;}
+  .idx{font-size:12px; color:var(--dim);}
+  .stop{font-size:21px; font-weight:700; line-height:1.3;}
+  .next{font-size:12px; color:var(--dim); margin-top:3px;}
+  .bar{height:5px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:8px;}
+  .bar i{display:block; height:100%; background:var(--accent);}
+  .tapwrap{flex:1; display:flex; flex-direction:column; min-height:0;}
+  .tap{flex:1; min-height:150px; border:0; border-radius:16px; background:var(--accent); color:#fff;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer;
+    font-family:inherit;}
+  .tap:active{filter:brightness(1.25);}
+  .tap .n{font-size:84px; font-weight:800; line-height:1;}
+  .tap .t{font-size:15px; opacity:.9; margin-top:6px;}
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .mini{font-size:12px; color:var(--dim); text-align:center;}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th,td{border-bottom:1px solid var(--line); padding:6px 4px; text-align:left;}
+  td.n,th.n{text-align:right; width:58px;}
+  .scroll{overflow:auto; max-height:46vh; border:1px solid var(--line); border-radius:10px; padding:8px;}
+  .total{background:var(--panel); border-radius:12px; padding:12px; font-size:15px;}
+  .total b{font-size:22px;}
+  .note{font-size:12px; color:var(--dim); line-height:1.6; white-space:pre-line;}
+  .danger{color:#fca5a5;}
+  textarea{width:100%; height:120px; font-size:11px; background:#0b1220; color:var(--fg);
+    border:1px solid var(--line); border-radius:10px; padding:8px;}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:#0b1220; border:1px solid var(--line); padding:10px 16px; border-radius:999px;
+    font-size:14px; opacity:0; transition:opacity .2s; pointer-events:none;}
+  .toast.on{opacity:1;}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const VERSION = "counter-1.0.0";
+
+/* 吹田市内線2系統・ＪＲ吹田駅（南口）⇔ 桃山台駅。22停留所・両方向対称。
+   出典：阪急バス公式の路線別時刻一覧表（行先番号2の列）。docs/operation_plan.md §1 */
+const OUTBOUND = ["ＪＲ吹田駅（南口）","田中町","吹田市役所前（阪急吹田駅）","アサヒビール会社前",
+  "ＪＲ吹田駅（北口）","片山小学校前","朝日が丘町名神下","上山手町","佐井寺南が丘","総合運動場前",
+  "竹谷","佐井寺","佐井寺北","五月が丘","亥子谷","佐竹台六丁目","佐竹台五丁目","高野台中学校前",
+  "佐竹台診療所前","阪急南千里駅","桃山台二丁目","桃山台駅"];
+const INBOUND = OUTBOUND.slice().reverse();
+
+const ROLES = {
+  board:   { name:"乗車係", desc:"この停留所で乗ってきた人を数える", verb:"乗った人", color:"#2563eb" },
+  alight:  { name:"降車係", desc:"この停留所で降りた人を数える",   verb:"降りた人", color:"#b45309" },
+  recount: { name:"数え直し係", desc:"発車したあと、車内にいる人を最初から数える", verb:"車内の人", color:"#15803d" },
+};
+
+const KEY = "counter_run_v1";
+let run = null;
+
+/* ---------------- 保存。1タップごとに書くので、落ちても消えない ---------------- */
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(run)); }catch(e){} }
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){ return null; } }
+function clearRun(){ try{ localStorage.removeItem(KEY); }catch(e){} run = null; }
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("on");
+  clearTimeout(toast._t); toast._t = setTimeout(()=>t.classList.remove("on"), 1600);
+}
+function hhmm(ts){
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+}
+function el(tag, cls, text){
+  const e = document.createElement(tag);
+  if(cls) e.className = cls;
+  if(text != null) e.textContent = text;
+  return e;
+}
+
+/* 画面を消さない。対応していない端末では黙って諦める */
+let wakeLock = null;
+async function keepAwake(on){
+  try{
+    if(on && "wakeLock" in navigator){ wakeLock = await navigator.wakeLock.request("screen"); }
+    else if(wakeLock){ await wakeLock.release(); wakeLock = null; }
+  }catch(e){}
+}
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "visible" && run && !run.done) keepAwake(true);
+});
+
+/* ---------------- 画面1：はじめる ---------------- */
+function renderSetup(){
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  app.appendChild(el("h1", null, "乗降計測"));
+  app.appendChild(el("p", "sub", "計数役むけ。紙の記録用紙の代わりに使います。"));
+
+  app.appendChild(el("label", null, "あなたの役割"));
+  const roles = el("div", "roles");
+  let picked = "board";
+  Object.keys(ROLES).forEach(k=>{
+    const d = el("div", "role" + (k===picked?" on":""));
+    d.appendChild(el("b", null, ROLES[k].name));
+    d.appendChild(el("span", null, ROLES[k].desc));
+    d.onclick = ()=>{ picked = k;
+      [...roles.children].forEach(c=>c.classList.remove("on")); d.classList.add("on"); };
+    roles.appendChild(d);
+  });
+  app.appendChild(roles);
+
+  app.appendChild(el("label", null, "方向"));
+  const dir = el("select");
+  dir.innerHTML = '<option value="out">ＪＲ吹田駅（南口） → 桃山台駅</option>'
+                + '<option value="in">桃山台駅 → ＪＲ吹田駅（南口）</option>';
+  app.appendChild(dir);
+
+  app.appendChild(el("label", null, "便（発車時刻など。あとで見分けるための覚え書き）"));
+  const bin = el("input");
+  bin.type = "text"; bin.placeholder = "例：10/20 桃山台17:18発";
+  const now = new Date();
+  bin.value = (now.getMonth()+1) + "/" + now.getDate() + " ";
+  app.appendChild(bin);
+
+  app.appendChild(el("div", null, "")).style.height = "8px";
+  const go = el("button", "btn", "はじめる");
+  go.onclick = ()=>{
+    const stops = dir.value === "out" ? OUTBOUND : INBOUND;
+    run = {
+      v: VERSION, run_id: String(Date.now()) + "-" + Math.random().toString(36).slice(2,8),
+      role: picked, dir: dir.value, bin: bin.value.trim(),
+      started_at: Date.now(), done: false, i: 0,
+      stops: stops.map((n,ix)=>({ ix:ix, name:n, taps:[], closed_at:null })),
+    };
+    save(); keepAwake(true); renderCount();
+  };
+  app.appendChild(go);
+
+  const old = load();
+  if(old){
+    app.appendChild(el("div", null, "")).style.height = "6px";
+    const r = el("button", "btn ghost",
+      old.done ? "前回の記録を見る（" + (old.bin||"便の記入なし") + "）"
+               : "途中の記録を続ける（" + (old.bin||"便の記入なし") + "）");
+    r.onclick = ()=>{ run = old; if(run.done){ renderDone(); } else { keepAwake(true); renderCount(); } };
+    app.appendChild(r);
+  }
+
+  app.appendChild(el("p","note",
+    "・タップ1回が1人です。押しすぎたら「1つ戻す」で消せます。\n"+
+    "・記録は押すたびに端末へ保存されます。電波は要りません。\n"+
+    "・終わったら最後の画面で記録を書き出して、松本に送ってください。"));
+}
+
+/* ---------------- 画面2：計測 ---------------- */
+function renderCount(){
+  const app = document.getElementById("app");
+  const R = ROLES[run.role];
+  const s = run.stops[run.i];
+  app.innerHTML = "";
+
+  const head = el("div","head");
+  head.appendChild(el("div","idx", R.name + "　|　" + (run.i+1) + " / " + run.stops.length
+                      + (run.bin ? "　|　" + run.bin : "")));
+  head.appendChild(el("div","stop", s.name));
+  const nx = run.stops[run.i+1];
+  head.appendChild(el("div","next", nx ? "次：" + nx.name : "ここが終点です"));
+  const bar = el("div","bar"); const fill = el("i");
+  fill.style.width = Math.round(run.i / (run.stops.length-1) * 100) + "%";
+  bar.appendChild(fill); head.appendChild(bar);
+  app.appendChild(head);
+
+  const wrap = el("div","tapwrap");
+  const tap = el("button","tap");
+  tap.style.background = R.color;
+  const n = el("div","n", String(s.taps.length));
+  const t = el("div","t", R.verb + "　＋1");
+  tap.appendChild(n); tap.appendChild(t);
+  tap.onclick = ()=>{
+    s.taps.push(Date.now()); save();
+    n.textContent = String(s.taps.length);
+    if(navigator.vibrate) navigator.vibrate(8);
+  };
+  wrap.appendChild(tap);
+  app.appendChild(wrap);
+
+  const row = el("div","row");
+  const undo = el("button","btn ghost","1つ戻す");
+  undo.onclick = ()=>{
+    if(!s.taps.length){ toast("この停留所はまだ0です"); return; }
+    s.taps.pop(); save(); n.textContent = String(s.taps.length);
+  };
+  const next = el("button","btn", nx ? "次の停留所へ" : "終わる");
+  next.onclick = ()=>{
+    s.closed_at = Date.now(); save();
+    if(nx){ run.i++; save(); renderCount(); }
+    else { run.done = true; run.ended_at = Date.now(); save(); keepAwake(false); renderDone(); }
+  };
+  row.appendChild(undo); row.appendChild(next);
+  app.appendChild(row);
+
+  const back = el("div","row");
+  const prev = el("button","btn ghost","← 前の停留所");
+  prev.disabled = run.i === 0;
+  prev.onclick = ()=>{ if(run.i>0){ run.i--; save(); renderCount(); } };
+  const fin = el("button","btn ghost","記録を見る");
+  fin.onclick = ()=>{ renderDone(true); };
+  back.appendChild(prev); back.appendChild(fin);
+  app.appendChild(back);
+
+  app.appendChild(el("div","mini",
+    "この停留所の合計 " + s.taps.length + " 人　／　ここまでの合計 " + totalSoFar() + " 人"));
+}
+
+function totalSoFar(){ return run.stops.reduce((a,s)=>a+s.taps.length, 0); }
+
+/* ---------------- 画面3：終了・書き出し ---------------- */
+function renderDone(peek){
+  const app = document.getElementById("app");
+  const R = ROLES[run.role];
+  app.innerHTML = "";
+  app.appendChild(el("h1", null, peek ? "途中経過" : "記録おわり"));
+  app.appendChild(el("p","sub", R.name + "　|　" + (run.bin || "便の記入なし") + "　|　"
+    + (run.dir==="out" ? "南口→桃山台" : "桃山台→南口")));
+
+  const tot = el("div","total");
+  tot.appendChild(el("span", null, R.verb + "の合計　"));
+  const b = el("b", null, String(totalSoFar()) + " 人");
+  tot.appendChild(b);
+  app.appendChild(tot);
+
+  if(run.role !== "recount"){
+    app.appendChild(el("p","note",
+      "※ 乗車係と降車係で合計を見せ合ってください。\n"+
+      "　 始発から乗っていれば「乗車の合計 − 降車の合計 ＝ 0」になるはずです。\n"+
+      "　 0にならなくても数を書き直さないでください。ずれたこと自体が記録になります。"));
+  }
+
+  const sc = el("div","scroll");
+  const tb = el("table");
+  const hr = el("tr");
+  ["#","停留所", "人数"].forEach((h,i)=>{ const th = el("th", i===2?"n":null, h); hr.appendChild(th); });
+  tb.appendChild(hr);
+  run.stops.forEach(s=>{
+    const tr = el("tr");
+    tr.appendChild(el("td", null, String(s.ix+1)));
+    tr.appendChild(el("td", null, s.name + (s.closed_at ? "　" + hhmm(s.closed_at) : "")));
+    tr.appendChild(el("td","n", String(s.taps.length)));
+    tb.appendChild(tr);
+  });
+  sc.appendChild(tb);
+  app.appendChild(sc);
+
+  if(peek){
+    const back = el("button","btn","計測にもどる");
+    back.onclick = ()=>renderCount();
+    app.appendChild(back);
+    return;
+  }
+
+  app.appendChild(el("label", null, "書き出し（この文字をまるごと松本に送ってください）"));
+  const ta = el("textarea");
+  ta.readOnly = true;
+  ta.value = asCSV();
+  app.appendChild(ta);
+
+  const row = el("div","row");
+  const cp = el("button","btn","コピーする");
+  cp.onclick = async ()=>{
+    try{ await navigator.clipboard.writeText(ta.value); toast("コピーしました"); }
+    catch(e){ ta.select(); toast("長押しでコピーしてください"); }
+  };
+  const dl = el("button","btn ghost","ファイルに保存");
+  dl.onclick = ()=>{
+    const blob = new Blob([asCSV(), "\n\n", JSON.stringify(run)], {type:"text/plain;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "乗降計測_" + (run.bin||"便").replace(/[\\/:*?"<>|]/g,"_") + "_" + R.name + ".txt";
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+  row.appendChild(cp); row.appendChild(dl);
+  app.appendChild(row);
+
+  app.appendChild(el("div", null, "")).style.height = "4px";
+  const reset = el("button","btn warn","新しい便をはじめる");
+  reset.onclick = ()=>{
+    if(!confirm("この記録を消して、新しい便をはじめます。\n書き出しは済んでいますか？")) return;
+    clearRun(); renderSetup();
+  };
+  app.appendChild(reset);
+  app.appendChild(el("p","note danger",
+    "★「新しい便をはじめる」を押すと、この記録は端末から消えます。\n"+
+    "　 先にコピーかファイル保存を済ませてください。"));
+}
+
+/* タップの時刻まで含めて書き出す。あとから「1人数えるのに何秒かかったか」が出せる */
+function asCSV(){
+  const R = ROLES[run.role];
+  const L = [];
+  L.push("# 乗降計測 " + VERSION);
+  L.push("# 役割," + R.name);
+  L.push("# 便," + (run.bin||""));
+  L.push("# 方向," + (run.dir==="out" ? "南口→桃山台" : "桃山台→南口"));
+  L.push("# 開始," + new Date(run.started_at).toLocaleString("ja-JP"));
+  if(run.ended_at) L.push("# 終了," + new Date(run.ended_at).toLocaleString("ja-JP"));
+  L.push("# 合計," + totalSoFar());
+  L.push("run_id,順番,停留所,人数,確定時刻,タップ時刻（ミリ秒）");
+  run.stops.forEach(s=>{
+    L.push([run.run_id, s.ix+1, '"'+s.name+'"', s.taps.length,
+            s.closed_at ? new Date(s.closed_at).toLocaleTimeString("ja-JP") : "",
+            '"'+s.taps.join(" ")+'"'].join(","));
+  });
+  return L.join("\n");
+}
+
+/* ---------------- 起動 ---------------- */
+(function boot(){
+  const old = load();
+  if(old && !old.done && old.stops){ run = old; keepAwake(true); renderCount(); }
+  else { renderSetup(); }
+})();
+</script>
+</body>
+</html>
