@@ -100,50 +100,67 @@ def sheet_members(wb):
 
 
 def sheet_dates(wb):
+    """候補16日を昼枠・夕方枠に割った一覧。
+
+    「回」の列に 1〜10 を入れると、組・入力方式・ポスター・参加者が
+    「実施割当」シートから自動で引かれる。当日の取り違えを減らすため。
+    """
     ws = wb.create_sheet("日程")
-    ws["A1"] = "日程（使える平日16日 × 昼枠・夕方枠）"
+    ws["A1"] = "日程（候補16日 × 昼枠・夕方枠）"
     ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = ("実施は4日（昼2日・夕方2日）。残りは予備日です。"
-                "土日はこの4便が土休日ダイヤに存在しないので使えません。"
-                "参加者の都合を聞いて「状態」を埋めてください。")
+    ws["A2"] = ("「回」に 1〜10 を入れると、右の列が「実施割当」シートから自動で入ります。"
+                "本実験は回1〜8、計数方法の実験は回9〜10です。")
     ws["A2"].font = Font(size=9, color="555555")
+    ws["A3"] = ("※ 回9・10（計数方法）は1日で昼と夕方の4便を回すので、同じ日の両方の行に入れてください。")
+    ws["A3"].font = Font(size=9, color="555555")
 
     cols = ["日付", "曜日", "枠", "集合", "1本目 南口発", "桃山台着",
-            "2本目 桃山台発", "南口着＝解散", "拘束", "担当する組", "参加者（3名）",
-            "計数役（2名）", "状態", "備考"]
-    header(ws, 4, cols)
-    widths(ws, [10, 6, 17, 7, 13, 10, 15, 14, 11, 11, 22, 18, 9, 22])
+            "2本目 桃山台発", "南口着＝解散", "拘束",
+            "回", "区分", "組", "入力方式", "1本目", "2本目", "参加者", "状態", "備考"]
+    header(ws, 5, cols)
+    widths(ws, [9, 5, 16, 7, 12, 10, 14, 13, 11,
+                5, 13, 7, 11, 7, 7, 14, 9, 20])
 
-    r = 5
+    # 自動で引く列 → （この表の列番号, 実施割当シートの列番号）
+    LOOK = [(11, 2), (12, 5), (13, 7), (14, 8), (15, 9), (16, 10)]
+
+    r = 6
     for m, d in DATES:
         dt = datetime.date(2026, m, d)
-        for si, s in enumerate(SLOTS):
-            vals = ["%d/%d" % (m, d), WEEK[dt.weekday()], s["name"], s["meet"],
-                    s["go"], s["arr"], s["back"], s["ret"], s["hold"], "", "", "", "", ""]
+        for si, s_ in enumerate(SLOTS):
+            vals = ["%d/%d" % (m, d), WEEK[dt.weekday()], s_["name"], s_["meet"],
+                    s_["go"], s_["arr"], s_["back"], s_["ret"], s_["hold"],
+                    "", "", "", "", "", "", "", "", ""]
             for c, v in enumerate(vals, start=1):
                 cell = ws.cell(row=r, column=c, value=v)
                 cell.border = BOX
-                if c in (1, 2, 4, 5, 6, 7, 8, 9, 10, 13):
+                if c in (1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 17):
                     cell.alignment = Alignment(horizontal="center")
                 if si == 1:
                     cell.fill = SUB_FILL
+            for here, there in LOOK:
+                ws.cell(row=r, column=here).value = (
+                    '=IFERROR(VLOOKUP($J%d,実施割当!$A$5:$L$14,%d,FALSE),"")' % (r, there))
             r += 1
 
-    dv = DataValidation(type="list", formula1='"未定,候補,確定,中止"', allow_blank=True)
+    dv = DataValidation(type="list", formula1='"1,2,3,4,5,6,7,8,9,10"', allow_blank=True)
     ws.add_data_validation(dv)
-    dv.add("M5:M%d" % (r - 1))
+    dv.add("J6:J%d" % (r - 1))
 
-    dv2 = DataValidation(type="list", formula1='"組1,組2,組3,組4,組5,組6,組7,組8"', allow_blank=True)
+    dv2 = DataValidation(type="list", formula1='"未定,候補,確定,実施済,中止"', allow_blank=True)
     ws.add_data_validation(dv2)
-    dv2.add("J5:J%d" % (r - 1))
+    dv2.add("Q6:Q%d" % (r - 1))
 
-    ws.freeze_panes = "A5"
+    ws.freeze_panes = "D6"
     ws.cell(row=r + 1, column=1,
             value="※ 便はすべて阪急バス 吹田市内線2系統。4便とも始発便なので車内0人から数えられます。").font = Font(size=9, color="555555")
     ws.cell(row=r + 2, column=1,
             value="※ 南口のりば2からは [2] と [3] の両方が「桃山台駅ゆき」で出ます。行先番号が 2 のバスに乗ること。").font = Font(size=9, color="C00000")
     ws.cell(row=r + 3, column=1,
             value="※ 桃山台では「[2] ＪＲ吹田駅（南口）ゆき」に乗り、終点の南口まで乗ります。「北口ゆき」と出ているのは [5] という別系統です。").font = Font(size=9, color="C00000")
+    ws.cell(row=r + 5, column=1, value="■ 土日は使えません").font = Font(bold=True)
+    ws.cell(row=r + 6, column=1,
+            value="10/24・25、11/14・15 は土日。桃山台17時台が土休日は 北10/20/北40/50 で 17:18 が無く、夕方の2本目が組めません。").font = Font(size=9, color="555555")
     return ws
 
 
