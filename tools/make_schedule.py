@@ -344,13 +344,11 @@ def sheet_forms(wb):
         return ws
 
     header(ws, 4, ["版", "① 前半（その日の解散直後・全員）",
-                   "② 後半 S4（①を送信してから渡す）", "③ まとめ（2日目の最後だけ）"])
-    widths(ws, [8, 46, 46, 46])
-    plan = [("v1", "後半A", "まとめA"), ("v2", "後半A", "まとめB"),
-            ("v3", "後半B", "まとめA"), ("v4", "後半B", "まとめB")]
-    for i, (ver, kouhan, matome) in enumerate(plan, start=5):
-        for c, v in enumerate([ver, urls.get("前半", ""), urls.get(kouhan, ""),
-                               urls.get(matome, "")], start=1):
+                   "② 後半（①を送信してから渡す）"])
+    widths(ws, [8, 56, 56])
+    plan = [("v1", "後半A"), ("v2", "後半A"), ("v3", "後半B"), ("v4", "後半B")]
+    for i, (ver, kouhan) in enumerate(plan, start=5):
+        for c, v in enumerate([ver, urls.get("前半", ""), urls.get(kouhan, "")], start=1):
             cell = ws.cell(row=i, column=c, value=v)
             cell.border = BOX
             cell.alignment = Alignment(vertical="top", wrap_text=True)
@@ -366,8 +364,8 @@ def sheet_forms(wb):
     ws["A13"] = "渡す順番"
     ws["A13"].font = Font(bold=True)
     for j, t in enumerate([
-        "1日目の解散直後 … ①前半 → 送信を確認 → ②後半",
-        "2日目の解散直後 … ①前半 → 送信を確認 → ②後半 → ③まとめ",
+        "1日目も2日目も同じ … ①前半 → 送信を確認 → ②後半",
+        "②後半の最後に「★2日目の方だけ」の区切りがあり、1日目の人はそこで終わる",
         "★②後半を先に見せないこと。「わからない」ボタンの話が先に出ると、"
         "①前半のS3（今日どう数えたか）が、ボタンを意識した答えになってしまう",
     ], start=14):
@@ -378,6 +376,7 @@ def sheet_forms(wb):
     ws["A18"].font = Font(bold=True)
     for j, t in enumerate([
         "回答を1回に制限しない（1人が1日目と2日目で2回答えるため）",
+        "①前半と②後半は「今日は何日目ですか」で1日目/2日目を区別する",
         "各フォームの「回答」タブからスプレッドシートに出力しておくと集計が楽",
         "リンクをSNSやリポジトリなど公開の場所に貼らない（知らない人の回答が混ざる）",
     ], start=19):
