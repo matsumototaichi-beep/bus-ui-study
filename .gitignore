@@ -22,3 +22,6 @@ accounts*.html
 schedule*.xlsx
 *_名簿*.xlsx
 accounts_admin.txt
+
+# アンケートのフォームURL（回答用リンクが公開の場所にあると知らない人の回答が混ざる）
+questionnaire_urls.txt

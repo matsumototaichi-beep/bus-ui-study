@@ -14,6 +14,8 @@
   3. 当日の流れ … 昼の日・夕方の日のタイムラインと持ち物
   4. 便と条件  … どの便でどちらのURLを配るか（群1/群2）
   5. 準備チェック … 当日までにやることの一覧（docs/preflight_checklist.md と対）
+  6. アンケートURL … 版ごとにどのGoogleフォームを渡すか
+     （URLは questionnaire_urls.txt から読む。.gitignore 済み。無ければ「未作成」と出る）
 
 ★ 氏名や連絡先が入るので .gitignore 済み。public リポジトリなので commit しないこと。
 """
@@ -311,6 +313,79 @@ def sheet_preflight(wb):
     return ws
 
 
+def sheet_forms(wb):
+    """版ごとに、どのGoogleフォームのURLを渡すか。当日これを見れば迷わない。
+
+    URLは questionnaire_urls.txt（.gitignore 済み）から読む。
+    回答用リンクが公開の場所にあると、知らない人の回答が混ざるため、
+    このリポジトリには入れない。
+    """
+    ws = wb.create_sheet("アンケートURL")
+    ws["A1"] = "事後アンケート（Googleフォーム）"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws["A2"] = ("参加者の版は配布カードに刷ってあります。その版の行のURLを渡してください。"
+                "①前半を送信してもらってから①後半のURLを渡すこと。")
+    ws["A2"].font = Font(size=9, color="555555")
+
+    urls = {}
+    path = os.path.join(ROOT, "questionnaire_urls.txt")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split("|")
+                if len(parts) >= 2:
+                    urls[parts[0]] = parts[1]
+    if not urls:
+        ws["A4"] = "★ questionnaire_urls.txt がありません。フォームを作ってからURLを書いてください。"
+        ws["A4"].font = Font(bold=True, color="C00000")
+        return ws
+
+    header(ws, 4, ["版", "① 前半（その日の解散直後・全員）",
+                   "② 後半 S4（①を送信してから渡す）", "③ まとめ（2日目の最後だけ）"])
+    widths(ws, [8, 46, 46, 46])
+    plan = [("v1", "後半A", "まとめA"), ("v2", "後半A", "まとめB"),
+            ("v3", "後半B", "まとめA"), ("v4", "後半B", "まとめB")]
+    for i, (ver, kouhan, matome) in enumerate(plan, start=5):
+        for c, v in enumerate([ver, urls.get("前半", ""), urls.get(kouhan, ""),
+                               urls.get(matome, "")], start=1):
+            cell = ws.cell(row=i, column=c, value=v)
+            cell.border = BOX
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+            if c == 1:
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal="center")
+        ws.row_dimensions[i].height = 30
+
+    ws["A10"] = "参加者の番号と版の対応"
+    ws["A10"].font = Font(bold=True)
+    ws["A11"] = "p01 p05 p09 → v1　／　p02 p06 p10 → v2　／　p03 p07 p11 → v3　／　p04 p08 p12 → v4"
+
+    ws["A13"] = "渡す順番"
+    ws["A13"].font = Font(bold=True)
+    for j, t in enumerate([
+        "1日目の解散直後 … ①前半 → 送信を確認 → ②後半",
+        "2日目の解散直後 … ①前半 → 送信を確認 → ②後半 → ③まとめ",
+        "★②後半を先に見せないこと。「わからない」ボタンの話が先に出ると、"
+        "①前半のS3（今日どう数えたか）が、ボタンを意識した答えになってしまう",
+    ], start=14):
+        c = ws.cell(row=j, column=1, value="・" + t)
+        c.font = Font(size=9, color=("C00000" if t.startswith("★") else "555555"))
+
+    ws["A18"] = "フォーム側で確認しておくこと"
+    ws["A18"].font = Font(bold=True)
+    for j, t in enumerate([
+        "回答を1回に制限しない（1人が1日目と2日目で2回答えるため）",
+        "各フォームの「回答」タブからスプレッドシートに出力しておくと集計が楽",
+        "リンクをSNSやリポジトリなど公開の場所に貼らない（知らない人の回答が混ざる）",
+    ], start=19):
+        c = ws.cell(row=j, column=1, value="・" + t)
+        c.font = Font(size=9, color="555555")
+    return ws
+
+
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "schedule.xlsx")
     wb = Workbook()
@@ -320,6 +395,7 @@ def main():
     sheet_dayflow(wb)
     sheet_conditions(wb)
     sheet_preflight(wb)
+    sheet_forms(wb)
     wb.save(out)
     print("書き出しました: " + out)
     print("Excel で開いて自由に編集できます。日程が変わってもこのスクリプトを回し直す必要はありません")
