@@ -307,7 +307,7 @@ Cは通勤流動が期待できる反面、便数と停留所数で他の2つに
 ## 6. ファイルの在り処
 
 ```
-C:\Users\taichi\Desktop\研究\bus-ui-study\
+C:\Users\taichi\Desktop\卒業研究\★バス人数計測アプリUI研究\bus-ui-study\
   EXPERIMENT_PLAN.md      実験計画（二重差分・R2・日程・費用）★まずこれ
   UI_STUDY_SPEC.md        測定する変数・条件の定義・残タスク
   DESIGN_PHILOSOPHY.md    UI の原則と変更台帳（根拠のない変更は書けない）
@@ -330,6 +330,6 @@ BLE 実測データ（利用可否が未確認）：
 ## 7. 新しいチャットに貼るプロンプト
 
 > 卒業研究（バス車内人数報告アプリのUI実験）を引き継いでください。
-> `C:\Users\taichi\Desktop\研究\bus-ui-study\docs\HANDOFF_hankyu.md` を読んでから作業を始めてください。
+> `C:\Users\taichi\Desktop\卒業研究\★バス人数計測アプリUI研究\bus-ui-study\docs\HANDOFF_hankyu.md` を読んでから作業を始めてください。
 > 阪急バスから条件付きの承諾が出たので、系統と日程を決めるところからです。
 > 日本語で回答してください。

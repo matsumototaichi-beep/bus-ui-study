@@ -11,7 +11,7 @@
 ### 別アカウントに貼り付けるプロンプト
 ```
 これから卒業研究「移動中の人数回答UI」の作業を引き継ぎます。
-まず C:\Users\taichi\Desktop\研究\bus-ui-study\HANDOFF.md を最後まで読んでください。
+まず C:\Users\taichi\Desktop\卒業研究\★バス人数計測アプリUI研究\bus-ui-study\HANDOFF.md を最後まで読んでください。
 次に同じフォルダで git log --oneline -10 と git status を実行し、前任の変更を確認してください。
 メモリ（C:\Users\taichi\.claude\projects\C--Users-taichi-Desktop-----ikenaga-san\memory\）も読んでください。
 読み終えたら、現状と「決まっていないこと」を短くまとめて私に報告してから作業を始めてください。
@@ -41,12 +41,12 @@
 
 | 場所 | 中身 | 注意 |
 |---|---|---|
-| `研究\bus-ui-study\` | **卒研の本体**（このリポジトリ）。ローカルgit、**リモート未設定** | リモートが無いのは、NAIST提出アプリのリモートへ誤ってpushしないための意図的な措置 |
-| `研究\bus-ui-study-refs\papers\` | **読んだ論文のPDFと抽出テキスト**（§5） | **Git管理外。GitHubに上げない**（論文の再配布は著作権の問題） |
+| `卒業研究\★バス人数計測アプリUI研究\bus-ui-study\` | **卒研の本体**（このリポジトリ）。GitHub の `matsumototaichi-beep/bus-ui-study` に push 済み | **public リポジトリ。**GitHub Pages で参加者に配信している。個人情報の入るファイルは .gitignore で除外済み |
+| `卒業研究\★バス人数計測アプリUI研究\bus-ui-study-refs\papers\` | **読んだ論文のPDFと抽出テキスト**（§5） | **Git管理外。GitHubに上げない**（論文の再配布は著作権の問題）。このリポジトリの**隣**に置くこと（README が `../bus-ui-study/LITERATURE.md` を参照している） |
 | `研究\★アプリケーション\naist-bus-congestion\` | NAIST提出用アプリ。GitHub Pages で公開中（`phaseA-1.5`） | **原則触らない**。ユーザーが「本来とコピーどちらも」と明示したときだけ両方に同じ修正を入れる。**pushは必ずユーザーの許可を得てから** |
 | `研究\★アプリケーション\handoff_bus_app.md` | NAIST アプリ側の引継ぎ書 | Supabase・管理者・保留中のセキュリティSQLなどはこちら |
 | `研究\★アプリケーション\traj_extract\` | BLE データとの突合エンジン | **卒研では使わない**（ユーザー方針：UI研究ではBLEと紐づけない） |
-| `研究\★ikenaga_san\.claude\launch.json` | 動作確認用のローカルサーバー設定（§9） | |
+| `研究\★ikenaga_san\.claude\launch.json` | 動作確認用のローカルサーバー設定（§9）。**旧 `研究` フォルダを配信する設定なので、2026-10-06 の移動以降は当たらない** | |
 | メモリ `C:\Users\taichi\.claude\projects\C--Users-taichi-Desktop-----ikenaga-san\memory\` | `ui-study-project.md`（卒研の要点）、`read-full-papers.md`（文献ルール）、`explain-data-provenance.md`（出典明示）、`bus-hitl-project.md`（NAIST側） | 同じPC・同じプロジェクトなら読めるはず |
 
 ### bus-ui-study の中身
@@ -271,7 +271,8 @@
 - git のグローバル設定が無い。コミットは `git -c user.name=taichi -c user.email=taichi1104.deters@gmail.com commit ...` の形で行ってきた
 
 ### 動作確認のやり方
-- `研究\★ikenaga_san\.claude\launch.json` に `study-static`（`python -m http.server 8777`、`研究` フォルダを配信）がある。ブラウザで `http://localhost:8777/bus-ui-study/index.html`
+- 手元で画面を見るときは、`C:\Users\taichi\Desktop\卒業研究\★バス人数計測アプリUI研究\` で `python -m http.server 8777` を実行し、ブラウザで `http://localhost:8777/bus-ui-study/index.html`
+  （`研究\★ikenaga_san\.claude\launch.json` の `study-static` は旧 `研究` フォルダを配信する設定。2026-10-06 の移動以降は当たらない）
 - **ログインせずに人数画面を出す**（ブラウザのコンソールで）：
   ```js
   view='report'; user={id:'t',email:'t@id.local'}; render();
