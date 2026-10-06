@@ -78,9 +78,12 @@ for i, r in enumerate(rows):
         page.insert_text((x + CW - 46, y + 24), "予備", fontname="B", fontsize=10,
                          color=(0.7, 0, 0))
 
-    # 名前 / ID / パスワード を同じ形で並べる
-    for dy, label, value in ((24, "名前", r["名前"]),
-                             (76, "ID", r["ID"]),
+    # 名前は空欄。参加者に手書きしてもらう
+    page.insert_text((x + 16, y + 24), "名前", fontname="R", fontsize=9, color=(0.4, 0.4, 0.4))
+    page.draw_line(pymupdf.Point(x + 16, y + 48), pymupdf.Point(x + CW - 16, y + 48),
+                   color=(0.35, 0.35, 0.35), width=0.9)
+
+    for dy, label, value in ((76, "ID", r["ID"]),
                              (128, "パスワード", r["パスワード"])):
         page.insert_text((x + 16, y + dy), label, fontname="R", fontsize=9,
                          color=(0.4, 0.4, 0.4))
