@@ -25,7 +25,7 @@ service_role キーは全権限を持つ。**画面共有・スクショ・コ�
 """
 import os, sys, json, csv, random, urllib.request, urllib.error, urllib.parse
 
-SUPABASE_URL = "https://qhfegbptgkgccwdnrnas.supabase.co"   # index.html と同じ
+SUPABASE_URL = "https://wwavbfdojschxohvvpzb.supabase.co"   # index.html と同じ
 APP_URL      = "https://matsumototaichi-beep.github.io/bus-ui-study/"
 ID_DOMAIN    = "id.local"       # index.html の normLogin() と合わせる
 IDS          = [chr(c) for c in range(ord("A"), ord("X") + 1)]   # A〜X の24人。A〜L が本番、M〜X は予備

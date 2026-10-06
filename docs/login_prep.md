@@ -81,7 +81,7 @@ python tools/create_accounts.py --dry-run
 - [ ] `python tools/create_accounts.py` を実行し、24件そろったことを確認
 - [ ] `accounts_cards.html` をA4に印刷（12名なら2枚。予備込みなら3枚）
 - [ ] **Supabase の Confirm email が OFF のままか確認**
-      → `https://qhfegbptgkgccwdnrnas.supabase.co/auth/v1/settings` を開いて
+      → `https://wwavbfdojschxohvvpzb.supabase.co/auth/v1/settings` を開いて
       `mailer_autoconfirm` が `true` であること（2026-09-25 時点で確認済み）
 - [ ] **松本が自分のアカウントで実際に1件送ってみる。** 当日使う2つのURL両方で
 - [ ] QRポスター（`docs/qr_posters.html` の **A・B・C・D の4枚**）をA4で印刷

@@ -53,7 +53,7 @@ where auth.email() in ('taichi1104.deters@gmail.com', 'admin@id.local');
 `ADMIN_EMAILS` の `admin@id.local` は **2026-09-06 の最初のコミットから**入っている
 （NAIST提出アプリからコピーした土台にもともと書かれていた）。
 **コードに書いてあることと、アカウントが存在することは別の話。**
-このプロジェクトの Supabase（`qhfegbptgkgccwdnrnas`）に作られていなければ、当然入れない。
+このプロジェクトの Supabase（`wwavbfdojschxohvvpzb`）に作られていなければ、当然入れない。
 
 ### 直し方
 
