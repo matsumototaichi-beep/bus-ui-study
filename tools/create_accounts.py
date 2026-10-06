@@ -28,6 +28,9 @@ import os, sys, json, csv, random, urllib.request, urllib.error, urllib.parse
 SUPABASE_URL = "https://wwavbfdojschxohvvpzb.supabase.co"   # index.html と同じ
 APP_URL      = "https://matsumototaichi-beep.github.io/bus-ui-study/"
 ID_DOMAIN    = "id.local"       # index.html の normLogin() と合わせる
+# 対応表と配布カードの置き場所。リポジトリの外（★UI研究）に出す。
+# public リポジトリにパスワードを置かないため。
+OUTDIR       = os.path.join(os.path.dirname(ROOT), "★UI研究")
 IDS          = [chr(c) for c in range(ord("A"), ord("X") + 1)]   # A〜X の24人。A〜L が本番、M〜X は予備
 ROOT         = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -98,7 +101,7 @@ def admin_account():
             return
         note = "既にあったのでパスワードを入れ直した"
 
-    path = os.path.join(ROOT, "accounts_admin.txt")
+    path = os.path.join(OUTDIR, "accounts_admin.txt")
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write("管理者アカウント（%s）\n\n  ID       : admin\n  パスワード : %s\n\n"
                 "アプリで「ログイン」タブ → 上の2つを入力 → 「データ一覧」タブが出る。\n"
@@ -152,13 +155,14 @@ def main():
                      "予備": yobi, "結果": note})
         print("%sさん  %s" % (pid, note))
 
-    csv_path = os.path.join(ROOT, "accounts.csv")
+    os.makedirs(OUTDIR, exist_ok=True)
+    csv_path = os.path.join(OUTDIR, "accounts.csv")
     with open(csv_path, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)
 
-    html_path = os.path.join(ROOT, "accounts_cards.html")
+    html_path = os.path.join(OUTDIR, "accounts_cards.html")
     with open(html_path, "w", encoding="utf-8", newline="") as f:
         f.write(build_cards(rows, sample=dry))
 
@@ -166,7 +170,7 @@ def main():
     print("\n%d/%d 件そろいました。" % (ok, len(rows)))
     print("  対応表   : " + csv_path)
     print("  配布カード: " + html_path + "（ブラウザで開いてA4に印刷）")
-    print("\n★ この2つは .gitignore 済みです。public リポジトリなので commit しないこと。")
+    print("\n★ この2つは ★UI研究 に出しています。リポジトリの外なので GitHub には上がりません。")
 
 
 def build_cards(rows, sample=False):
