@@ -46,7 +46,7 @@
 | `研究\★アプリケーション\naist-bus-congestion\` | NAIST提出用アプリ。GitHub Pages で公開中（`phaseA-1.5`） | **原則触らない**。ユーザーが「本来とコピーどちらも」と明示したときだけ両方に同じ修正を入れる。**pushは必ずユーザーの許可を得てから** |
 | `研究\★アプリケーション\handoff_bus_app.md` | NAIST アプリ側の引継ぎ書 | Supabase・管理者・保留中のセキュリティSQLなどはこちら |
 | `研究\★アプリケーション\traj_extract\` | BLE データとの突合エンジン | **卒研では使わない**（ユーザー方針：UI研究ではBLEと紐づけない） |
-| `研究\★ikenaga_san\.claude\launch.json` | 動作確認用のローカルサーバー設定（§9）。**旧 `研究` フォルダを配信する設定なので、2026-10-06 の移動以降は当たらない** | |
+| `卒業研究\★バス人数計測アプリUI研究\.claude\launch.json` | 動作確認用のローカルサーバー設定（§9）。`study-static` で `bus-ui-study` を配信する | **リポジトリの外**（親フォルダ側）にある。git 管理外なので GitHub には無い |
 | メモリ `C:\Users\taichi\.claude\projects\C--Users-taichi-Desktop-----ikenaga-san\memory\` | `ui-study-project.md`（卒研の要点）、`read-full-papers.md`（文献ルール）、`explain-data-provenance.md`（出典明示）、`bus-hitl-project.md`（NAIST側） | 同じPC・同じプロジェクトなら読めるはず |
 
 ### bus-ui-study の中身
@@ -271,8 +271,11 @@
 - git のグローバル設定が無い。コミットは `git -c user.name=taichi -c user.email=taichi1104.deters@gmail.com commit ...` の形で行ってきた
 
 ### 動作確認のやり方
-- 手元で画面を見るときは、`C:\Users\taichi\Desktop\卒業研究\★バス人数計測アプリUI研究\` で `python -m http.server 8777` を実行し、ブラウザで `http://localhost:8777/bus-ui-study/index.html`
-  （`研究\★ikenaga_san\.claude\launch.json` の `study-static` は旧 `研究` フォルダを配信する設定。2026-10-06 の移動以降は当たらない）
+- `卒業研究\★バス人数計測アプリUI研究\.claude\launch.json` に `study-static` がある（`python -m http.server 8777`、`bus-ui-study` フォルダを配信）。ブラウザで `http://localhost:8777/` を開くとそのまま `index.html` が出る
+  - `counter.html`（乗降計測）は `http://localhost:8777/counter.html`、記録用紙は `/docs/counting_sheet.html`、QRポスターは `/docs/qr_posters.html`
+  - **本番（GitHub Pages）と同じ相対パスで動く。**`index.html` が読むのは `stops.js` だけで、ルート絶対パス（`/` 始まり）の参照は無い
+  - 手で起動するなら `python -m http.server 8777 --directory C:\Users\taichi\Desktop\卒業研究\★バス人数計測アプリUI研究\bus-ui-study`
+  - 旧 `研究\★ikenaga_san\.claude\launch.json` の `study-static` は旧 `研究` フォルダを配信する設定。2026-10-06 の移動以降は当たらないので使わない
 - **ログインせずに人数画面を出す**（ブラウザのコンソールで）：
   ```js
   view='report'; user={id:'t',email:'t@id.local'}; render();
