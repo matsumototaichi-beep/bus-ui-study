@@ -13,7 +13,8 @@ import pymupdf
 from fontTools.ttLib import TTCollection
 from fontTools import subset
 
-OUT = r'C:/Users/taichi/Desktop/研究/bus-ui-study/docs/実施計画_2026-10-03.pdf'
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(ROOT, "docs", "実施計画_2026-10-03.pdf")
 FONTDIR = pathlib.Path(os.environ['TEMP']) / 'jpfonts_plan_v2'
 FONTDIR.mkdir(parents=True, exist_ok=True)
 
