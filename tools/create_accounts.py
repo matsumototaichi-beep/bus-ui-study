@@ -28,7 +28,7 @@ import os, sys, json, csv, random, urllib.request, urllib.error, urllib.parse
 SUPABASE_URL = "https://qhfegbptgkgccwdnrnas.supabase.co"   # index.html と同じ
 APP_URL      = "https://matsumototaichi-beep.github.io/bus-ui-study/"
 ID_DOMAIN    = "id.local"       # index.html の normLogin() と合わせる
-N_ACCOUNTS   = 24               # 3名 × 8組。実際に使うのは組1〜4、残りは予備
+IDS          = [chr(c) for c in range(ord("A"), ord("X") + 1)]   # A〜X の24人。A〜L が本番、M〜X は予備
 ROOT         = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 紛らわしい字を抜いた英数字。カードを見ながらスマホで打つので i/l/1、o/0 は入れない
@@ -116,23 +116,20 @@ def main():
         admin_account()
         return
     rows = []
-    for i in range(1, N_ACCOUNTS + 1):
-        pid    = "p%02d" % i                 # そのまま参加者番号になる
-        email  = pid + "@" + ID_DOMAIN
+    for i, pid in enumerate(IDS, start=1):
+        email  = pid.lower() + "@" + ID_DOMAIN
         passwd = gen_password()
-        group  = 1 if ((i - 1) // 3) % 2 == 0 else 2     # 3名ずつ1組、組ごとに群を交互に
-        team   = (i - 1) // 3 + 1
-        form_v = ((i - 1) % 4) + 1                       # 事後アンケートの版 v1〜v4
+        yobi   = "予備" if i > 12 else ""
 
         if dry:
-            rows.append({"番号": pid, "組": team, "群": group, "アンケート版": "v%d" % form_v,
-                         "ID": pid, "パスワード": passwd, "結果": "dry-run（作成していない）"})
+            rows.append({"名前": pid + "さん", "ID": pid, "パスワード": passwd,
+                         "予備": yobi, "結果": "dry-run（作成していない）"})
             continue
 
         st, body = api("/auth/v1/admin/users", "POST", {
             "email": email, "password": passwd,
             "email_confirm": True,                       # 確認メールは @id.local 宛なので届かない。ここで済ませる
-            "user_metadata": {"display_name": pid},
+            "user_metadata": {"display_name": pid + "さん"},
         })
         note = "新規作成"
         if st not in (200, 201):
@@ -151,9 +148,9 @@ def main():
             else:
                 note = "失敗(%d): %s" % (st, msg)
                 passwd = ""
-        rows.append({"番号": pid, "組": team, "群": group, "アンケート版": "v%d" % form_v,
-                     "ID": pid, "パスワード": passwd, "結果": note})
-        print("%s  群%d  組%d  %s" % (pid, group, team, note))
+        rows.append({"名前": pid + "さん", "ID": pid, "パスワード": passwd,
+                     "予備": yobi, "結果": note})
+        print("%sさん  %s" % (pid, note))
 
     csv_path = os.path.join(ROOT, "accounts.csv")
     with open(csv_path, "w", encoding="utf-8-sig", newline="") as f:
@@ -178,15 +175,14 @@ def build_cards(rows, sample=False):
     for r in rows:
         cards.append(u"""
       <div class="card">
-        <div class="hd"><span class="no">%(番号)s%(sample)s</span><span class="meta">組%(組)s ／ 群%(群)s ／ アンケート %(アンケート版)s</span></div>
+        <div class="hd"><span class="no">%(名前)s%(sample)s</span><span class="meta">%(予備)s</span></div>
         <div class="body">
           <table class="cred">
             <tr><th>ID</th><td class="mono">%(ID)s</td></tr>
             <tr><th>パスワード</th><td class="mono">%(パスワード)s</td></tr>
           </table>
         </div>
-        <p class="note">このIDとパスワードは<b>別の日にもう一度使います。</b>カードを無くさないでください。<br>
-        メールアドレスを使わない仕組みなので、<b>忘れると元に戻せません。</b></p>
+        <p class="note">このIDとパスワードは<b>2回目にもう一度使います。</b>カードを無くさないでください。</p>
       </div>""" % dict(r, url=APP_URL,
                         sample=u'<span class="smp">サンプル</span>' if sample else u''))
 
