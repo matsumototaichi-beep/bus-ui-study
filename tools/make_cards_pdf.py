@@ -49,7 +49,7 @@ def build_font(ttc_path, out_name, chars):
 with open(CSV, encoding="utf-8-sig", newline="") as f:
     rows = list(csv.DictReader(f))
 
-used = set("ID パスワード 予備" + NOTE1 + NOTE2)
+used = set("名前 ID パスワード 予備" + NOTE1 + NOTE2)
 used |= set(chr(c) for c in range(0x20, 0x7f))
 for r in rows:
     used |= set(r["名前"]) | set(r["ID"]) | set(r["パスワード"])
@@ -74,26 +74,21 @@ for i, r in enumerate(rows):
 
     yobi = (r.get("予備") or "").strip()
 
-    # 名前
-    page.insert_text((x + 16, y + 34), r["名前"], fontname="B", fontsize=22)
     if yobi:
         page.insert_text((x + CW - 46, y + 24), "予備", fontname="B", fontsize=10,
                          color=(0.7, 0, 0))
 
-    # 区切り線
-    page.draw_line(pymupdf.Point(x + 16, y + 46), pymupdf.Point(x + CW - 16, y + 46),
-                   color=(0.8, 0.8, 0.8), width=0.6)
-
-    # ID / パスワード
-    page.insert_text((x + 16, y + 72), "ID", fontname="R", fontsize=9, color=(0.4, 0.4, 0.4))
-    page.insert_text((x + 16, y + 92), r["ID"], fontname="B", fontsize=19)
-
-    page.insert_text((x + 16, y + 120), "パスワード", fontname="R", fontsize=9, color=(0.4, 0.4, 0.4))
-    page.insert_text((x + 16, y + 140), r["パスワード"], fontname="B", fontsize=19)
+    # 名前 / ID / パスワード を同じ形で並べる
+    for dy, label, value in ((24, "名前", r["名前"]),
+                             (76, "ID", r["ID"]),
+                             (128, "パスワード", r["パスワード"])):
+        page.insert_text((x + 16, y + dy), label, fontname="R", fontsize=9,
+                         color=(0.4, 0.4, 0.4))
+        page.insert_text((x + 16, y + dy + 22), value, fontname="B", fontsize=19)
 
     # 注意書き
-    page.insert_text((x + 16, y + CH - 26), NOTE1, fontname="R", fontsize=8, color=(0.3, 0.3, 0.3))
-    page.insert_text((x + 16, y + CH - 14), NOTE2, fontname="R", fontsize=8, color=(0.3, 0.3, 0.3))
+    page.insert_text((x + 16, y + CH - 24), NOTE1, fontname="R", fontsize=8, color=(0.3, 0.3, 0.3))
+    page.insert_text((x + 16, y + CH - 12), NOTE2, fontname="R", fontsize=8, color=(0.3, 0.3, 0.3))
 
 doc.save(OUT, garbage=4, deflate=True)
 print("書き出しました: %s" % OUT)
