@@ -7,18 +7,16 @@
 
   ★ ポスターに条件の中身は書かない。
      参加者に条件の存在を気づかれると、条件そのものへの反応（要求特性）が入る。
-     見分けは右上の A / B / C / D だけ。
+     見分けは右上の「1回目 ゆき」などの表記だけ。
 
-       A … ステッパー ＋「わからない」ボタン あり   ?input=stepper
-       B … ステッパー ＋「わからない」ボタン なし   ?input=stepper&unknown=off
-       C … テンキー   ＋「わからない」ボタン あり   ?input=numpad
-       D … テンキー   ＋「わからない」ボタン なし   ?input=numpad&unknown=off
+       1回目 ゆき   … 数字キー  ＋ わからないボタン なし
+       1回目 かえり … ＋−ボタン ＋ わからないボタン なし
+       2回目 ゆき   … ＋−ボタン ＋ わからないボタン あり
+       2回目 かえり … 数字キー  ＋ わからないボタン あり
 
-     どれをどの便で使うか（docs/operation_plan.md §4／schedule.xlsx「便と条件」）
-
-                昼1本目  昼2本目  夕1本目  夕2本目
-       群1        A        B        D        C
-       群2        D        C        A        B
+     その日に使うのは2枚だけ。
+     1回目の人が来る日 … 「1回目 ゆき」と「1回目 かえり」
+     2回目の人が来る日 … 「2回目 ゆき」と「2回目 かえり」
 -->
 <style>
   @page { size: A4 portrait; margin: 12mm; }
@@ -28,7 +26,7 @@
             display: flex; flex-direction: column; align-items: center;
             border: 0.6mm solid #333; border-radius: 3mm; padding: 10mm 8mm; position: relative; }
   .poster:last-child { page-break-after: auto; }
-  .mark { position: absolute; top: 6mm; right: 8mm; font-size: 30pt; font-weight: 700;
+  .mark { position: absolute; top: 6mm; right: 8mm; font-size: 20pt; font-weight: 700;
           color: #333; line-height: 1; }
   h1 { font-size: 26pt; margin: 4mm 0 2mm; text-align: center; letter-spacing: .04em; }
   .sub { font-size: 12pt; color: #444; text-align: center; margin: 0 0 6mm; }
@@ -47,12 +45,13 @@
 <div id="sheet"></div>
 <script>
   const BASE = "https://matsumototaichi-beep.github.io/bus-ui-study/";
-  // 中身（ステッパー/テンキー・ボタンあり/なし）はポスターに書かない。記号だけで見分ける。
+  // 中身（数字キー/＋−ボタン・わからないボタンの有無）はポスターに書かない。
+  // 参加者が条件に気づくと、条件そのものへの反応が混ざるため。
   const POSTERS = [
-    { mark: "A", qs: "?input=stepper" },
-    { mark: "B", qs: "?input=stepper&unknown=off" },
-    { mark: "C", qs: "?input=numpad" },
-    { mark: "D", qs: "?input=numpad&unknown=off" },
+    { mark: "1回目　ゆき",   qs: "?input=numpad&unknown=off" },
+    { mark: "1回目　かえり", qs: "?input=stepper&unknown=off" },
+    { mark: "2回目　ゆき",   qs: "?input=stepper" },
+    { mark: "2回目　かえり", qs: "?input=numpad" },
   ];
   const sheet = document.getElementById("sheet");
   POSTERS.forEach(function(po){
