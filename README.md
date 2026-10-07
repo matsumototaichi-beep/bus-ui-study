@@ -20,7 +20,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | 回答テーブル | `responses` | **`ui_responses`** |
 | 一覧ビュー | `report_feed` | **`ui_report_feed`** |
 | ローカル退避キー | `bus_outbox_v1` | **`uistudy_outbox_v1`** |
-| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.8.0`**（2026-09-21時点） |
+| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.0`**（2026-10-07時点） |
 
 > Supabaseの接続先（URL/キー）は元アプリと同じままです。**テーブルが別なので混ざりません**が、
 > 完全分離したい場合は「別のSupabaseプロジェクトを作る」のが最も安全です（未決定）。
@@ -45,7 +45,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 ## これからやること（順序）
 1. ~~Supabaseにテーブル作成~~ → **2026-09-18 完了**（`ui_responses` / `ui_sessions` / `ui_report_feed`）
 2. **ログ計装**：操作イベント（タップ・所要時間・訂正回数など）の記録
-3. **UI条件（バリアント）の割当**：セッションごとに自動で条件を切替・記録
+3. **UI条件（バリアント）の割当**：QR の回（1回目／2回目）・ゆき/かえり・IDの1文字目からアプリが決め、study / round / leg / group / label を付けて記録（2026-10-07。`HANDOFF.md` §8 #24〜27）
 4. **エクスポートと分析**：JSON出力 → Python(pandas)で条件間比較
 
 ## 公開URL

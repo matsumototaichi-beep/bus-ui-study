@@ -74,6 +74,23 @@
   .pbanner{display:block; width:100%; max-width:300px; margin:0 auto 6px; border:none; border-radius:10px;
            background:#f59e0b; color:#1f2937; padding:8px 10px; font-size:12.5px; font-weight:800;
            line-height:1.35; text-align:center; font-family:inherit;}
+  /* ★2026-10-07: ゆき/かえり。QR は南口で1回読むだけなので、桃山台では参加者がアプリで切り替える。
+     「ゆきに戻す」は誤操作の取り消し用なので目立たせない */
+  .legbar{display:flex; align-items:center; justify-content:space-between; gap:8px; max-width:300px; margin:0 auto 6px;}
+  .legnow{font-size:12px; color:var(--muted); white-space:nowrap;}
+  .legnow b{color:var(--ink); font-size:15px; margin-left:4px;}
+  .legsw{border:1px solid #2563eb; background:rgba(37,99,235,.16); color:var(--ink); border-radius:9px; padding:6px 10px; font-size:12.5px; font-weight:700; font-family:inherit; white-space:nowrap;}
+  .legsw.quiet{border-color:var(--line); background:transparent; color:var(--muted); font-weight:600; font-size:11.5px;}
+  .leghint{max-width:300px; margin:0 auto 6px; border-radius:10px; background:#1e3a8a; color:#dbeafe;
+           padding:8px 10px; font-size:12.5px; font-weight:800; line-height:1.35; text-align:center;}
+  .legpick{display:flex; flex-direction:column; gap:14px; width:100%; max-width:340px;}
+  .legbig{border:none; border-radius:16px; color:#fff; font-family:inherit; padding:20px 16px;
+          display:flex; flex-direction:column; align-items:center; gap:6px;}
+  .legbig.yuki{background:#2563eb;} .legbig.kaeri{background:#0f766e;}
+  .legbig .lgn{font-size:26px; font-weight:800;}
+  .legbig .lgr{font-size:15px; font-weight:600; opacity:.95;}
+  .legbig:active{filter:brightness(.9);}
+  .legtag{font-size:13px; color:var(--muted);}
   .card{
     border:none; border-radius:12px; color:#fff; font-family:inherit; padding:0 16px; min-height:56px;
     display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:14px;
@@ -283,7 +300,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.8.3";
+const APP_VERSION = "uiStudy-0.9.0";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -310,15 +327,78 @@ const UI_CONDS = [
 // ★2026-09-18: URLのクエリパラメータで条件を固定できるようにする（例 ?input=stepper、?unknown=off）。
 // 「条件ごとに別URLのアプリを配布し、実験者が渡すURLで条件を決める」運用のため。
 // 指定しない軸は今までどおりアプリ内でローテーションする。
+// ★2026-10-07: ?input= / ?unknown= はテスト用に残す。明示されていれば下の (回目, 区間, 組) より優先する。
 const URL_QS = new URLSearchParams(location.search);
-const FIXED_INPUT = (()=>{ const v=(URL_QS.get("input")||"").toLowerCase(); return (v==="stepper"||v==="numpad") ? v : null; })();
-// ★2026-09-19:「わからない」ボタンの有無（要因B）。?unknown=off で非表示、既定は表示。
+const URL_INPUT = (()=>{ const v=(URL_QS.get("input")||"").toLowerCase(); return (v==="stepper"||v==="numpad") ? v : null; })();
+// ★2026-09-19:「わからない」ボタンの有無（要因B）。?unknown=off で非表示。
 // 「逃げ道があると人は逃げるのか」＝ボタンがあると人数の欠損が増えるのかを見る。
 // これはアプリ内ではローテーションさせない。ボタンが出たり消えたりするのは参加者に気づかれ、
-// 条件そのものへの反応（要求特性）を生むため、便ごとに配布URLで固定する。
-const SHOW_UNKNOWN = (URL_QS.get("unknown")||"").toLowerCase() !== "off";
+// 条件そのものへの反応（要求特性）を生むため、その回（往復）のあいだは固定する。
+const URL_UNKNOWN = URL_QS.has("unknown") ? ((URL_QS.get("unknown")||"").toLowerCase() !== "off") : null;
+// ★2026-10-07: QR は「1回目」(?round=1)「2回目」(?round=2)「計数研究」(?study=count) の3枚にした。
+// 便ごと・区間ごとに別QRを読ませると、実験者が同乗しない桃山台でかえりに切り替えられないため。
+// 入力方式は (回目, ゆき/かえり)、「わからない」ボタンは (回目, 組) からアプリが決める。
+const URL_STUDY = (URL_QS.get("study")||"").toLowerCase()==="count" ? "count"
+                : ({"1":"r1","2":"r2"})[URL_QS.get("round")||""] || null;
+const STUDY_KEY = "uistudy_round_v1";    // "r1" | "r2" | "count"（日付つき）
+const LEG_KEY   = "uistudy_leg_v1";      // "yuki" | "kaeri"（日付つき）
+const LEGAT_KEY = "uistudy_leg_at_v1";   // ゆきを選んだ時刻(ms)。桃山台で切り替えの案内を出すため
+// URL から消えても（再読込・ホーム画面から開き直し）その日のうちは保持する。
+// 別のQRを読んだら区間を選び直させる（同じ日に1回目と2回目をする人がいるため）
+function rememberUrlStudy(){
+  if(!URL_STUDY) return;
+  if(getDaily(STUDY_KEY) !== URL_STUDY){ setDaily(LEG_KEY, null); setDaily(LEGAT_KEY, null); }
+  setDaily(STUDY_KEY, URL_STUDY);
+}
+// 最後に読んだQRを優先する（古いタブを開いたままでも、新しいQRの回目に従う）
+function studyMode(){ return getDaily(STUDY_KEY) || URL_STUDY; }
+function roundNo(){ const m=studyMode(); return m==="r1" ? 1 : m==="r2" ? 2 : null; }
+function curLeg(){
+  if(studyMode()==="count") return "yuki";   // 計数研究のかえりは乗降アプリ(counter.html)を使う
+  if(!roundNo()) return null;
+  const v=getDaily(LEG_KEY); return (v==="yuki"||v==="kaeri") ? v : null;
+}
+function needLeg(){ return !!roundNo() && !curLeg(); }
+function setLeg(leg){
+  setDaily(LEG_KEY, leg);
+  // 「ゆきに戻す」（誤操作の取り消し）では最初にゆきを選んだ時刻を残す。案内が遅れないように
+  if(leg==="yuki" && !getDaily(LEGAT_KEY)) setDaily(LEGAT_KEY, String(Date.now()));
+}
+function legElapsedMin(){ const a=parseInt(getDaily(LEGAT_KEY)||"",10); return a ? (Date.now()-a)/60000 : 0; }
+// 組＝ログインIDの1文字目。A=1, B=2, … が奇数なら奇数組。アルファベット以外で始まるIDは奇数組
+function idGroup(){
+  const c=((user && user.email) || "").split("@")[0].charAt(0).toUpperCase();
+  if(c.length!==1 || c<"A" || c>"Z") return "odd";
+  return ((c.charCodeAt(0)-64) % 2 === 1) ? "odd" : "even";
+}
+// 入力方式。null ならアプリ内でローテーション（round も study も無いURL＝今までどおり）
+//   1回目: ゆき=テンキー / かえり=＋−ボタン　2回目: ゆき=＋−ボタン / かえり=テンキー
+function condInput(){
+  if(URL_INPUT) return URL_INPUT;
+  if(studyMode()==="count") return "numpad";
+  const r=roundNo(); if(!r) return null;
+  const yuki = (curLeg()||"yuki")==="yuki";
+  return ((r===1)===yuki) ? "numpad" : "stepper";
+}
+// 「わからない」ボタンの有無。往復とも同じ。奇数組は1回目なし→2回目あり、偶数組はその逆
+function condUnknown(){
+  if(URL_UNKNOWN!==null) return URL_UNKNOWN;
+  if(studyMode()==="count") return true;
+  const r=roundNo(); if(!r) return true;
+  return (idGroup()==="odd") ? (r===2) : (r===1);
+}
+// 送る・残すデータすべてに付けるラベル。時刻とこれで「どの回のどちら向きか」を分けられる
+function studyTag(){
+  if(studyMode()==="count") return { study:"count", round:null, leg:"yuki", group:null, label:"計数研究ゆき" };
+  const r=roundNo();
+  if(!r) return { study:null, round:null, leg:null, group:null, label:null };
+  const leg=curLeg();
+  return { study:"ui", round:r, leg:leg, group:idGroup(),
+           label: r+"回目"+(leg==="kaeri" ? "かえり" : leg==="yuki" ? "ゆき" : "") };
+}
 function activeConds(){
-  const c = UI_CONDS.filter(x => FIXED_INPUT===null || x.input===FIXED_INPUT);
+  const fixed = condInput();
+  const c = UI_CONDS.filter(x => fixed===null || x.input===fixed);
   return c.length ? c : UI_CONDS;   // 該当が0件（あり得ないURL指定）なら全条件にフォールバック
 }
 const UISTUDY_KEY  = "uistudy_sessions_v1";        // 未送信セッションの退避
@@ -352,10 +432,12 @@ function peekVariant(){
   const conds = activeConds();
   const off = condOffset(conds.length);
   const c = conds[(n + off) % conds.length];
-  return { input: c.input, count_init: c.count_init, seq: n, offset: off,
-           unknown_ui: SHOW_UNKNOWN,          // ★要因B：「わからない」ボタンを出したか
-           url_fixed: { input: FIXED_INPUT }, // ★入力方式がURLで固定されていたか
-           practice: prac };
+  // ★2026-10-07: 条件はクラスタップの時点で決めて pending に持たせる。人数画面の描画・操作ログ・
+  // 送信データはすべてここの値を使う（途中で区間が変わっても1回答の中で食い違わないように）
+  return Object.assign({ input: c.input, count_init: c.count_init, seq: n, offset: off,
+           unknown_ui: condUnknown(),         // ★要因B：「わからない」ボタンを出したか
+           url_fixed: { input: URL_INPUT, unknown: URL_UNKNOWN }, // ★テスト用URLで固定されていたか
+           practice: prac }, studyTag());     // ★study / round / leg / group / label
 }
 // 送信/スキップが確定した回答についてだけ呼ぶ。カウンタを実際に1つ進める。
 // n===variant.seq のときだけ進めるので、同じ variant を誤って2回コミットしても多重には進まない。
@@ -380,13 +462,21 @@ const POSTURE_KEY  = "uistudy_posture_v1";
 const PRACTICE_KEY = "uistudy_practice_v1";
 function isPractice(){ return getDaily(PRACTICE_KEY) === "1"; }
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+// ★2026-10-07: 端末に保存できない（Cookie 全ブロック等で localStorage が例外を出す）ときはメモリに持つ。
+// 区間を選んでも覚えられず「どちらのバスに乗りますか？」に戻り続け、回答できなくなるため
+const DAILY_MEM = {};
 function getDaily(k){
-  let raw=null; try{ raw=localStorage.getItem(k); }catch(e){}
+  let raw=null;
+  if(k in DAILY_MEM) raw=DAILY_MEM[k];
+  else{ try{ raw=localStorage.getItem(k); }catch(e){} }
   if(!raw) return null;
   const i=raw.lastIndexOf("|");
   return (i>0 && raw.slice(i+1)===todayStr()) ? raw.slice(0,i) : null;
 }
-function setDaily(k,v){ try{ if(v) localStorage.setItem(k, v+"|"+todayStr()); else localStorage.removeItem(k); }catch(e){} }
+function setDaily(k,v){
+  const s = v ? v+"|"+todayStr() : null;
+  try{ if(s) localStorage.setItem(k, s); else localStorage.removeItem(k); delete DAILY_MEM[k]; }catch(e){ DAILY_MEM[k]=s; }
+}
 function expBarInner(t){
   const pos=getDaily(POSTURE_KEY);
   const pracOn = isPractice();
@@ -413,6 +503,50 @@ function wireExpBar(){
   document.querySelectorAll("#expbar .pz").forEach(b=>{ b.onclick=()=>{ setDaily(POSTURE_KEY, b.dataset.p); renderExpBar(); }; });
   const pr=$("pracBtn");
   if(pr) pr.onclick=()=>{ setDaily(PRACTICE_KEY, isPractice()?null:"1"); renderExpBar(); };
+}
+// ★2026-10-07: いまの区間と切り替えボタン。実験者は南口で離脱するので、桃山台では参加者が自分で切り替える
+function legBar(t){
+  if(studyMode()==="count") return `<div class="legbar"><span class="legnow"><b>${t.count_study}</b></span></div>`;
+  const r=roundNo(); if(!r) return "";
+  const yuki = curLeg()!=="kaeri";
+  // 70分：ゆきを選ぶのは集合直後（11:40／15:30ごろ）、桃山台着は 12:48／16:40。50分だとまだ車内で出てしまう
+  const hint = (yuki && legElapsedMin()>=70) ? `<div class="leghint">${t.leg_hint}</div>` : "";
+  return hint + `<div class="legbar"><span class="legnow">${t.round_lbl(r)}<b>${yuki?t.leg_yuki:t.leg_kaeri}</b></span>` +
+    (yuki ? `<button id="legSw" class="legsw" data-to="kaeri">${t.leg_to_kaeri}</button>`
+          : `<button id="legSw" class="legsw quiet" data-to="yuki">${t.leg_to_yuki}</button>`) + `</div>`;
+}
+// バーだけ描き直す（renderMain を呼ぶと t_class が狂う）。70分たったら案内を出すため定期的にも呼ぶ
+function renderLegBar(){
+  const el=$("legwrap"); if(!el) return;
+  const h=legBar(T[lang]);
+  if(el.dataset.h===h) return;   // 変化が無ければ触らない（押している最中のボタンを作り直さない）
+  el.dataset.h=h; el.innerHTML=h;
+  const b=$("legSw"); if(b) b.onclick=()=>switchLeg(b.dataset.to);
+}
+function switchLeg(to){
+  const t=T[lang];
+  if(answering){ toast(t.leg_busy,"#f59e0b"); return; }   // 人数入力中は切り替えない（回答の条件が混ざる）
+  if(!confirm(to==="kaeri" ? t.leg_confirm_kaeri : t.leg_confirm_yuki)) return;
+  // 送信後の軌跡記録中の回答は、前の区間のラベルのまま先に確定させる
+  if(pending){ commitVariant(pending.variant); finalizeNow(true); }
+  setLeg(to);
+  renderMain();
+  toast(t.leg_switched(to==="kaeri" ? t.leg_kaeri : t.leg_yuki));
+}
+// ログイン後、その日まだ区間を選んでいなければ最初に聞く
+function renderLegPick(){
+  const t=T[lang];
+  main.innerHTML = `
+    <div class="center">
+      <div class="legtag">${t.round_lbl(roundNo())}</div>
+      <h2>${t.leg_q}</h2>
+      <div class="legpick">
+        <button class="legbig yuki" data-leg="yuki"><span class="lgn">${t.leg_yuki}</span><span class="lgr">${t.leg_yuki_route}</span></button>
+        <button class="legbig kaeri" data-leg="kaeri"><span class="lgn">${t.leg_kaeri}</span><span class="lgr">${t.leg_kaeri_route}</span></button>
+      </div>
+    </div>`;
+  main.querySelectorAll(".legbig").forEach(b=>{ b.onclick=()=>{ setLeg(b.dataset.leg); renderMain(); }; });
+  setStatus();
 }
 // 人数画面を開いてから最初に値を操作するまでの時間（＝考えていた時間の目安）を1回だけ記録する
 function markFirst(){
@@ -583,6 +717,13 @@ const T = {
     st_ok:"送信済", st_pend:"未送信", st_rec:"記録中", log_head:"送信状況",
     sit:"着席", stand:"立席",
     prac:"練習", prac_banner:"練習モード｜この回答は分析に使いません（タップで終了）",
+    leg_q:"どちらのバスに乗りますか？", round_lbl:(r)=>`${r}回目`, count_study:"計数研究",
+    leg_yuki:"ゆき", leg_kaeri:"かえり", leg_yuki_route:"吹田駅 → 桃山台駅", leg_kaeri_route:"桃山台駅 → 吹田駅",
+    leg_to_kaeri:"かえりに切り替える", leg_to_yuki:"ゆきに戻す",
+    leg_confirm_kaeri:"「かえり　桃山台駅 → 吹田駅」に切り替えます。よろしいですか？",
+    leg_confirm_yuki:"「ゆき　吹田駅 → 桃山台駅」に戻します。よろしいですか？",
+    leg_hint:"桃山台駅で降りたら「かえりに切り替える」を押してください",
+    leg_switched:(l)=>`${l}に切り替えました`, leg_busy:"回答中は切り替えできません",
     gpsOn:"位置情報 取得中…", gpsOk:"位置情報 OK", gpsNo:"位置情報が取得できません（許可が必要）",
     gpsSlow:"位置情報を取得中…（少し時間がかかっています）",
     who:(h)=>`調査員 <b>${h}</b>`, langLabel:"EN",
@@ -638,6 +779,13 @@ const T = {
     st_ok:"Sent", st_pend:"Not sent", st_rec:"Recording", log_head:"Status",
     sit:"Seated", stand:"Standing",
     prac:"Practice", prac_banner:"PRACTICE MODE — not used in analysis (tap to end)",
+    leg_q:"Which bus are you taking?", round_lbl:(r)=>`Session ${r}`, count_study:"Counting study",
+    leg_yuki:"Outbound", leg_kaeri:"Return", leg_yuki_route:"Suita Sta. → Momoyamadai Sta.", leg_kaeri_route:"Momoyamadai Sta. → Suita Sta.",
+    leg_to_kaeri:"Switch to return", leg_to_yuki:"Back to outbound",
+    leg_confirm_kaeri:"Switch to the return trip (Momoyamadai Sta. → Suita Sta.)?",
+    leg_confirm_yuki:"Go back to the outbound trip (Suita Sta. → Momoyamadai Sta.)?",
+    leg_hint:"When you get off at Momoyamadai Sta., tap “Switch to return”.",
+    leg_switched:(l)=>`Switched to ${l.toLowerCase()}`, leg_busy:"You can't switch while answering",
     gpsOn:"Getting location…", gpsOk:"Location OK", gpsNo:"Location unavailable (permission required)",
     gpsSlow:"Getting location… (taking a little while)",
     who:(h)=>`Surveyor <b>${h}</b>`, langLabel:"日本語",
@@ -744,6 +892,7 @@ function stopSampling(){ if(watchId!=null){ navigator.geolocation.clearWatch(wat
 
 /* ---------------- 回答フロー ---------------- */
 function pickClass(cls){
+  if(needLeg()){ renderMain(); return; }   // ★2026-10-07: 区間が未選択（日付が変わった等）なら先に選ばせる
   // 直前の回答が確定待ちなら即確定（★未コミットならここで確実にコマを消費させる）
   if(pending){ commitVariant(pending.variant); finalizeNow(true); }
   const variant = peekVariant();       // ★UI研究: この回答に使う条件（確定はsubmit()でcommit）
@@ -866,6 +1015,8 @@ function renderCount(){
   const [lo,hi]=COUNT_RANGES[pending.congestion_class-1];
   // ★UI研究: 人数は常に未入力（「—」）から始める。初期値あり条件は廃止した（経緯は UI_CONDS のコメント）
   const inputMode = (pending.variant && pending.variant.input) || "stepper";
+  // ★2026-10-07:「わからない」ボタンの有無も variant から取る（描画・ログ・送信データで必ず一致させる）
+  const unknownUi = !(pending.variant && pending.variant.unknown_ui === false);
   // 入力途中の値は pending に持たせる。言語切替やナビで描き直されても失わないため。
   // 条件(variant)はクラスタップ時に確定済みなので、描き直しても条件は進まない
   const firstDraw = (pending.n_live===undefined);
@@ -895,7 +1046,7 @@ function renderCount(){
       <h2>${t.countTitle}</h2>
       <p class="hint">${t.countHint}</p>
       ${ctrlHtml}
-      ${SHOW_UNKNOWN ? `<div class="unknownrow">
+      ${unknownUi ? `<div class="unknownrow">
         <button type="button" id="unknownBtn">${t.unknown}</button>
       </div>` : ``}
       <div class="stopwrap">
@@ -924,7 +1075,7 @@ function renderCount(){
   // ★UI研究:「わからない」の明示。値を消すだけの C(クリア) とは別物として扱う。
   // 「一度も触っていない未入力」「触ったが消した」「数えられないと明言した」を
   // 解析で区別できるようにするため、専用のイベントとフラグで残す
-  const unknownBtn = SHOW_UNKNOWN ? $("unknownBtn") : null;
+  const unknownBtn = unknownUi ? $("unknownBtn") : null;
   const showUnknown = ()=>{ if(unknownBtn) unknownBtn.classList.toggle("on", !!pending.n_unknown); };
   showUnknown();
   if(unknownBtn) unknownBtn.onclick=()=>{
@@ -943,7 +1094,7 @@ function renderCount(){
     // Fittsの法則どおり標的の大きさによるものかを、解析側で切り分けられるようにするため
     const ctl = main.querySelector(inputMode==="numpad" ? ".numpad button" : ".stepper button");
     const cr  = ctl ? ctl.getBoundingClientRect() : null;
-    logEvent("screen_view", { screen:"count", input:inputMode, count_init:"none", unknown_ui:SHOW_UNKNOWN,
+    logEvent("screen_view", { screen:"count", input:inputMode, count_init:"none", unknown_ui:unknownUi,
                               lo:lo, hi:hi, cmin:COUNT_MIN, cmax:COUNT_MAX,
                               ctl_w: cr?Math.round(cr.width):null, ctl_h: cr?Math.round(cr.height):null,
                               vw: window.innerWidth, vh: window.innerHeight });
@@ -1023,16 +1174,20 @@ function buildRec(p){
            session_id:p.session_id||null, client_id:p.cid,     // ★UI研究: ui_sessions と結合
            practice:!!(p.variant && p.variant.practice) };     // 回答側にも持たせる（結合せず除外できるように）
 }
+// ★2026-10-07: ui_responses には列を足さない（ラベルは session_id で ui_sessions.variant と結合して取る）。
+// 端末内の退避データにはラベルを rec の外に持たせる（rec に入れると insert が未知の列で失敗する）
+function labelOf(p){ return (p && p.variant && p.variant.label) || null; }
 function syncPendingToOutbox(ready){
   if(!pending) return;
-  outboxUpsert({ cid:pending.cid, ready:!!ready, rec:buildRec(pending) });
+  outboxUpsert({ cid:pending.cid, ready:!!ready, rec:buildRec(pending), label:labelOf(pending) });
 }
 
 function submit(){
   commitVariant(pending.variant);   // ★UI研究: 送信/スキップが確定したのでローテーションを1つ進める
   // 画面ログに「記録中」で追加
   const entry={ cid:pending.cid, congestion_class:pending.congestion_class,
-                exact_count:pending.exact_count, answered_at:pending.answered_at, state:"rec" };
+                exact_count:pending.exact_count, answered_at:pending.answered_at, state:"rec",
+                label:labelOf(pending) };
   logEntries.unshift(entry);
   syncPendingToOutbox(false);   // 未確定として退避(クラッシュ耐性)
   // 送信後もしばらく測位を続け、ウィンドウ到達で確定
@@ -1074,7 +1229,7 @@ async function finalizeNow(immediate){
     try{ await insertRecord(rec); ok=true; outboxRemove(p.cid); }
     catch(err){ ok=false; console.error("[finalizeNow] insert失敗:", err?.code||"", err?.message||err); }
   }
-  if(!ok){ outboxUpsert({ cid:p.cid, ready:true, rec }); }
+  if(!ok){ outboxUpsert({ cid:p.cid, ready:true, rec, label:labelOf(p) }); }
   if(entry){ entry.state = ok?"ok":"pend"; entry.npts=p.trajectory.length; delete entry.remain; }
   // 非同期の後処理: 次の回答を入力中(新pending)や人数画面表示中は画面を作り直さない
   // （前の回答の確定処理が、出したばかりの人数画面を上書きしてしまう不具合を防ぐ）
@@ -1096,6 +1251,7 @@ function renderMain(){
   if(view!=="report") { updateNav(); return; }   // データ一覧表示中は報告画面で上書きしない
   const t=T[lang];
   updateNav();
+  if(needLeg()){ renderLegPick(); return; }      // ★2026-10-07: UI研究で区間が未選択なら先に選ばせる
   let cards="";
   t.classes.forEach((c,i)=>{ cards+=`<button class="card c${i+1}" onclick="pickClass(${i+1})"><span class="num">${i+1}</span><span class="cardtext"><span class="lbl">${c.lbl}</span><span class="rng">${c.rng}</span></span></button>`; });
   let rows="";
@@ -1108,19 +1264,20 @@ function renderMain(){
       rows+=`<div class="logrow">
         <span class="chip c${e.congestion_class}">${e.congestion_class}</span>
         <span class="lt">${hhmm(e.answered_at)}</span>
-        <span class="lmid"><div class="lcount">${countTxt}</div><div class="lsub">${cls.lbl}</div></span>
+        <span class="lmid"><div class="lcount">${countTxt}</div><div class="lsub">${cls.lbl}${e.label?` · ${e.label}`:""}</div></span>
         <span class="lstat ${stc}" data-cid="${e.cid}">${st}</span>
       </div>`;
     });
   }
   main.innerHTML = `
-    <div class="picker"><div id="pracwrap">${pracBanner(t)}</div><div class="expbar" id="expbar">${expBarInner(t)}</div><p class="ptitle">${t.pick}</p><div class="grid">${cards}</div></div>
+    <div class="picker"><div id="pracwrap">${pracBanner(t)}</div><div id="legwrap"></div><div class="expbar" id="expbar">${expBarInner(t)}</div><p class="ptitle">${t.pick}</p><div class="grid">${cards}</div></div>
     <div class="log">
       <div class="lhead"><span>${t.records} ${logEntries.length}</span><span>${t.log_head}</span></div>
       ${rows}
     </div>`;
   wireExpBar();
   renderPracBanner();   // バナーのタップ（＝練習終了）を有効にする
+  renderLegBar();       // ★2026-10-07: ゆき/かえりと切り替えボタン
   setStatus();
   pickerShownAt = performance.now();   // ★UI研究: クラス選択画面が出た時刻
   startSampling();   // 一覧表示中は測位を回してpreBufferを温める（前倒し）
@@ -1381,6 +1538,7 @@ async function submitAuth(){
 }
 
 async function boot(){
+  rememberUrlStudy();   // ★2026-10-07: QR の回目（?round= / ?study=）を日付つきで覚える
   $("langBtn").onclick=()=>{ lang=(lang==="ja")?"en":"ja"; render(); };
   $("outBtn").onclick=async()=>{
     // ★uiStudy-0.8.1: 乗車中の誤タップ対策。ここで落ちると電波の悪い車内で
@@ -1389,8 +1547,12 @@ async function boot(){
     if(sb){ await sb.auth.signOut(); }
     // ★UI研究: 着席/立席・練習モードはその時々の状態なので、ログアウトのたびにリセットする
     setDaily(POSTURE_KEY, null); setDaily(PRACTICE_KEY, null);
+    // ★2026-10-07: 回目・区間も消す（同じ端末で別の人がログインしても前の人の区間を引き継がない）
+    setDaily(STUDY_KEY, null); setDaily(LEG_KEY, null); setDaily(LEGAT_KEY, null);
     user=null; authMode="login"; view="report"; render();
   };
+  // ★2026-10-07: 報告画面を開いたままでも、ゆきを選んで70分たったら切り替えの案内を出す
+  setInterval(()=>{ if(view==="report" && !answering) renderLegBar(); }, 30000);
   $("navReport").onclick=()=>setView("report");
   $("navFeed").onclick=()=>setView("feed");
 
@@ -1406,6 +1568,8 @@ async function boot(){
     user = sess ? sess.user : null;
     const uid = user ? user.id : null;
     if(ev==="PASSWORD_RECOVERY"){ authMode="newpass"; view="report"; render(); return; }  // 再設定リンクから復帰
+    // ★2026-10-07: ログアウト→同じタブで再ログインしたとき、URL の回目を覚え直す
+    if(user && !prevUid && !getDaily(STUDY_KEY)) rememberUrlStudy();
     // ログイン/ログアウトが実際に変わった時だけ画面を作り直す。
     // スマホのフォーカス復帰やトークン更新でも発火するため、同一ユーザー継続中は
     // 画面を保持する（回答中にクラス選択へ戻される不具合を防ぐ）。
@@ -1423,7 +1587,7 @@ async function boot(){
   document.addEventListener("visibilitychange", ()=>{
     // 背景化: 送信後の記録中(pending & 人数入力は終了)だけ確定。人数入力中は保持したまま測位停止。
     if(document.hidden){ if(pending && !answering) finalizeNow(true); stopSampling(); }
-    else if(user){ startSampling(); flushOutbox(); flushSessions(); }                        // 復帰: 測位再開＆再送
+    else if(user){ startSampling(); flushOutbox(); flushSessions(); if(view==="report" && !answering) renderLegBar(); }  // 復帰: 測位再開＆再送
   });
   window.addEventListener("pagehide", ()=>{ if(pending) finalizeNow(true); });
 }

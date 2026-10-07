@@ -17,7 +17,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTDIR = os.path.join(ROOT, "docs", "questionnaire")
 XLSX = os.path.join(OUTDIR, "設問一覧.xlsx")
 FONT = "Yu Gothic"
-NCOL = 8
+NCOL = 9          # 9列目「何が分かるか」は用紙に出さない
 
 
 def setup(doc):
@@ -53,9 +53,11 @@ def lines(doc, n=2):
 
 
 def emit(doc, row, first):
-    youshi, setsu, no, kata, bun, sel, must, hosoku = row
+    youshi, setsu, no, kata, bun, sel, must, hosoku = row[:8]
     choices = [x.strip() for x in (sel or "").split("／") if x.strip()]
 
+    if kata == "表紙":
+        return                      # 題名と説明文は build() で出す
     if kata in ("ページ", "説明"):
         if kata == "ページ" and not first[0]:
             doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
@@ -79,16 +81,22 @@ def emit(doc, row, first):
         p(doc, "　　1 ・ 2 ・ 3 ・ 4 ・ 5　（1＝%s　5＝%s）" % (left, right), size=10, after=3)
     elif kata == "日付":
         p(doc, "　　＿＿月＿＿日", size=10, after=4)
-    elif kata == "短文":
+    elif kata in ("短文", "ID"):
         lines(doc, 1)
     elif kata == "段落":
         lines(doc, 2)
 
 
-def build(rows, title):
+def build(rows):
     doc = Document()
     setup(doc)
-    p(doc, title, size=15, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, after=8)
+    # ★2026-10-07: 題名と説明文は Excel の「表紙」の行から取る（Googleフォームと同じ文言にする）
+    hyoshi = [r for r in rows if r[3] == "表紙"]
+    if not hyoshi:
+        sys.exit("%s の「表紙」の行がありません。" % rows[0][0])
+    p(doc, hyoshi[0][4], size=15, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, after=4)
+    if hyoshi[0][7]:
+        p(doc, hyoshi[0][7], size=10, color=(0x55, 0x55, 0x55), align=WD_ALIGN_PARAGRAPH.CENTER, after=8)
     first = [True]
     for row in rows:
         emit(doc, row, first)
@@ -111,7 +119,7 @@ def main():
     for youshi, fname in (("1回目", "アンケート_1回目.docx"), ("2回目", "アンケート_2回目.docx")):
         sub = [r for r in rows if r[0] == youshi]
         path = os.path.join(OUTDIR, fname)
-        build(sub, "バスの人数アプリ　%sのアンケート" % youshi).save(path)
+        build(sub).save(path)
         print("書き出しました: %s（%d問）" % (path, len([r for r in sub if r[2]])))
 
 

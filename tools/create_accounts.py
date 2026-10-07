@@ -28,11 +28,11 @@ import os, sys, json, csv, random, urllib.request, urllib.error, urllib.parse
 SUPABASE_URL = "https://wwavbfdojschxohvvpzb.supabase.co"   # index.html と同じ
 APP_URL      = "https://matsumototaichi-beep.github.io/bus-ui-study/"
 ID_DOMAIN    = "id.local"       # index.html の normLogin() と合わせる
+ROOT         = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 対応表と配布カードの置き場所。リポジトリの外（★UI研究）に出す。
 # public リポジトリにパスワードを置かないため。
 OUTDIR       = os.path.join(os.path.dirname(ROOT), "★UI研究")
 IDS          = [chr(c) for c in range(ord("A"), ord("X") + 1)]   # A〜X の24人。A〜L が本番、M〜X は予備
-ROOT         = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 紛らわしい字を抜いた英数字。カードを見ながらスマホで打つので i/l/1、o/0 は入れない
 ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
