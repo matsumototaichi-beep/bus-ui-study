@@ -283,7 +283,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.8.2";
+const APP_VERSION = "uiStudy-0.8.3";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -551,7 +551,7 @@ const T = {
     auth_title:"バス混雑度 計測",
     auth_intro:"バス車内の混み具合を答えていただく卒業研究です。<b>好きなIDとパスワード</b>を決めて登録してください（メールアドレスは使いません）。回答はクラスと人数だけ、位置と時刻は自動で記録されます。",
     tab_login:"ログイン", tab_signup:"新規登録",
-    ph_id:"ID（半角英数 3〜20文字）", ph_email:"メールアドレス", ph_pass:"パスワード（6文字以上）",
+    ph_id:"ID（カードに書いてある文字）", ph_email:"メールアドレス", ph_pass:"パスワード（6文字以上）",
     id_hint:"このIDとパスワードは、別の日にもう一度使います。配布カードに必ず書いてください。",
     show_pass:"パスワードを表示して確かめる",
     confirm_logout:"ログアウトします。次に使うときはIDとパスワードの入力が必要です。よろしいですか？",
@@ -561,7 +561,7 @@ const T = {
     resend:"確認メールを再送", to_login:"ログインへ戻る", resent:"再送しました",
     err_login:"IDまたはパスワードが違います", err_unconfirmed:"このアカウントはまだ有効になっていません。実験者に伝えてください。",
     err_pass:"パスワードは6文字以上にしてください", err_email:"IDを入力してください",
-    err_id_format:"IDは半角英数・ハイフン・アンダースコアで3〜20文字にしてください",
+    err_id_format:"IDは半角英数・ハイフン・アンダースコアで20文字までにしてください",
     err_confirm_on:"登録はできましたが、サーバー側でメール確認が必要な設定のままです。実験者に伝えてください。",
     login_wait:"処理中…",
     pick:"混雑度を選択", records:"記録", none:"まだ記録がありません",
@@ -606,7 +606,7 @@ const T = {
     auth_title:"Bus Crowding Survey",
     auth_intro:"Data collection for a graduation research study on bus crowding reports. Pick <b>any ID and password</b> to register (no email needed). You only choose the crowding level and count — your location and time are recorded automatically.",
     tab_login:"Sign in", tab_signup:"Sign up",
-    ph_id:"ID (3-20 letters/digits)", ph_email:"Email address", ph_pass:"Password (6+ characters)",
+    ph_id:"ID (printed on your card)", ph_email:"Email address", ph_pass:"Password (6+ characters)",
     id_hint:"You will need this ID and password again on another day. Write them on your card.",
     show_pass:"Show password",
     confirm_logout:"Sign out? You will need your ID and password to get back in.",
@@ -616,7 +616,7 @@ const T = {
     resend:"Resend confirmation email", to_login:"Back to sign in", resent:"Resent",
     err_login:"Incorrect ID or password", err_unconfirmed:"This account is not active yet. Please tell the experimenter.",
     err_pass:"Password must be at least 6 characters", err_email:"Please enter an ID",
-    err_id_format:"Use 3-20 letters, digits, hyphens or underscores",
+    err_id_format:"Use up to 20 letters, digits, hyphens or underscores",
     err_confirm_on:"Registered, but the server still requires email confirmation. Please tell the experimenter.",
     login_wait:"Processing…",
     pick:"Select the crowding level", records:"Records", none:"No records yet",
@@ -1224,7 +1224,8 @@ async function loadFeed(){
    「パスワードを忘れた方」はメール前提なので画面から外した（reset/newpass のコードは残置）。 */
 let authMode = "login";   // login | signup | sent
 let authForm = { email:"", pass:"", sentEmail:"" };   // email には「ID」もそのまま入る（normLoginで固定ドメインを補う）
-const ID_RE = /^[A-Za-z0-9_-]{3,20}$/;
+// ★2026-10-07: 1文字から許す。参加者のIDは A〜X の1文字（カードに刷ってあるもの）。
+const ID_RE = /^[A-Za-z0-9_-]{1,20}$/;
 
 function renderAuth(){
   const t=T[lang];
