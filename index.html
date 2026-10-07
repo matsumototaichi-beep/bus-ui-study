@@ -283,7 +283,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.8.1";
+const APP_VERSION = "uiStudy-0.8.2";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -294,10 +294,10 @@ const APP_VERSION = "uiStudy-0.8.1";
 //
 // ★2026-09-19: 初期値あり(count_init:"median")の条件を廃止した。人数欄は常に「—」から始まる。
 // 廃止の理由は2つある。
-// (1) ステッパーの初回タップはクラス下限(lo)から始まるため、「初期値なし」条件でも
-//     ステッパーには下限アンカーが効いてしまう。つまり「アンカーあり/なし」の対比が
-//     入力方式によって意味が変わる。ステッパーは起点なしには成立しないので、
-//     これは取り除ける交絡ではなく入力方式の性質そのもの。
+// (1) ステッパーの初回タップがクラス下限(lo)から始まっていたため、「初期値なし」条件でも
+//     ステッパーには下限アンカーが効いてしまっていた。
+//     ★2026-10-07 に 0 起点へ修正した。テンキーが空から始まるのと起点が揃い、
+//     押した数と表示が一致する。
 // (2) 初期値が入った状態から「わからない」に戻す手段が、テンキー(Cあり)とステッパー(なし)で
 //     非対称だった。先行実験(2026-09-18)で、数えられないときにステッパーでは0まで下げて
 //     送るしかなく、「わからない」が「0人」として記録された。
@@ -976,8 +976,10 @@ function renderCount(){
   } else {
     main.querySelectorAll(".stepper button").forEach(b=>{ b.onclick=()=>{
       const d=parseInt(b.dataset.d,10);
-      // 初回タップはクラスの目安下限(lo)から開始（タップ数削減）。値はクラスに縛らず 0〜99 で自由。
-      n=Math.max(COUNT_MIN,Math.min(COUNT_MAX,(n===null?lo:n)+d));
+      // ★2026-10-07: 初回タップは必ず 0 から。以前はクラス下限(lo)から始めていたが、
+      // 「＋1」を押したのに 7 と出るなど、押した数と表示が一致しなかった。
+      // テンキーは空から始まるので、起点を揃えないと入力方式の比較にならない。
+      n=Math.max(COUNT_MIN,Math.min(COUNT_MAX,(n===null?0:n)+d));
       pending.n_unknown=false;      // 値を触ったら「わからない」の表明は取り消す
       show(); showUnknown();
       if(LOG){ LOG.taps_value++; markFirst(); }
