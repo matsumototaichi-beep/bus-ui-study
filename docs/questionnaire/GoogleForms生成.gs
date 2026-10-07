@@ -10,7 +10,7 @@
 // ★先に whoami を実行して、どのアカウントで動くか確かめること。
 //   フォームは、ここに出たアカウントの Google ドライブに作られる。
 //
-// ★2026-10-07 に設問を減らした（1回目8問・2回目11問）。前に作った2つのフォームはゴミ箱に入れること。
+// ★2026-10-07 に設問を減らした（1回目8問・2回目21問）。前に作った2つのフォームはゴミ箱に入れること。
 
 function whoami() {
   Logger.log('いま動いているアカウント: ' + Session.getEffectiveUser().getEmail());
@@ -55,7 +55,7 @@ function make1() {
 
 function make2() {
   var f = FormApp.create('バスの人数アプリ　2回目のアンケート');
-  f.setDescription('往復が終わったら答えてください（3分ほど）。思ったとおりに選んでください。');
+  f.setDescription('往復が終わったら答えてください（5分ほど）。思ったとおりに選んでください。');
   try { f.setCollectEmail(false); } catch (e) {}
   try { f.setRequireLogin(false); } catch (e) {}
   try { f.setPublished(true); } catch (e) {}
@@ -87,7 +87,29 @@ function make2() {
   it.setRequired(true);
   it = f.addMultipleChoiceItem().setTitle('問10 数えたとおりの人数を答えられたのは、どちらの回ですか').setChoiceValues(['1回目', '2回目', '変わらない']);
   it.setRequired(true);
-  it = f.addParagraphTextItem().setTitle('問11 答えにくかったことがあれば書いてください（なければ「なし」）');
+  it = f.addPageBreakItem().setTitle('アプリ全体について');
+  it.setHelpText('2回使ってみた全体の印象をお答えください。');
+  it = f.addScaleItem().setTitle('問11 このアプリを何度も使いたいと思う').setBounds(1, 5).setLabels('まったくそう思わない', 'とてもそう思う');
+  it.setRequired(true);
+  it = f.addScaleItem().setTitle('問12 このアプリは必要以上に複雑だと思う').setBounds(1, 5).setLabels('まったくそう思わない', 'とてもそう思う');
+  it.setRequired(true);
+  it = f.addScaleItem().setTitle('問13 このアプリは簡単に使えると思う').setBounds(1, 5).setLabels('まったくそう思わない', 'とてもそう思う');
+  it.setRequired(true);
+  it = f.addScaleItem().setTitle('問14 このアプリを使うには、詳しい人の助けが必要だと思う').setBounds(1, 5).setLabels('まったくそう思わない', 'とてもそう思う');
+  it.setRequired(true);
+  it = f.addScaleItem().setTitle('問15 このアプリのいろいろな機能は、うまくまとまっていると思う').setBounds(1, 5).setLabels('まったくそう思わない', 'とてもそう思う');
+  it.setRequired(true);
+  it = f.addScaleItem().setTitle('問16 このアプリには一貫性のないところが多いと思う').setBounds(1, 5).setLabels('まったくそう思わない', 'とてもそう思う');
+  it.setRequired(true);
+  it = f.addScaleItem().setTitle('問17 たいていの人は、このアプリの使い方をすぐ覚えられると思う').setBounds(1, 5).setLabels('まったくそう思わない', 'とてもそう思う');
+  it.setRequired(true);
+  it = f.addScaleItem().setTitle('問18 このアプリはとても使いにくいと思う').setBounds(1, 5).setLabels('まったくそう思わない', 'とてもそう思う');
+  it.setRequired(true);
+  it = f.addScaleItem().setTitle('問19 このアプリを自信をもって使えた').setBounds(1, 5).setLabels('まったくそう思わない', 'とてもそう思う');
+  it.setRequired(true);
+  it = f.addScaleItem().setTitle('問20 このアプリを使う前に、いろいろ覚える必要があった').setBounds(1, 5).setLabels('まったくそう思わない', 'とてもそう思う');
+  it.setRequired(true);
+  it = f.addParagraphTextItem().setTitle('問21 答えにくかったことがあれば書いてください（なければ「なし」）');
   it.setRequired(true);
   return [f.getPublishedUrl(), f.getEditUrl()];
 }
