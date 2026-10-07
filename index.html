@@ -300,7 +300,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.9.0";
+const APP_VERSION = "uiStudy-0.9.1";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -703,7 +703,9 @@ const T = {
       {lbl:"ガラガラ", rng:"0〜5人"},{lbl:"やや空き", rng:"6〜15人"},{lbl:"席が埋まる", rng:"16〜30人"},
       {lbl:"立ち客", rng:"31〜45人"},{lbl:"混雑", rng:"46〜60人"},{lbl:"満員近い", rng:"61人〜"},
     ],
-    countTitle:"正確な人数（任意）", countHint:"数えられれば入力（目安外の人数でもOK）",
+    // ★2026-10-07: 見出しだけにする。「数えられれば入力」は数えられないときの逃げ道を勧めてしまい、
+    //「わからない」ボタンの有無による差が見えなくなるため。空欄・スキップはこれまでどおりできる
+    countTitle:"車内の人数", countHint:"",
     unknown:"わからない",
     back:"戻る", already_registered:"このIDは使われています。別のIDにしてください。",
     next_label:"次に停まるバス停（任意）",
@@ -765,7 +767,7 @@ const T = {
       {lbl:"Empty", rng:"0–5"},{lbl:"Fairly empty", rng:"6–15"},{lbl:"Seats filling up", rng:"16–30"},
       {lbl:"Some standing", rng:"31–45"},{lbl:"Crowded", rng:"46–60"},{lbl:"Nearly full", rng:"61+"},
     ],
-    countTitle:"Exact count (optional)", countHint:"Enter it only if you actually counted (any number is fine)",
+    countTitle:"People on board", countHint:"",
     unknown:"Don't know",
     back:"Back", already_registered:"That ID is taken. Please choose another one.",
     next_label:"Next stop (optional)",
@@ -1044,7 +1046,7 @@ function renderCount(){
     <div class="center">
       <div class="selchip"><span class="chip c${pending.congestion_class}">${pending.congestion_class}</span>${cls.lbl}<span class="rng">${t.count_range} ${cls.rng}</span></div>
       <h2>${t.countTitle}</h2>
-      <p class="hint">${t.countHint}</p>
+      ${t.countHint ? `<p class="hint">${t.countHint}</p>` : ``}
       ${ctrlHtml}
       ${unknownUi ? `<div class="unknownrow">
         <button type="button" id="unknownBtn">${t.unknown}</button>
