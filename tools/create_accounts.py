@@ -5,10 +5,10 @@
 メールアドレスを使わない方式なので **パスワードを忘れても再設定できない**うえ、
 参加者は別の日にもう一度ログインする。カードに刷って渡すのがいちばん確実。
 
-  p01 〜 p24 のアカウントを Supabase に作り、
+  A 〜 X のアカウントを Supabase に作り、★UI研究 に
     accounts.csv        … 対応表（松本の手元用）
-    accounts_cards.html … A4に8面で刷る配布カード（QR付き）
-  を書き出す。**どちらも .gitignore 済み。public リポジトリなので絶対に commit しない。**
+    accounts_cards.html … A4に8面で刷る配布カード
+  を書き出す。**public リポジトリなので、どちらもリポジトリに入れない。**
 
 使い方（PowerShell）:
     $env:SUPABASE_SERVICE_ROLE_KEY = "<Supabase の Settings → API → service_role>"
@@ -78,7 +78,7 @@ def find_user(email):
 def admin_account():
     """管理者アカウント admin@id.local を作る（無ければ作成、あればパスワードを入れ直す）。
 
-    アプリの ADMIN_EMAILS と ui_report_feed.sql の WHERE に
+    アプリの ADMIN_EMAILS と docs/テーブル作成.sql（ui_report_feed）の WHERE に
     'admin@id.local' が入っているので、ID `admin` でログインすれば
     「データ一覧」タブが開く。**このアカウントが Supabase 側に無いと入れない。**
     """
@@ -109,7 +109,7 @@ def admin_account():
     print("管理者アカウント: %s" % note)
     print("  ID       : admin")
     print("  パスワード : %s" % passwd)
-    print("  控え     : " + path + "（.gitignore 済み）")
+    print("  控え     : " + path + "（リポジトリの外）")
 
 
 def main():

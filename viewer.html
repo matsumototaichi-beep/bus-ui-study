@@ -48,7 +48,7 @@
   <div class="side" id="side">
     <div class="hint">
       Supabaseで下のSQLを実行し、結果(JSON)をコピーして貼り付け → <b>描画</b>。<br>
-      <code>select json_agg(x) from (select id, answered_at, congestion_class, exact_count, trajectory from public.responses order by created_at desc limit 50) x;</code><br>
+      <code>select json_agg(x) from (select id, answered_at, congestion_class, exact_count, trajectory from public.ui_responses order by created_at desc limit 50) x;</code><br>
       ※ 単一の <code>trajectory</code> 配列だけを貼ってもOK。
     </div>
     <textarea id="input" placeholder='[{"id":1,"answered_at":"...","congestion_class":3,"exact_count":20,"trajectory":[{"t":...,"lat":...,"lng":...,"acc":..,"hdg":..,"spd":..}, ...]}, ...]'></textarea>

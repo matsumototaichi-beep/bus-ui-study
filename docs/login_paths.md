@@ -11,11 +11,11 @@
 
 | | 入力するID | 誰が使う | 見えるもの |
 |---|---|---|---|
-| **参加者** | `p01` 〜 `p24` | 実験参加者 | 報告画面のみ |
+| **参加者** | `A` 〜 `X` | 実験参加者 | 報告画面のみ |
 | **管理者（ID方式）** | `admin` | 松本 | 報告画面 ＋ **データ一覧** |
 | **管理者（メール方式・旧）** | `taichi1104.deters@gmail.com` | 松本 | 同上 |
 
-管理者かどうかは **`index.html` の `ADMIN_EMAILS`** と **`ui_report_feed.sql` の `WHERE auth.email() in (...)`**
+管理者かどうかは **`index.html` の `ADMIN_EMAILS`** と **`docs/テーブル作成.sql`（`ui_report_feed`）の `WHERE auth.email() in (...)`**
 の2か所で決まる。**両方に同じものが並んでいないと、画面は出るのに0件になる。**
 
 ```js
@@ -30,17 +30,17 @@ where auth.email() in ('taichi1104.deters@gmail.com', 'admin@id.local');
 
 ## 2. 「@」が入っているかどうかで動きが変わる
 
-入力欄は1つだけ。`normLogin()` が**「@」を含まない入力に `@id.local` を足す**。
+入力欄は1つだけ。`normLogin()` が**「@」を含まない入力を小文字にして `@id.local` を足す**。
 
 | 入力 | Supabase に送られるメール |
 |---|---|
 | `admin` | `admin@id.local` |
-| `p01` | `p01@id.local` |
+| `A` | `a@id.local` |
 | `taichi1104.deters@gmail.com` | そのまま |
 
 つまり **`admin` と打つのと `admin@id.local` と打つのは同じこと。** どちらでも入れる。
 
-- 「@」を含まない入力は `ID_RE = /^[A-Za-z0-9_-]{3,20}$/` で書式を確かめる（`admin` は通る）
+- 「@」を含まない入力は `ID_RE = /^[A-Za-z0-9_-]{1,20}$/` で書式を確かめる（`admin` は通る）
 - 「@」を含む入力は書式チェックを飛ばして、そのままメールとして扱う
 - `uiStudy-0.8.1` から、**全角で打たれた入力は半角に直してから**この判定にかける
 
@@ -62,7 +62,7 @@ python tools/create_accounts.py --admin
 ```
 
 無ければ作り、あればパスワードを入れ直す。ID は `admin`、パスワードは自動生成して
-`accounts_admin.txt` に書き出す（`.gitignore` 済み）。事前に service_role キーを渡しておく：
+`★UI研究/accounts_admin.txt` に書き出す（リポジトリの外）。事前に service_role キーを渡しておく：
 
 ```bash
 $env:SUPABASE_SERVICE_ROLE_KEY = "<Supabase → Settings → API → service_role>"
@@ -73,9 +73,9 @@ $env:SUPABASE_SERVICE_ROLE_KEY = "<Supabase → Settings → API → service_rol
 | 画面に出るもの | 見るところ |
 |---|---|
 | **IDまたはパスワードが違います** | アカウントが無い／パスワード違い。上のコマンドで入れ直す |
-| **IDは半角英数・ハイフン・アンダースコアで3〜20文字に** | 全角で打っている。`0.8.1` で自動変換されるが、変換前の版がキャッシュに残っていることがある。URLの末尾に `&cb=1` を足して開き直す |
+| **IDは半角英数・ハイフン・アンダースコアで20文字までに** | 全角で打っている。`0.8.1` で自動変換されるが、変換前の版がキャッシュに残っていることがある。URLの末尾に `&cb=1` を足して開き直す |
 | ログインはできるが**「データ一覧」タブが出ない** | `index.html` の `ADMIN_EMAILS` にそのメールが無い |
-| タブは出るが**0件** | `ui_report_feed.sql` の `WHERE` にそのメールが無い。SQL Editor で貼り直す |
+| タブは出るが**0件** | `docs/テーブル作成.sql`（`ui_report_feed`）の `WHERE` にそのメールが無い。SQL Editor で貼り直す |
 
 ---
 
@@ -108,5 +108,5 @@ Supabase の再設定メールが届く。ただし **`0.8.0` で画面から「
 |---|---|
 | データ一覧を見たい | ID `admin` でログイン。入れなければ `--admin` で作り直す |
 | 参加者アカウントを作る | `python tools/create_accounts.py` |
-| 管理者を増やす | `index.html` の `ADMIN_EMAILS` と `ui_report_feed.sql` の **両方**に足す |
+| 管理者を増やす | `index.html` の `ADMIN_EMAILS` と `docs/テーブル作成.sql`（`ui_report_feed`）の **両方**に足す |
 | 参加者のパスワードを聞かれた | `accounts.csv` を見る |

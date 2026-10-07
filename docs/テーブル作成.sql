@@ -1,7 +1,7 @@
 -- バス人数アプリ テーブル作成（3本まとめ）
 -- Supabase の SQL Editor に貼って Run
 
--- ========== ui_sessions.sql ==========
+-- ========== ui_sessions ==========
 -- ============================================================
 -- UI研究：操作ログ（1回答＝1セッション）
 -- Supabase SQL Editor に貼り付けて実行してください。
@@ -16,7 +16,7 @@ create table if not exists public.ui_sessions (
   started_at          timestamptz,                           -- セッション開始(端末時刻)
   client_submitted_at timestamptz,                           -- 実送信時の端末時刻
   outcome             text,                                  -- submit | skip | abandon
-  variant             jsonb,                                 -- 割り当てたUI条件 {input, count_init, unknown_ui, seq, offset, url_fixed, practice}
+  variant             jsonb,                                 -- 割り当てたUI条件 {input, count_init, seq, offset, unknown_ui, url_fixed{input,unknown}, practice, study, round, leg, group, label}
                                                              --   input=要因A(stepper/numpad) / unknown_ui=要因B(「わからない」ボタンの有無)
                                                              --   count_init は2026-09-19に要因から外れ、以降は常に "none"（それ以前は "median" が混在）
   context             jsonb,                                 -- congestion_class / exact_count / count_touched / count_unknown /
@@ -43,7 +43,7 @@ create policy "ui select own" on public.ui_sessions
 -- 分析は SQL Editor（service_role）で全件参照:
 --   select json_agg(t) from (select * from ui_sessions order by id) t;
 
--- ========== ui_responses.sql ==========
+-- ========== ui_responses ==========
 -- ============================================================
 -- バス混雑度 HITL データ収集  Supabase スキーマ (Phase A)
 -- Supabase ダッシュボード > SQL Editor に貼り付けて実行してください。
@@ -54,7 +54,7 @@ create policy "ui select own" on public.ui_sessions
 create table if not exists public.ui_responses (
   id               bigint generated always as identity primary key,
   created_at       timestamptz not null default now(),        -- サーバ受信時刻
-  surveyor_id      uuid        not null default auth.uid(),    -- 認証ユーザー(GitHub)のUUID
+  surveyor_id      uuid        not null default auth.uid(),    -- 認証ユーザーのUUID
   answered_at      timestamptz,                               -- 端末での回答時刻(TZ付き)
   congestion_class smallint    not null,                       -- 1〜6
   exact_count      integer,                                    -- 実測人数(任意, null可)
@@ -128,7 +128,7 @@ create policy "auth select own"
 --   select count(*) from public.ui_responses;
 -- ============================================================
 
--- ========== ui_report_feed.sql ==========
+-- ========== ui_report_feed ==========
 -- ============================================================
 -- データ一覧（管理者用）ビュー
 -- responses から「安全な列だけ」を、管理者のみに見せる。

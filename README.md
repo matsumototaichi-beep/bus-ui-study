@@ -1,7 +1,7 @@
 # bus-ui-study：バス混雑度回答アプリの UI／ユーザビリティ研究（卒業研究）
 
 NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土台（コピー）**にして、
-**どの回答UIが速く・正確に・少ない操作で答えられるか**を調べるための研究用アプリと分析基盤です。
+**どの回答UIが速く・少ない操作で答えられるか**を調べるための研究用アプリと分析基盤です。
 
 ## このプロジェクトの位置づけ
 | | 用途 | 場所 | 触ってよいか |
@@ -10,7 +10,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | **本プロジェクト** | UI／ユーザビリティの卒業研究 | `卒業研究\★バス人数計測アプリUI研究\bus-ui-study` | ここで自由に改造する |
 
 - 元アプリの **`ee61321`（phaseA-1.3）** 時点をコピーして作成。
-- 研究計画・計測仕様は **`UI_STUDY_SPEC.md`** を参照。
+- 今の計画は **`HANDOFF.md` §8**（決定の表）と **`docs/実験の進め方.docx`**。
 
 ## ⚠️ 安全設計（元アプリのデータを汚さないため）
 コピー時に以下を**分離済み**です。**絶対に元に戻さないでください。**
@@ -22,30 +22,50 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | ローカル退避キー | `bus_outbox_v1` | **`uistudy_outbox_v1`** |
 | APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.1`**（2026-10-07時点） |
 
-> Supabaseの接続先（URL/キー）は元アプリと同じままです。**テーブルが別なので混ざりません**が、
-> 完全分離したい場合は「別のSupabaseプロジェクトを作る」のが最も安全です（未決定）。
-> **2026-09-18 に `ui_responses` / `ui_sessions` / `ui_report_feed` を作成済み**。
-> テスト送信で `ui_responses` に保存されることを確認済み。
+> **2026-10-06 に Supabase を元アプリとは別のプロジェクト（`wwavbfdojschxohvvpzb`）に切り替えた**（前のプロジェクトは削除されていた）。
+> テーブルは `docs/テーブル作成.sql`（`ui_responses` / `ui_sessions` / `ui_report_feed`）で作る。
+> 2026-09-18 に旧プロジェクトで作成し、テスト送信で `ui_responses` に保存されることを確認していた。
 
-## 構成
-- `index.html` … アプリ本体（**UI条件の切替・操作ログとも実装済み**）
-- `stops.js` … バス停辞書736件・阪急バス（大阪府内、`window.HANKYU_STOPS`）
-  （出典：国土数値情報 バス停留所データ P11／国土交通省・大阪府・令和4年度〈2022年〉・PDL1.0＝出典明記で編集加工可。
-  2026-09-17 に奈良県+京都府版〈平成22年・非商用〉から差し替え。実施事業者が阪急バスに変わったため）
-- `ui_responses.sql` / `ui_report_feed.sql` … Supabaseスキーマ（テーブル名を分離済み）
-- `viewer.html` … 軌跡ビューア（元アプリから流用）
-- `UI_STUDY_SPEC.md` … **研究計画・計測仕様（RQ／実験デザイン／ログスキーマ）**
-- `EXPERIMENT_PLAN.md` … **実施計画の大枠**（奈良交通前提：人数・日数・時間帯・費用・基準値の作り方・想定問答）
-- `QUESTIONNAIRE.md` … 事後アンケート
-- `DESIGN_PHILOSOPHY.md` … UIの設計思想・改善シーケンス・変更台帳
-- `LITERATURE.md` … 文献メモ（**本文をどこまで読んだか**を記録）
-- `WORKFLOW.md` … 教授との共有・文献調査のルール
-- `docs/log/` … 打ち合わせ・作業ごとの要点ログ
+## どこに何があるか
+| 場所 | 中身 |
+|---|---|
+| `index.html` | 人数アプリ（UI研究・計数研究のゆき） |
+| `counter.html` | 乗降アプリ（計数研究のかえり） |
+| `stops.js` | バス停辞書736件・阪急バス（`window.HANKYU_STOPS`） |
+| `viewer.html` | 軌跡ビューア（元アプリから流用） |
+| `HANDOFF.md` | 引き継ぎ。§8 が決定の表 |
+| `UI_STUDY_SPEC.md` | 研究の問い・ログ仕様・分析計画 |
+| `DESIGN_PHILOSOPHY.md` | UIの設計思想・変更台帳 |
+| `LITERATURE.md` | 文献メモ（本文をどこまで読んだか） |
+| `WORKFLOW.md` | 教授との共有・文献調査のルール |
+| `docs/実験の進め方.docx` | 当日の運用 |
+| `docs/questionnaire/` | アンケート（設問一覧.xlsx・GoogleForms生成.gs・紙の予備） |
+| `docs/qr_posters.html` | QRポスター3枚 |
+| `docs/counting_sheet.html` | 記録用紙（乗降アプリが使えないときの予備） |
+| `docs/login_prep.md` / `docs/login_paths.md` | ログインの準備／管理者ログイン |
+| `docs/テーブル作成.sql` | Supabase のテーブル |
+| `tools/` | 下の表 |
+| `docs/log/` | 日ごとの記録 |
+| `docs/old/` | 今は使わない古い文書 |
+| `../★乗降人数計算/` | 計数研究（1から数える vs 乗降で数える）の案内・QR・ショートカット |
+| `../★UI研究/` | 参加者向け案内_Ui研究.docx（松本が直接編集）・QRポスター.pdf・配布カード.pdf・配布カード.html・accounts.csv・アンケートURL.txt・人数アプリ／乗降アプリのショートカット |
+
+| `tools/` | 作るもの |
+|---|---|
+| `make_operation_docx.py` | `docs/実験の進め方.docx` |
+| `make_posters_pdf.py` | `../★UI研究/QRポスター.pdf` |
+| `make_cards_pdf.py` | `../★UI研究/配布カード.pdf` |
+| `create_accounts.py` | 参加者アカウント・`../★UI研究/accounts.csv` |
+| `make_forms.py` / `make_questionnaire.py` | `docs/questionnaire/` |
+| `make_count_qr.py` | `../★乗降人数計算/QRポスター_計数研究.pdf`・`乗降アプリQR.png` |
+
+`stops.js` の出典：国土数値情報 バス停留所データ P11／国土交通省・大阪府・令和4年度〈2022年〉・PDL1.0＝出典明記で編集加工可。
+2026-09-17 に奈良県+京都府版〈平成22年・非商用〉から差し替え。実施事業者が阪急バスに変わったため。
 
 ## これからやること（順序）
-1. ~~Supabaseにテーブル作成~~ → **2026-09-18 完了**（`ui_responses` / `ui_sessions` / `ui_report_feed`）
-2. **ログ計装**：操作イベント（タップ・所要時間・訂正回数など）の記録
-3. **UI条件（バリアント）の割当**：QR の回（1回目／2回目）・ゆき/かえり・IDの1文字目からアプリが決め、study / round / leg / group / label を付けて記録（2026-10-07。`HANDOFF.md` §8 #24〜27）
+1. ~~Supabaseにテーブル作成~~ → **2026-09-18 完了**（`ui_responses` / `ui_sessions` / `ui_report_feed`。2026-10-06 に新プロジェクトへ切り替え）
+2. ~~**ログ計装**~~ → 完了：操作イベント（タップ・所要時間・訂正回数など）の記録
+3. ~~**UI条件（バリアント）の割当**~~ → 完了：QR の回（1回目／2回目）・ゆき/かえり・IDの1文字目からアプリが決め、study / round / leg / group / label を付けて記録（2026-10-07。`HANDOFF.md` §8 #24〜27）
 4. **エクスポートと分析**：JSON出力 → Python(pandas)で条件間比較
 
 ## 公開URL
