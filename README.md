@@ -58,6 +58,8 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | `create_accounts.py` | 参加者アカウント・`../★UI研究/accounts.csv` |
 | `make_forms.py` / `make_questionnaire.py` | `docs/questionnaire/` |
 | `make_count_qr.py` | `../★乗降人数計算/QRポスター_計数研究.pdf`・`乗降アプリQR.png` |
+| `make_count_forms.py` | `../★乗降人数計算/計数研究アンケート生成.gs`・`計数研究アンケート.docx` |
+| `make_handouts.py` | 配布用紙（`../★UI研究/` に1回目・2回目、`../★乗降人数計算/` に計数研究）。アンケートURLは各フォルダの `アンケートURL.xlsx` から読む |
 
 `stops.js` の出典：国土数値情報 バス停留所データ P11／国土交通省・大阪府・令和4年度〈2022年〉・PDL1.0＝出典明記で編集加工可。
 2026-09-17 に奈良県+京都府版〈平成22年・非商用〉から差し替え。実施事業者が阪急バスに変わったため。
