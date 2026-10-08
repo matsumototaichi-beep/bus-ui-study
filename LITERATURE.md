@@ -12,10 +12,10 @@
 | # | 文献 | 読んだ範囲 | 計画での使い道 |
 |---|---|---|---|
 | 1 | Boyle, D. K. (1998). *TCRP Synthesis 29: Passenger Counting Technologies and Procedures*. Transportation Research Board. | ○ 要旨・第1章・第3章（手作業／自動計数機）・第4章（データ検証）・第6章の精度の記述・第8章（結論） | 基準値 R2（乗降カウント）の根拠と限界 |
-| 2 | Zimmerman, J., et al. (2011). Field trial of Tiramisu: Crowd-sourcing bus arrival times to spur co-design. *CHI 2011*. | ◎ 全文 | 乗客によるバスの混み具合報告の先行事例。フィールド実験の規模と苦労 |
-| 3 | Izard, V., & Dehaene, S. (2008). Calibrating the mental number line. *Cognition*, 106(3), 1221–1247. | ○ 序論・実験1・実験2の結果（プレプリント p.1–13）。総合考察とモデルの節は未読 | 「混雑時は数えられない」への答え／初期値・目安表示が回答をずらす根拠 |
+| 2 | Zimmerman, J., Tomasic, A., Garrod, C., Yoo, D., Hiruncharoenvate, C., Aziz, R., Thiruvengadam, N. R., Huang, Y., & Steinfeld, A. (2011). Field trial of Tiramisu: Crowd-sourcing bus arrival times to spur co-design. In *Proceedings of the SIGCHI Conference on Human Factors in Computing Systems* (pp. 1677–1686). ACM. https://doi.org/10.1145/1978942.1979187 | ◎ 全文 | 乗客によるバスの混み具合報告の先行事例。フィールド実験の規模と苦労 |
+| 3 | Izard, V., & Dehaene, S. (2008). Calibrating the mental number line. *Cognition*, 106(3), 1221–1247. https://doi.org/10.1016/j.cognition.2007.06.004 | ○ 序論・実験1・実験2の結果（プレプリント p.1–13）。総合考察とモデルの節は未読 | 「混雑時は数えられない」への答え／初期値・目安表示が回答をずらす根拠 |
 | 4 | van Berkel, N., Ferreira, D., & Kostakos, V. (2017). The Experience Sampling Method on Mobile Devices. *ACM Computing Surveys*, 50(6), 93. | ○ §3.1（研究の規模）・§4.3〜4.6（割り込み・提示・回答率・データ品質）。歴史・ソフトウェアの章は未読 | 参加者数・期間・回答率の相場、参加者との信頼関係づくり、データの除外基準 |
-| 5 | Fryer, L. K., & Nakao, K. (2020). The future of survey self-report: An experiment contrasting Likert, VAS, Slide, and Swipe touch interfaces. *Frontline Learning Research*, 8(3), 10–25. | ◎ 全文 | スマホの回答形式の比較実験。**慣れ（学習効果）が実際に起きた**証拠 |
+| 5 | Fryer, L. K., & Nakao, K. (2020). The future of survey self-report: An experiment contrasting Likert, VAS, Slide, and Swipe touch interfaces. *Frontline Learning Research*, 8(3), 10–25. https://doi.org/10.14786/flr.v8i3.501（DOI の登録情報では題名が "The How of Survey Self-report..." になっているが、論文に印刷された題名はこちら） | ◎ 全文 | スマホの回答形式の比較実験。**慣れ（学習効果）が実際に起きた**証拠 |
 | 6 | Caine, K. (2016). Local standards for sample size at CHI. *CHI '16*, 981–992. | ○ 要旨・Results 節（表を含む）・検出力に関する考察（p.988） | 「参加者10人で成り立つか」への答え |
 | 7 | 奈良交通「CI-CAのご利用方法」（公式Webページ） | ◎ 本文（HTML）を直接確認（2026-09-12） | 基準値 R3（IC乗降記録）の可否 |
 | 8 | Liu, M., & Conrad, F. G. (2019). Where should I start? On default values for slider questions in web surveys. *Social Science Computer Review*, 37(2), 248–269. | △ アブストのみ ＋ × #5 の中での引用 | **判断には使っていない**。本文入手が課題 |
