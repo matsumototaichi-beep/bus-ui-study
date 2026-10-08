@@ -300,7 +300,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.9.2";
+const APP_VERSION = "uiStudy-0.9.3";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -366,10 +366,17 @@ function setLeg(leg){
 }
 function legElapsedMin(){ const a=parseInt(getDaily(LEGAT_KEY)||"",10); return a ? (Date.now()-a)/60000 : 0; }
 // 組＝ログインIDの1文字目。A=1, B=2, … が奇数なら奇数組。アルファベット以外で始まるIDは奇数組
+// ★2026-10-08: 組はアカウントごとの表で決める。以前は ID の1文字目で決めていたため、
+// admin のような参加者以外のアカウントが「a」＝Aさんと同じ組になっていた。
+// 表に無いアカウント（admin など）は確認用。画面の「確認用」ボタンで組を切り替えて両方を見られる
+const GROUP_OF = {};
+"ACEGIKMOQSUW".split("").forEach(c=>{ GROUP_OF[c]="odd"; });    // 1回目なし → 2回目あり
+"BDFHJLNPRTVX".split("").forEach(c=>{ GROUP_OF[c]="even"; });   // 1回目あり → 2回目なし
+const TESTGROUP_KEY = "uistudy_testgroup_v1";   // 確認用アカウントで見ている組（日付つき）
+function loginId(){ return ((user && user.email) || "").split("@")[0].toUpperCase(); }
+function isTestAccount(){ return !GROUP_OF[loginId()]; }
 function idGroup(){
-  const c=((user && user.email) || "").split("@")[0].charAt(0).toUpperCase();
-  if(c.length!==1 || c<"A" || c>"Z") return "odd";
-  return ((c.charCodeAt(0)-64) % 2 === 1) ? "odd" : "even";
+  return GROUP_OF[loginId()] || (getDaily(TESTGROUP_KEY)==="even" ? "even" : "odd");
 }
 // 入力方式。null ならアプリ内でローテーション（round も study も無いURL＝今までどおり）
 //   1回目: ゆき=テンキー / かえり=＋−ボタン　2回目: ゆき=＋−ボタン / かえり=テンキー
@@ -393,7 +400,7 @@ function studyTag(){
   const r=roundNo();
   if(!r) return { study:null, round:null, leg:null, group:null, label:null };
   const leg=curLeg();
-  return { study:"ui", round:r, leg:leg, group:idGroup(),
+  return { study:"ui", round:r, leg:leg, group:idGroup(), test_account:isTestAccount(),
            label: r+"回目"+(leg==="kaeri" ? "かえり" : leg==="yuki" ? "ゆき" : "") };
 }
 function activeConds(){
@@ -518,7 +525,9 @@ function legBar(t){
   const hint = (yuki && legElapsedMin()>=70) ? `<div class="leghint">${t.leg_hint}</div>` : "";
   return hint + `<div class="legbar"><span class="legnow">${t.round_lbl(r)}<b>${yuki?t.leg_yuki:t.leg_kaeri}</b></span>` +
     (yuki ? `<button id="legSw" class="legsw" data-to="kaeri">${t.leg_to_kaeri}</button>`
-          : `<button id="legSw" class="legsw quiet" data-to="yuki">${t.leg_to_yuki}</button>`) + `</div>`;
+          : `<button id="legSw" class="legsw quiet" data-to="yuki">${t.leg_to_yuki}</button>`) + `</div>` +
+    (isTestAccount() ? `<div class="legbar"><span class="legnow">${t.test_acct}</span>` +
+      `<button id="grpSw" class="legsw quiet">${t.test_group(idGroup())}</button></div>` : ``);
 }
 // バーだけ描き直す（renderMain を呼ぶと t_class が狂う）。70分たったら案内を出すため定期的にも呼ぶ
 function renderLegBar(){
@@ -527,6 +536,12 @@ function renderLegBar(){
   if(el.dataset.h===h) return;   // 変化が無ければ触らない（押している最中のボタンを作り直さない）
   el.dataset.h=h; el.innerHTML=h;
   const b=$("legSw"); if(b) b.onclick=()=> b.dataset.to==="counter" ? toCounter() : switchLeg(b.dataset.to);
+  const g=$("grpSw");
+  if(g) g.onclick=()=>{
+    if(answering){ toast(T[lang].leg_busy,"#f59e0b"); return; }
+    if(pending){ commitVariant(pending.variant); finalizeNow(true); }   // 送信後の記録中の回答は前の組のまま確定
+    setDaily(TESTGROUP_KEY, idGroup()==="odd" ? "even" : "odd"); renderMain();
+  };
 }
 // ★2026-10-07: 計数研究のかえり。ログインは同じサイトなので乗降アプリに引き継がれる
 async function toCounter(){
@@ -743,6 +758,7 @@ const T = {
     leg_confirm_yuki:"「ゆき　吹田駅 → 桃山台駅」に戻します。よろしいですか？",
     leg_hint:"桃山台駅で降りたら「かえりに切り替える」を押してください",
     leg_switched:(l)=>`${l}に切り替えました`, leg_busy:"回答中は切り替えできません",
+    test_acct:"確認用アカウント", test_group:(g)=>g==="odd" ? "奇数組で表示中 → 偶数組へ" : "偶数組で表示中 → 奇数組へ",
     leg_confirm_counter:"かえりは乗降アプリで数えます。乗降アプリを開きますか？",
     gpsOn:"位置情報 取得中…", gpsOk:"位置情報 OK", gpsNo:"位置情報が取得できません（許可が必要）",
     gpsSlow:"位置情報を取得中…（少し時間がかかっています）",
@@ -806,6 +822,7 @@ const T = {
     leg_confirm_yuki:"Go back to the outbound trip (Suita Sta. → Momoyamadai Sta.)?",
     leg_hint:"When you get off at Momoyamadai Sta., tap “Switch to return”.",
     leg_switched:(l)=>`Switched to ${l.toLowerCase()}`, leg_busy:"You can't switch while answering",
+    test_acct:"Test account", test_group:(g)=>g==="odd" ? "Showing odd group → even" : "Showing even group → odd",
     leg_confirm_counter:"On the return trip you count with the boarding/alighting app. Open it?",
     gpsOn:"Getting location…", gpsOk:"Location OK", gpsNo:"Location unavailable (permission required)",
     gpsSlow:"Getting location… (taking a little while)",
@@ -1571,7 +1588,7 @@ async function boot(){
     // ★UI研究: 着席/立席・練習モードはその時々の状態なので、ログアウトのたびにリセットする
     setDaily(POSTURE_KEY, null); setDaily(PRACTICE_KEY, null);
     // ★2026-10-07: 回目・区間も消す（同じ端末で別の人がログインしても前の人の区間を引き継がない）
-    setDaily(STUDY_KEY, null); setDaily(LEG_KEY, null); setDaily(LEGAT_KEY, null);
+    setDaily(STUDY_KEY, null); setDaily(LEG_KEY, null); setDaily(LEGAT_KEY, null); setDaily(TESTGROUP_KEY, null);
     // ★2026-10-07: ログインは乗降アプリと共有しているので、乗降アプリの着席/立席・練習も消す
     setDaily("counter_posture_v1", null); setDaily("counter_practice_v1", null);
     user=null; authMode="login"; view="report"; render();

@@ -823,7 +823,7 @@ async function boot(){
     if(sb){ try{ await sb.auth.signOut(); }catch(e){} }
     setDaily(POSTURE_KEY, null); setDaily(PRACTICE_KEY, null);
     // ★2026-10-07: ログインは人数アプリと共有しているので、人数アプリの着席/立席・練習・回目・区間も消す（index.html のログアウトと同じ）
-    ["uistudy_posture_v1","uistudy_practice_v1","uistudy_round_v1","uistudy_leg_v1","uistudy_leg_at_v1"].forEach(k=>lsSet(k, null));
+    ["uistudy_posture_v1","uistudy_practice_v1","uistudy_round_v1","uistudy_leg_v1","uistudy_leg_at_v1","uistudy_testgroup_v1"].forEach(k=>lsSet(k, null));
     user=null; run=null; render();
   };
   updateHeader();
