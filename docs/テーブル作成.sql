@@ -26,6 +26,9 @@ create table if not exists public.ui_sessions (
   summary             jsonb,                                 -- t_total/t_class/t_count/t_first/t_stop/taps_total/taps_value/corrections
   events              jsonb                                  -- 操作イベント列 [{dt,type,...}]
 );
+-- ★2026-10-07: 計数研究かえり（乗降アプリ counter.html）の行も入る。1バス停＝1行。スキーマは同じ
+--   variant {study:"count", leg:"kaeri", method:"flow", app:"counter", ...}
+--   context {run_id, stop{name,seq}, board, alight, resend, ...}。resend:true があれば同じ run_id・stop の最後の行を使う
 
 create index if not exists ui_sessions_created_idx  on public.ui_sessions (created_at desc);
 create index if not exists ui_sessions_surveyor_idx on public.ui_sessions (surveyor_id);

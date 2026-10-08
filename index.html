@@ -300,7 +300,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.9.1";
+const APP_VERSION = "uiStudy-0.9.2";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -506,7 +506,12 @@ function wireExpBar(){
 }
 // ★2026-10-07: いまの区間と切り替えボタン。実験者は南口で離脱するので、桃山台では参加者が自分で切り替える
 function legBar(t){
-  if(studyMode()==="count") return `<div class="legbar"><span class="legnow"><b>${t.count_study}</b></span></div>`;
+  // ★2026-10-07: 計数研究のかえりは乗降アプリ（counter.html）で数える。桃山台駅でここから移る
+  if(studyMode()==="count"){
+    const hint = (legElapsedMin()>=70) ? `<div class="leghint">${t.leg_hint}</div>` : "";
+    return hint + `<div class="legbar"><span class="legnow">${t.count_study}<b>${t.leg_yuki}</b></span>` +
+      `<button id="legSw" class="legsw" data-to="counter">${t.leg_to_kaeri}</button></div>`;
+  }
   const r=roundNo(); if(!r) return "";
   const yuki = curLeg()!=="kaeri";
   // 70分：ゆきを選ぶのは集合直後（11:40／15:30ごろ）、桃山台着は 12:48／16:40。50分だとまだ車内で出てしまう
@@ -521,7 +526,19 @@ function renderLegBar(){
   const h=legBar(T[lang]);
   if(el.dataset.h===h) return;   // 変化が無ければ触らない（押している最中のボタンを作り直さない）
   el.dataset.h=h; el.innerHTML=h;
-  const b=$("legSw"); if(b) b.onclick=()=>switchLeg(b.dataset.to);
+  const b=$("legSw"); if(b) b.onclick=()=> b.dataset.to==="counter" ? toCounter() : switchLeg(b.dataset.to);
+}
+// ★2026-10-07: 計数研究のかえり。ログインは同じサイトなので乗降アプリに引き継がれる
+async function toCounter(){
+  const t=T[lang];
+  if(answering){ toast(t.leg_busy,"#f59e0b"); return; }   // 人数入力中は切り替えない（UI研究と同じ）
+  if(!confirm(t.leg_confirm_counter)) return;
+  // 送信後の軌跡記録中の回答は先に確定させる。ページを離れると送信が途中で切れることがあるので、
+  // 先に「送る」印で端末に残す。★2026-10-07: 送れずに残った回答・操作ログは、乗降アプリが届いたかを確かめてから送る
+  // （ここで flushOutbox/flushSessions を呼ぶと確かめずに送り直すので、同じものが2回入ることがある）
+  if(pending){ commitVariant(pending.variant); syncPendingToOutbox(true);
+    await Promise.race([finalizeNow(true), new Promise(r=>setTimeout(r,3000))]); }
+  location.href="counter.html";
 }
 function switchLeg(to){
   const t=T[lang];
@@ -726,6 +743,7 @@ const T = {
     leg_confirm_yuki:"「ゆき　吹田駅 → 桃山台駅」に戻します。よろしいですか？",
     leg_hint:"桃山台駅で降りたら「かえりに切り替える」を押してください",
     leg_switched:(l)=>`${l}に切り替えました`, leg_busy:"回答中は切り替えできません",
+    leg_confirm_counter:"かえりは乗降アプリで数えます。乗降アプリを開きますか？",
     gpsOn:"位置情報 取得中…", gpsOk:"位置情報 OK", gpsNo:"位置情報が取得できません（許可が必要）",
     gpsSlow:"位置情報を取得中…（少し時間がかかっています）",
     who:(h)=>`調査員 <b>${h}</b>`, langLabel:"EN",
@@ -788,6 +806,7 @@ const T = {
     leg_confirm_yuki:"Go back to the outbound trip (Suita Sta. → Momoyamadai Sta.)?",
     leg_hint:"When you get off at Momoyamadai Sta., tap “Switch to return”.",
     leg_switched:(l)=>`Switched to ${l.toLowerCase()}`, leg_busy:"You can't switch while answering",
+    leg_confirm_counter:"On the return trip you count with the boarding/alighting app. Open it?",
     gpsOn:"Getting location…", gpsOk:"Location OK", gpsNo:"Location unavailable (permission required)",
     gpsSlow:"Getting location… (taking a little while)",
     who:(h)=>`Surveyor <b>${h}</b>`, langLabel:"日本語",
@@ -1254,6 +1273,8 @@ function renderMain(){
   const t=T[lang];
   updateNav();
   if(needLeg()){ renderLegPick(); return; }      // ★2026-10-07: UI研究で区間が未選択なら先に選ばせる
+  // ★2026-10-07: 計数研究は区間を選ばないので、この画面を初めて出した時刻から70分で「かえりに切り替える」の案内を出す
+  if(studyMode()==="count" && !getDaily(LEGAT_KEY)) setDaily(LEGAT_KEY, String(Date.now()));
   let cards="";
   t.classes.forEach((c,i)=>{ cards+=`<button class="card c${i+1}" onclick="pickClass(${i+1})"><span class="num">${i+1}</span><span class="cardtext"><span class="lbl">${c.lbl}</span><span class="rng">${c.rng}</span></span></button>`; });
   let rows="";
@@ -1551,6 +1572,8 @@ async function boot(){
     setDaily(POSTURE_KEY, null); setDaily(PRACTICE_KEY, null);
     // ★2026-10-07: 回目・区間も消す（同じ端末で別の人がログインしても前の人の区間を引き継がない）
     setDaily(STUDY_KEY, null); setDaily(LEG_KEY, null); setDaily(LEGAT_KEY, null);
+    // ★2026-10-07: ログインは乗降アプリと共有しているので、乗降アプリの着席/立席・練習も消す
+    setDaily("counter_posture_v1", null); setDaily("counter_practice_v1", null);
     user=null; authMode="login"; view="report"; render();
   };
   // ★2026-10-07: 報告画面を開いたままでも、ゆきを選んで70分たったら切り替えの案内を出す

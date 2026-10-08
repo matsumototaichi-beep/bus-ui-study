@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
-<title>QRポスター（A4・3枚）</title>
+<title>QRポスター（A4・2枚）</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!--
-  松本が南口で掲げる掲示。A4縦で3枚刷る（1回目 / 2回目 / 計数研究）。
+  松本が南口で掲げる掲示。A4縦で2枚刷る（1回目 / 2回目）。
 
   ★ ポスターに条件の中身は書かない。
      参加者に条件の存在を気づかれると、条件そのものへの反応（要求特性）が入る。
@@ -12,6 +12,7 @@
   ★2026-10-07: 4枚→3枚。QR は南口で1回読むだけ。ゆき/かえりはアプリ内で切り替える
      （実験者は南口で離脱するので、桃山台で別のQRを出す人がいない）。
      入力方式と「わからない」ボタンの有無は、アプリが (回目, ゆき/かえり, 組) から決める。
+  ★2026-10-07: 3枚→2枚。計数研究は ★乗降人数計算 に分けた（tools/make_count_qr.py）。
 -->
 <style>
   @page { size: A4 portrait; margin: 12mm; }
@@ -45,7 +46,6 @@
   const POSTERS = [
     { mark: "1回目",    qs: "?round=1",     last: "ログインしたら<b>「ゆき」</b>を押して、実験者に見せてください" },
     { mark: "2回目",    qs: "?round=2",     last: "ログインしたら<b>「ゆき」</b>を押して、実験者に見せてください" },
-    { mark: "計数研究", qs: "?study=count", last: "ログインできたら実験者に見せてください" },
   ];
   const sheet = document.getElementById("sheet");
   POSTERS.forEach(function(po){

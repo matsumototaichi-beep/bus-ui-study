@@ -1,89 +1,225 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>乗降計測</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>乗降アプリ</title>
 <!--
-  乗降計測専用アプリ（計数役むけ）  counter-1.0.0
+  乗降アプリ（計数研究のかえり）  counter-2.0.0
 
-  計数方法の比較実験（足し引き vs 数え直し）で使う。紙の記録用紙を置き換える。
-  参加者が使う index.html とは別物で、こちらは計数役の3名だけが使う。
-
-  ★設計の前提
-  ・走行中のバスで片手で使う。揺れる。つかまったまま操作する（阪急バスの承諾条件①）
-  ・通信は当てにしない。すべて端末内に保存し、終わってから書き出す
-  ・ログイン不要。当日のトラブルを減らすため Supabase には繋がない
-  ・タップ1回＝1人。タップの時刻を全部残すので、
-    「1人数えるのにどれくらいかかったか」が後から出せる
+  ★2026-10-07: 計数研究（車内を1から数える vs 乗った人・降りた人を数えて足し引き）が UI研究とは別の実験になったので作り直した。
+    ゆき＝人数アプリ index.html（?study=count）で車内を1から数える。かえり＝このアプリで乗った人・降りた人を数える。
+    桃山台駅で人数アプリの「かえりに切り替える」を押すとここに来る。画面の順番は参加者向け案内の「人数の答え方」と同じ。
+  ・参加者1人が、停まるたびに乗ってきた人・降りた人の両方をその場でタップする。係の分担（乗車係・降車係・数え直し係）はやめた。
+    1便に参加者が数人乗り、全員がそれぞれ独立に記録する
+  ・車内の合計人数（足し引きの結果）はどこにも出さない。合計を見ると車内を見回して直したくなり、1から数える方式と混ざるため
+  ・ログインは人数アプリと共有する（同じサイト・同じ Supabase なので、人数アプリでログイン済みならそのまま使える）
+  ・記録は ui_sessions に1バス停＝1行。新しいテーブルは作らない（variant.study="count", method="flow", app="counter"）
+  ・送れないとき（電波なし・未ログイン・エラー）は端末に残し、起動時・online・画面復帰・次の送信のたびに送り直す
+  ・人数アプリ（ゆき）で送れずに残った回答・操作ログもここから送る（桃山台駅で移ったあと、人数アプリは開き直さないため）
+  ・送ったバス停の送り直しは前回の値から始める。数えている途中の値は退避し、送り直しが済んだら戻す
 -->
 <style>
   :root{
-    --bg:#0f172a; --panel:#1e293b; --line:#334155; --fg:#f1f5f9; --dim:#94a3b8;
-    --accent:#2563eb; --warn:#dc2626; --ok:#16a34a;
+    --bg:#0f172a; --panel:#1e293b; --line:#334155; --ink:#f1f5f9; --muted:#94a3b8;
+    --board:#2563eb; --alight:#c2410c;
+    --plush:72px;   /* ＋1 の高さ（画面サイズで@mediaが上書き） */
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{margin:0; height:100%; background:var(--bg); color:var(--fg);
-    font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-    overscroll-behavior:none;}
-  body{display:flex; flex-direction:column; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}
-  .wrap{flex:1; display:flex; flex-direction:column; padding:12px; gap:10px; max-width:560px; margin:0 auto; width:100%;}
-  h1{font-size:17px; margin:2px 0 0;}
-  .sub{font-size:12px; color:var(--dim); margin:0;}
-  label{display:block; font-size:13px; color:var(--dim); margin:10px 0 4px;}
-  select,input{width:100%; padding:13px; font-size:16px; border-radius:10px;
-    border:1px solid var(--line); background:#0b1220; color:var(--fg);}
-  .btn{display:block; width:100%; padding:16px; font-size:17px; font-weight:700;
-    border:0; border-radius:12px; background:var(--accent); color:#fff; cursor:pointer;}
-  .btn.ghost{background:transparent; border:1px solid var(--line); color:var(--fg); font-weight:600;}
-  .btn.warn{background:var(--warn);}
-  .btn:disabled{opacity:.4;}
-  .roles{display:grid; gap:8px;}
-  .role{padding:14px; border:2px solid var(--line); border-radius:12px; cursor:pointer; background:#0b1220;}
-  .role.on{border-color:var(--accent); background:#13213f;}
-  .role b{display:block; font-size:16px;}
-  .role span{font-size:12px; color:var(--dim);}
+  html,body{height:100%; margin:0;}
+  @supports (height:100dvh){ html,body{height:100dvh;} }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    background:var(--bg); color:var(--ink); display:flex; flex-direction:column; overflow:hidden;
+  }
+  /* 続けて速く押しても拡大されないように（ダブルタップ拡大を切る） */
+  button{font-family:inherit; touch-action:manipulation;}
+  header{flex:0 0 auto; padding:7px 12px; padding-top:calc(7px + env(safe-area-inset-top,0px));
+         display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--line); background:var(--panel);}
+  .brand{flex:1 1 auto; min-width:0; font-size:14px; font-weight:800; display:flex; flex-direction:column; line-height:1.2;}
+  .brand .staff{font-size:11px; font-weight:700; color:var(--muted); white-space:nowrap;}
+  .hactions{flex:0 0 auto; display:flex; align-items:center; gap:8px;}
+  .sess{font-size:11px; color:var(--muted); white-space:nowrap;}
+  .sess b{color:var(--ink); font-size:15px; font-weight:800; margin-left:3px;}
+  .iconbtn{flex:0 0 auto; border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:10px; padding:7px 10px; font-size:13px; font-weight:600;}
 
-  /* ---- 計測画面 ---- */
-  .head{background:var(--panel); border-radius:12px; padding:10px 12px;}
-  .idx{font-size:12px; color:var(--dim);}
-  .stop{font-size:21px; font-weight:700; line-height:1.3;}
-  .next{font-size:12px; color:var(--dim); margin-top:3px;}
-  .bar{height:5px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:8px;}
-  .bar i{display:block; height:100%; background:var(--accent);}
-  .tapwrap{flex:1; display:flex; flex-direction:column; min-height:0;}
-  .tap{flex:1; min-height:150px; border:0; border-radius:16px; background:var(--accent); color:#fff;
-    display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer;
-    font-family:inherit;}
-  .tap:active{filter:brightness(1.25);}
-  .tap .n{font-size:84px; font-weight:800; line-height:1;}
-  .tap .t{font-size:15px; opacity:.9; margin-top:6px;}
-  .row{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
-  .mini{font-size:12px; color:var(--dim); text-align:center;}
+  main{flex:1 1 auto; min-height:0; display:flex; flex-direction:column;}
+  .scroll{flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:8px 12px 18px;}
+  .inner{max-width:420px; margin:0 auto; display:flex; flex-direction:column; gap:8px;}
 
-  table{width:100%; border-collapse:collapse; font-size:13px;}
-  th,td{border-bottom:1px solid var(--line); padding:6px 4px; text-align:left;}
-  td.n,th.n{text-align:right; width:58px;}
-  .scroll{overflow:auto; max-height:46vh; border:1px solid var(--line); border-radius:10px; padding:8px;}
-  .total{background:var(--panel); border-radius:12px; padding:12px; font-size:15px;}
-  .total b{font-size:22px;}
-  .note{font-size:12px; color:var(--dim); line-height:1.6; white-space:pre-line;}
-  .danger{color:#fca5a5;}
-  textarea{width:100%; height:120px; font-size:11px; background:#0b1220; color:var(--fg);
-    border:1px solid var(--line); border-radius:10px; padding:8px;}
-  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
-    background:#0b1220; border:1px solid var(--line); padding:10px 16px; border-radius:999px;
-    font-size:14px; opacity:0; transition:opacity .2s; pointer-events:none;}
-  .toast.on{opacity:1;}
+  /* 着席/立席・練習（index.html と同じ見た目） */
+  .expbar{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .posture{display:flex; flex:0 0 auto; border:1px solid var(--line); border-radius:9px; overflow:hidden;}
+  .posture.unset{border-color:#f59e0b;}
+  .pz{border:none; background:transparent; color:var(--muted); padding:7px 12px; font-size:12px; font-weight:700;}
+  .pz.on{background:#2563eb; color:#fff;}
+  .prac{border:1px solid var(--line); background:var(--bg); color:var(--muted); border-radius:9px; padding:7px 11px; font-size:12px; white-space:nowrap;}
+  .prac.on{background:#f59e0b; border-color:#f59e0b; color:#1f2937; font-weight:800;}
+  .pbanner{display:block; width:100%; border:none; border-radius:10px; background:#f59e0b; color:#1f2937;
+           padding:8px 10px; font-size:12.5px; font-weight:800; line-height:1.35; text-align:center;}
+
+  /* 1バス停ぶんの画面。番号は参加者向け案内「人数の答え方」の 1〜4 */
+  .blk{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:8px 10px 10px;}
+  .lbl{display:flex; align-items:center; gap:7px; font-size:13px; font-weight:700; color:var(--muted); margin-bottom:6px;}
+  .no{flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:var(--line); color:var(--ink);
+      font-size:12px; font-weight:800; display:inline-flex; align-items:center; justify-content:center;}
+  .stoprow{display:flex; align-items:center; gap:8px;}
+  .stopname{flex:1 1 auto; min-width:0; font-size:20px; font-weight:800; line-height:1.25; overflow-wrap:anywhere;}
+  .stopname small{display:block; font-size:11px; font-weight:600; color:var(--muted);}
+  .lnote{margin-left:auto; font-size:11.5px; font-weight:600; color:var(--muted); white-space:nowrap;}
+  .renote{margin-top:4px; font-size:13px; font-weight:800; color:#fbbf24;}
+  .renote[hidden]{display:none;}
+  .chg{flex:0 0 auto; min-height:44px; padding:0 14px; border-radius:10px; border:1px solid #2563eb;
+       background:rgba(37,99,235,.16); color:var(--ink); font-size:14px; font-weight:700;}
+  .chg:active{background:rgba(37,99,235,.35);}
+  .blk.fresh{animation:fresh .7s ease;}
+  @keyframes fresh{0%{border-color:#60a5fa; background:#1e3a5f;}100%{border-color:var(--line); background:var(--panel);}}
+
+  .ctr{display:grid; grid-template-columns:54px 64px 1fr; gap:6px; align-items:stretch;}
+  .ctr button{border-radius:12px; font-weight:800; font-variant-numeric:tabular-nums;}
+  .ctr .minus{height:var(--plush); border:1px solid var(--line); background:var(--bg); color:#fca5a5; font-size:15px;}
+  .ctr .minus:disabled{color:var(--line);}
+  .ctr .val{display:flex; align-items:center; justify-content:center; border-radius:12px; border:2px solid var(--line); background:var(--bg);}
+  .ctr .vin{display:flex; align-items:baseline; gap:2px;}
+  .ctr .val b{font-size:32px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; color:var(--ink);}
+  .ctr .vin > span{font-size:12px; color:var(--muted);}
+  .ctr .plus{height:var(--plush); border:none; color:#fff; font-size:30px;}
+  .ctr .plus:active{filter:brightness(1.25);}
+  .board .plus{background:var(--board);}  .board .val{border-color:var(--board);}
+  .alight .plus{background:var(--alight);} .alight .val{border-color:var(--alight);}
+
+  .btn{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; border:none; border-radius:14px;
+       padding:15px; font-size:16px; font-weight:800; color:#fff;}
+  .btn.primary{background:#16a34a;}
+  .btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--line); font-weight:700; font-size:15px;}
+  .btn .no{background:rgba(255,255,255,.25);}
+  .btn:active{filter:brightness(.9);}
+  .btn:disabled{opacity:.5;}
+  /* ★2026-10-07: 降りた人の＋1 から離す（揺れる車内で＋1を続けて押す指がずれて送信しないように） */
+  #sendBtn{margin-top:26px;}
+
+  /* 記録一覧 */
+  .log{margin-top:6px; border-top:1px solid var(--line);}
+  .lhead{font-size:12px; color:var(--muted); padding:9px 2px; display:flex; justify-content:space-between; border-bottom:1px solid var(--line);}
+  .empty{color:var(--muted); font-size:13px; text-align:center; padding:18px 10px;}
+  .logrow{display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid #1e2a3d;}
+  .lt{flex:0 0 auto; width:42px; font-variant-numeric:tabular-nums; font-size:13px; color:var(--muted);}
+  .lmid{flex:1 1 auto; min-width:0;}
+  .lstop{font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .lcount{font-size:12px; color:var(--muted);}
+  .ptag{font-size:10.5px; font-weight:800; color:#1f2937; background:#f59e0b; border-radius:999px; padding:1px 7px; margin-left:4px; vertical-align:1px;}
+  .lstat{flex:0 0 auto; font-size:11.5px; color:var(--muted); text-align:right;}
+  .lstat.ok{color:#34d399;} .lstat.pend{color:#fbbf24;} .lstat.rec{color:#60a5fa;}
+  .linkbtn{display:block; margin:14px auto 0; border:none; background:transparent; color:var(--muted);
+           font-size:12px; text-decoration:underline; padding:8px;}
+
+  /* 終点 */
+  .endbox{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:26px 14px; text-align:center;}
+  .endbox .endt{font-size:20px; font-weight:800; line-height:1.5;}
+  .endnote{margin-top:14px; font-size:15px; font-weight:800; line-height:1.5; color:#34d399;}
+  .endnote.warn{background:#7c2d12; color:#fed7aa; border-radius:10px; padding:10px 12px; font-size:16px;}
+
+  /* バス停の一覧（下から出す） */
+  .sheet{position:fixed; inset:0; z-index:40; background:rgba(2,6,23,.72); display:flex; align-items:flex-end; justify-content:center;}
+  .sheet[hidden]{display:none;}
+  .sheetin{width:100%; max-width:480px; max-height:92%; background:var(--panel); border-radius:16px 16px 0 0;
+           display:flex; flex-direction:column; padding-bottom:env(safe-area-inset-bottom,0px);}
+  .sheethead{flex:0 0 auto; display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); font-size:15px;}
+  .sheetlist{flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:8px 10px 12px;}
+  .sp{display:flex; align-items:center; gap:10px; width:100%; min-height:46px; padding:6px 10px; margin:0 0 5px;
+      border:1px solid var(--line); border-radius:10px; background:var(--bg); color:var(--ink); text-align:left; font-size:15px;}
+  .sp.on{border-color:#2563eb; background:rgba(37,99,235,.22);}
+  .sp:active{background:var(--line);}
+  .spn{flex:0 0 auto; width:22px; text-align:right; color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums;}
+  .spname{flex:1 1 auto; min-width:0; font-weight:700;}
+  .spsent{flex:0 0 auto; font-size:11px; color:#34d399;}
+
+  .statusbar{flex:0 0 auto; padding:6px 12px calc(6px + env(safe-area-inset-bottom,0px)); font-size:12px; color:var(--muted);
+             text-align:center; border-top:1px solid var(--line); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .statusbar.warn{background:#7c2d12; color:#fed7aa;}
+  .toast{position:fixed; left:12px; right:12px; bottom:44px; margin:0 auto; width:fit-content; transform:translateY(12px); opacity:0;
+         background:#16a34a; color:#fff; padding:10px 18px; border-radius:12px; font-size:14px; font-weight:700; text-align:center;
+         transition:all .2s ease; pointer-events:none; z-index:50;}
+  .toast.show{opacity:1; transform:translateY(0);}
+
+  /* ログイン（index.html と同じ見た目） */
+  .login{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:24px; text-align:center; overflow-y:auto;}
+  .login h1{font-size:22px; margin:0;}
+  .login p{color:var(--muted); font-size:14px; margin:0; max-width:340px; line-height:1.5;}
+  .authform{display:flex; flex-direction:column; gap:10px; width:100%; max-width:320px;}
+  .afield{width:100%; padding:13px; border-radius:11px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:16px; font-family:inherit;}
+  .pwshow{display:flex; align-items:center; gap:.5em; font-size:13px; color:var(--muted); cursor:pointer; text-align:left;}
+  .pwshow input{width:1.1em; height:1.1em;}
+  .authform .btn{background:#2563eb;}
+  #authNote{color:#fca5a5; font-size:12px; min-height:16px; margin:0;}
+
+  /* ── 小さい画面（iPhone SE 375x667 / 320x568 など） ── */
+  @media (max-height:700px){
+    header{padding-top:calc(5px + env(safe-area-inset-top,0px)); padding-bottom:5px;}
+    .scroll{padding-top:6px;}
+    .inner{gap:6px;}
+    .blk{padding:6px 9px 8px;}
+    .lbl{margin-bottom:4px;}
+    :root{--plush:64px;}
+    .btn{padding:13px;}
+    .login{gap:14px; padding:16px;}
+    .afield{padding:11px;}
+  }
+  @media (max-height:620px){
+    :root{--plush:58px;}
+    .stopname{font-size:18px;}
+    .ctr .val b{font-size:28px;}
+    .btn{padding:12px;}
+  }
+  /* ★2026-10-07: 320x460 など（Safari の上下のバーが出ている小さい端末）でも、練習中を含めて送信がスクロールなしで見えるように */
+  @media (max-height:520px){
+    header{padding-top:calc(4px + env(safe-area-inset-top,0px)); padding-bottom:4px;}
+    .scroll{padding-top:5px;}
+    .inner{gap:4px;}
+    .blk{padding:4px 8px 6px;}
+    .lbl{margin-bottom:3px;}
+    .no{width:18px; height:18px; font-size:11px;}
+    :root{--plush:44px;}
+    .chg{min-height:38px;}
+    .stopname{font-size:17px;}
+    .ctr .val b{font-size:26px;}
+    .expbar .pz,.expbar .prac{padding-top:4px; padding-bottom:4px;}
+    .pbanner{padding:4px 8px; font-size:11.5px;}
+    .btn{padding:9px;}
+    #sendBtn{margin-top:22px;}
+    .statusbar{padding-top:5px;}
+  }
+  @media (max-width:360px){
+    header{gap:7px; padding-left:9px; padding-right:9px;}
+    .scroll{padding-left:10px; padding-right:10px;}
+    .iconbtn{padding:6px 8px; font-size:12px;}
+    .pz{padding:7px 10px;}
+  }
 </style>
 </head>
 <body>
-<div class="wrap" id="app"></div>
-<div class="toast" id="toast"></div>
 
+<header>
+  <div class="brand">乗降アプリ<span class="staff" id="legTag"></span></div>
+  <div class="hactions">
+    <span class="sess" id="sess"></span>
+    <button class="iconbtn" id="outBtn" style="display:none">ログアウト</button>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<div class="statusbar" id="status"></div>
+<div class="toast" id="toast"></div>
+<div class="sheet" id="sheet" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
-const VERSION = "counter-1.0.0";
+const VERSION = "counter-2.0.0";
+// index.html と同じプロジェクト・同じ設定。同じサイトなのでログイン状態も共有される
+const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
 
 /* 吹田市内線2系統・ＪＲ吹田駅（南口）⇔ 桃山台駅。22停留所・両方向対称。
    出典：阪急バス公式の路線別時刻一覧表（行先番号2の列）。docs/old/operation_plan.md §1 */
@@ -93,278 +229,636 @@ const OUTBOUND = ["ＪＲ吹田駅（南口）","田中町","吹田市役所前�
   "佐竹台診療所前","阪急南千里駅","桃山台二丁目","桃山台駅"];
 const INBOUND = OUTBOUND.slice().reverse();
 
-const ROLES = {
-  board:   { name:"乗車係", desc:"この停留所で乗ってきた人を数える", verb:"乗った人", color:"#2563eb" },
-  alight:  { name:"降車係", desc:"この停留所で降りた人を数える",   verb:"降りた人", color:"#b45309" },
-  recount: { name:"数え直し係", desc:"発車したあと、車内にいる人を最初から数える", verb:"車内の人", color:"#15803d" },
-};
+// ★2026-10-07: 既定はかえり（桃山台駅 → ＪＲ吹田駅（南口））。?dir=out はテスト用のゆき方向
+const DIR   = (new URLSearchParams(location.search).get("dir")||"").toLowerCase()==="out" ? "out" : "in";
+const STOPS = DIR==="out" ? OUTBOUND : INBOUND;
+const LEG   = DIR==="out" ? "yuki" : "kaeri";
+const LABEL = "計数研究" + (DIR==="out" ? "ゆき" : "かえり");
 
-const KEY = "counter_run_v1";
+// 端末の保存キー。人数アプリ（uistudy_*）と混ざらないよう counter 専用にする
+const RUN_KEY      = "counter_run_v2";        // 今の往路：どこまで送ったか・入力途中の値
+const REC_KEY      = "counter_records_v2";    // 端末内の全記録（送信済も未送信も）。未送信は state:"pend"
+const POSTURE_KEY  = "counter_posture_v1";    // 着席/立席（日付つき）
+const PRACTICE_KEY = "counter_practice_v1";   // 練習モード（日付つき）
+
+/* 位置情報（index.html と同じやり方）：約2.5秒間隔・直近30秒を保持。
+   最初の操作の15秒前から送信の約4秒後までを trajectory に入れる */
+const SAMPLE_MS = 2500, KEEP_MS = 30000, PRE_MS = 15000, POST_MS = 4000;
+
+const GPS_ON = "位置情報 取得中…", GPS_OK = "位置情報 OK", GPS_NO = "位置情報が取得できません（許可が必要）",
+      GPS_SLOW = "位置情報を取得中…（少し時間がかかっています）", NOTCONF = "バックエンド未設定（管理者に連絡）";
+
+const configured = !!(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
+let sb = null, user = null;
+if (configured) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, flowType:'pkce' }
+});
+
+const $ = (id)=>document.getElementById(id);
+const main = $("main");
+
+/* ---------------- helpers ---------------- */
+function toast(msg,color){ const el=$("toast"); el.textContent=msg; el.style.background=color||"#16a34a"; el.classList.add("show");
+  clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove("show"),1800); }
+function hhmm(ms){ const d=new Date(ms); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]); }
+function uuid(){   // crypto.randomUUID 未対応環境(旧iOS Safari等)でも落ちないように
+  if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
+    const r=Math.random()*16|0; return (c==="x"?r:(r&0x3|0x8)).toString(16); });
+}
+function stopObj(i){ return { name:STOPS[i], seq:i+1 }; }
+
+/* 端末への保存。保存できない端末（Cookie 全ブロック等）ではメモリに持つ（index.html の getDaily と同じ考え方） */
+const MEM = {};
+function lsGet(k){ if(k in MEM) return MEM[k]; try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); delete MEM[k]; }catch(e){ MEM[k]=v; } }
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+// 着席/立席・練習は日付つきで保存し、日付が変わったら未設定に戻す（前日の値の持ち越し防止）
+function getDaily(k){ const raw=lsGet(k); if(!raw) return null; const i=raw.lastIndexOf("|");
+  return (i>0 && raw.slice(i+1)===todayStr()) ? raw.slice(0,i) : null; }
+function setDaily(k,v){ lsSet(k, v ? v+"|"+todayStr() : null); }
+function isPractice(){ return getDaily(PRACTICE_KEY)==="1"; }
+
+/* ---------------- 記録（1バス停＝1件） ---------------- */
+// ★2026-10-07: メモリに持たず毎回端末から読み直し、読む・変える・書くを updRecs の1か所で行う。
+//   2つのタブで開いていると、古い一覧で上書きして、もう片方のタブの未送信の記録を消してしまうため
+function lsArr(k){ try{ const a=JSON.parse(lsGet(k)||"[]"); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function recs(){ return lsArr(REC_KEY); }
+function updRecs(fn){ const a=recs(); fn(a); lsSet(REC_KEY, JSON.stringify(a)); }
+function updRec(sid, fn){ updRecs(a=>{ const x=a.find(r=>r.sid===sid); if(x) fn(x); }); }
+function getRec(sid){ return recs().find(x=>x.sid===sid); }
+// ui_sessions の surveyor_id は送った瞬間のログインで決まる。別の人の記録を自分の名前で送らないよう、記録した人で分ける
+function myRecs(){ const u=user && user.id; return recs().filter(x=>!x.uid || x.uid===u); }
+// ★2026-10-07: 人数アプリ（ゆき）で送れずに残った回答・操作ログ。桃山台駅で移ったあと参加者は人数アプリを開き直さないので、ここから送る
+const IDX_OUTBOX = "uistudy_outbox_v1", IDX_SESS = "uistudy_sessions_v1";
+function idxLeft(){ return lsArr(IDX_OUTBOX).filter(x=>x && x.ready).length + lsArr(IDX_SESS).length; }
+function pendN(){ return myRecs().filter(x=>x.state==="pend").length + idxLeft(); }
+
+/* ---------------- 今の往路（run） ---------------- */
 let run = null;
-
-/* ---------------- 保存。1タップごとに書くので、落ちても消えない ---------------- */
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(run)); }catch(e){} }
-function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){ return null; } }
-function clearRun(){ try{ localStorage.removeItem(KEY); }catch(e){} run = null; }
-
-function toast(msg){
-  const t = document.getElementById("toast");
-  t.textContent = msg; t.classList.add("on");
-  clearTimeout(toast._t); toast._t = setTimeout(()=>t.classList.remove("on"), 1600);
+function loadRun(){ try{ return JSON.parse(lsGet(RUN_KEY)||"null"); }catch(e){ return null; } }
+function saveRun(){ lsSet(RUN_KEY, run ? JSON.stringify(run) : null); }
+function newRun(){
+  run = { run_id:uuid(), dir:DIR, uid:user.id, day:todayStr(), started_at:new Date().toISOString(),
+          next:0,      // 次に出すバス停（0〜21。22＝終点まで送った）
+          sent:{},     // 送ったバス停（練習は除く）。送り直しの判定に使う
+          draft:null,
+          stash:null };  // 送り直しのあいだ退避しておく、数えている途中のバス停
+  saveRun();
 }
-function hhmm(ts){
-  const d = new Date(ts);
-  return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+// ★2026-10-07: ほかのタブが同じ往路を進めていたら読み直す（古い run で上書きしない）
+function reloadRun(){
+  if(!user) return false;
+  const raw=lsGet(RUN_KEY);
+  if(!raw || (run && raw===JSON.stringify(run))) return false;
+  const r=loadRun();
+  if(!r || r.dir!==DIR || r.uid!==user.id) return false;   // 別の方向・別の人の run は触らない（タブどうしで作り直し合わない）
+  run=r; render(); return true;
 }
-function el(tag, cls, text){
-  const e = document.createElement(tag);
-  if(cls) e.className = cls;
-  if(text != null) e.textContent = text;
-  return e;
+// 同じ日・同じ人・同じ方向なら続きから。再読込や人数アプリとの行き来で途中の記録を失わない
+function ensureRun(){
+  if(!run){
+    const r=loadRun();
+    if(r && r.dir===DIR && r.uid===user.id && r.day===todayStr()){
+      run=r;
+      if(run.draft){ ev("screen_view", { stop:stopObj(run.draft.cur), screen_w:innerWidth, screen_h:innerHeight, restored:true }); saveRun(); }
+    }
+  }
+  if(!run || run.uid!==user.id) newRun();
+}
+// 1バス停ぶんの入力途中の値。押すたびに保存するので、ページが落ちても消えない
+function ensureDraft(){
+  if(!run.draft) newDraft(Math.min(run.next, STOPS.length-1), null);
+  return run.draft;
+}
+// prev があれば送り直し：前回の値から始める（数え漏れた人だけ＋1すればよい）
+function newDraft(i, prev){
+  const now=Date.now(), sug=Math.min(run.next, STOPS.length-1);   // 終点のあとの送り直しは終点が「出したバス停」
+  run.draft = { shown_at:now, started_at:new Date(now).toISOString(), sug:sug, cur:i,
+                board:prev ? prev.board : 0, alight:prev ? prev.alight : 0, resend:!!prev,
+                prev:prev ? { board:prev.board, alight:prev.alight } : null,
+                taps:0, cnt:{ board_plus:0, board_minus:0, alight_plus:0, alight_minus:0 },
+                first_at:null, traj:[], events:[] };
+  ev("screen_view", Object.assign({ stop:stopObj(i), screen_w:innerWidth, screen_h:innerHeight }, prev ? { resend:true, prev:run.draft.prev } : {}));
+  saveRun();
+}
+// この往路でそのバス停に最後に送った値
+function lastSent(i){
+  const a=myRecs().filter(x=>x.run_id===run.run_id && !x.practice && x.row && x.row.context.stop.seq===i+1);
+  return a.length ? a[a.length-1] : null;
+}
+function ev(type, data){ const d=run.draft; d.events.push(Object.assign({ dt:Date.now()-d.shown_at, type:type }, data||{})); }
+// 最初の操作。ここから15秒さかのぼって位置を残し始める
+function firstOp(){
+  const d=run.draft; if(d.first_at!=null) return;
+  d.first_at=Date.now();
+  d.traj=preBuffer.filter(p=>p._ms>=d.first_at-PRE_MS).map(({_ms,...pt})=>pt);
+  grabOneShot();   // すぐしまわれても代表点が1つ残るよう、その場で一発測位（index.html と同じ）
+}
+
+/* ---------------- 位置情報（index.html の startSampling / grabOneShot と同じ） ---------------- */
+const preBuffer = [];      // 直近30秒の測位
+let fins = [];             // 送信後に位置をとり続けている記録 {sid, until, send_sec, traj, timer}
+let watchId=null, lastSampleTs=0, geoMsg="", geoWarn=false;
+function setGeo(msg, warn){ if(geoMsg===msg && geoWarn===!!warn) return; geoMsg=msg; geoWarn=!!warn; setStatus(); }
+function toPt(p){
+  const c=p.coords;
+  return { t:Math.floor(Date.now()/1000), lat:+c.latitude.toFixed(6), lng:+c.longitude.toFixed(6), acc:Math.round(c.accuracy),
+           hdg:(c.heading!=null && !isNaN(c.heading)) ? Math.round(c.heading) : null,     // 進行方位(度)
+           spd:(c.speed!=null && !isNaN(c.speed)) ? +c.speed.toFixed(1) : null };          // 速度(m/s)
+}
+function pushPt(tj, pt){   // 同じ時刻（2秒以内）の重複は入れない。時刻順を保つ
+  if(tj.some(q=>Math.abs(q.t-pt.t)<2)) return false;
+  tj.push(pt); tj.sort((a,b)=>a.t-b.t); return true;
+}
+function addPoint(pt){
+  const now=Date.now();
+  preBuffer.push(Object.assign({ _ms:now }, pt));
+  while(preBuffer.length && preBuffer[0]._ms<now-KEEP_MS) preBuffer.shift();
+  const d=run && run.draft;
+  if(d && d.first_at!=null && pushPt(d.traj, pt)) saveRun();
+  fins.forEach(f=>{ if(now<=f.until) pushPt(f.traj, pt); });
+}
+function startSampling(){
+  if(watchId!=null) return;
+  if(!navigator.geolocation){ setGeo(GPS_NO, true); return; }
+  if(!geoMsg) setGeo(GPS_ON);
+  watchId = navigator.geolocation.watchPosition(
+    (p)=>{
+      setGeo(GPS_OK);
+      const now=Date.now();
+      if(now-lastSampleTs < SAMPLE_MS-300) return;   // 約2.5秒間隔に間引き
+      lastSampleTs=now;
+      addPoint(toPt(p));
+    },
+    (e)=>{   // 許可拒否と、車内でありがちなタイムアウト/一時的な取得不可を区別。許可されなくても記録はできる
+      if(e && e.code===1) setGeo(GPS_NO, true); else setGeo(GPS_SLOW);
+    },
+    { enableHighAccuracy:true, maximumAge:3000, timeout:15000 }
+  );
+}
+function stopSampling(){ if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; } }
+function grabOneShot(){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition((p)=>{ addPoint(toPt(p)); setGeo(GPS_OK); },
+    ()=>{}, { enableHighAccuracy:true, maximumAge:10000, timeout:15000 });
+}
+// 代表位置＝送信時刻に一番近い点
+function repPoint(tj, sec){
+  if(!tj.length) return { lat:null, lng:null, gps_accuracy:null, gps_fixed_at:null };
+  let best=tj[0];
+  for(const q of tj) if(Math.abs(q.t-sec) < Math.abs(best.t-sec)) best=q;
+  return { lat:best.lat, lng:best.lng, gps_accuracy:best.acc, gps_fixed_at:new Date(best.t*1000).toISOString() };
 }
 
 /* 画面を消さない。対応していない端末では黙って諦める */
 let wakeLock = null;
 async function keepAwake(on){
   try{
-    if(on && "wakeLock" in navigator){ wakeLock = await navigator.wakeLock.request("screen"); }
+    if(on){ if(!wakeLock && "wakeLock" in navigator){ wakeLock = await navigator.wakeLock.request("screen");
+              wakeLock.addEventListener("release", ()=>{ wakeLock=null; }); } }
     else if(wakeLock){ await wakeLock.release(); wakeLock = null; }
   }catch(e){}
 }
-document.addEventListener("visibilitychange", ()=>{
-  if(document.visibilityState === "visible" && run && !run.done) keepAwake(true);
-});
 
-/* ---------------- 画面1：はじめる ---------------- */
-function renderSetup(){
-  const app = document.getElementById("app");
-  app.innerHTML = "";
-  app.appendChild(el("h1", null, "乗降計測"));
-  app.appendChild(el("p", "sub", "計数役むけ。紙の記録用紙の代わりに使います。"));
-
-  app.appendChild(el("label", null, "あなたの役割"));
-  const roles = el("div", "roles");
-  let picked = "board";
-  Object.keys(ROLES).forEach(k=>{
-    const d = el("div", "role" + (k===picked?" on":""));
-    d.appendChild(el("b", null, ROLES[k].name));
-    d.appendChild(el("span", null, ROLES[k].desc));
-    d.onclick = ()=>{ picked = k;
-      [...roles.children].forEach(c=>c.classList.remove("on")); d.classList.add("on"); };
-    roles.appendChild(d);
-  });
-  app.appendChild(roles);
-
-  app.appendChild(el("label", null, "方向"));
-  const dir = el("select");
-  dir.innerHTML = '<option value="out">ＪＲ吹田駅（南口） → 桃山台駅</option>'
-                + '<option value="in">桃山台駅 → ＪＲ吹田駅（南口）</option>';
-  app.appendChild(dir);
-
-  app.appendChild(el("label", null, "便（発車時刻など。あとで見分けるための覚え書き）"));
-  const bin = el("input");
-  bin.type = "text"; bin.placeholder = "例：10/20 桃山台17:18発";
-  const now = new Date();
-  bin.value = (now.getMonth()+1) + "/" + now.getDate() + " ";
-  app.appendChild(bin);
-
-  app.appendChild(el("div", null, "")).style.height = "8px";
-  const go = el("button", "btn", "はじめる");
-  go.onclick = ()=>{
-    const stops = dir.value === "out" ? OUTBOUND : INBOUND;
-    run = {
-      v: VERSION, run_id: String(Date.now()) + "-" + Math.random().toString(36).slice(2,8),
-      role: picked, dir: dir.value, bin: bin.value.trim(),
-      started_at: Date.now(), done: false, i: 0,
-      stops: stops.map((n,ix)=>({ ix:ix, name:n, taps:[], closed_at:null })),
-    };
-    save(); keepAwake(true); renderCount();
-  };
-  app.appendChild(go);
-
-  const old = load();
-  if(old){
-    app.appendChild(el("div", null, "")).style.height = "6px";
-    const r = el("button", "btn ghost",
-      old.done ? "前回の記録を見る（" + (old.bin||"便の記入なし") + "）"
-               : "途中の記録を続ける（" + (old.bin||"便の記入なし") + "）");
-    r.onclick = ()=>{ run = old; if(run.done){ renderDone(); } else { keepAwake(true); renderCount(); } };
-    app.appendChild(r);
+/* ---------------- 送信（ui_sessions に insert。送れなければ端末に残す） ---------------- */
+let flushP=null, flushAgain=false;
+// 同時に2本走らせない（同じ記録を2回 insert しない）。走っている間に呼ばれたら、終わったあとにもう1周する
+function flush(){
+  if(flushP){ flushAgain=true; return flushP; }
+  flushP=(async()=>{
+    try{ do{ flushAgain=false; await flushLocked(); }while(flushAgain); }
+    finally{ flushP=null; }
+  })();
+  return flushP;
+}
+// ★2026-10-07: タブをまたいでも送信は同時に1本だけ（2つのタブが同時に「まだ届いていない」と確かめて2回 insert しないように）。
+//   ほかのタブが10秒たっても離さない（止まったタブが持ったまま等）ときは、待たずに送る（送れないままより、二重のほうがあとで直せる）
+async function flushLocked(){
+  if(!(navigator.locks && navigator.locks.request && window.AbortController)) return flushOnce();
+  const ac=new AbortController(), tm=setTimeout(()=>ac.abort(), 10000);
+  try{ await navigator.locks.request("counter-flush", { signal:ac.signal }, async()=>{ clearTimeout(tm); await flushOnce(); }); }
+  catch(e){ if(e && e.name==="AbortError") await flushOnce(); else console.error(e); }
+  finally{ clearTimeout(tm); }
+}
+async function flushOnce(){
+  if(!user || !sb) return;
+  const uid=user.id, live=fins.map(f=>f.sid);
+  // 記録中のまま残った記録（送信直後にページが閉じた等）は、とれたところまでの位置で送る。ほかのタブで記録中のものは待つ
+  if(recs().some(x=>x.state==="rec" && !live.includes(x.sid) && Date.now()-x.at>POST_MS+6000))
+    updRecs(a=>a.forEach(x=>{ if(x.state==="rec" && !live.includes(x.sid) && Date.now()-x.at>POST_MS+6000) x.state="pend"; }));
+  let ok=true;
+  for(const sid of myRecs().filter(x=>x.state==="pend" && (!x.uid || x.uid===uid)).map(x=>x.sid)){
+    const it=getRec(sid); if(!it || it.state!=="pend") continue;   // ほかのタブが送った
+    ok=false;
+    try{ ok=await sendOne(it); }
+    catch(err){ console.error("[ui_sessions] insert失敗:", err?.code||"", err?.message||err); }
+    if(!ok) break;   // 電波がないときは残りも通らない。次の機会にまとめて送る
+    updRec(sid, x=>{ x.state="ok"; x.sent_at=Date.now(); });
   }
+  if(ok){ try{ await sendIdxLeft(); }catch(err){ console.error("[人数アプリの未送信] insert失敗:", err?.code||"", err?.message||err); } }
+  renderLog(); setStatus();
+}
+async function sendOne(it){
+  const retry=(it.tries||0)>0;
+  updRec(it.sid, x=>{ x.tries=(x.tries||0)+1; });   // 送る前に数える。送信中にページが閉じても、次は届いていないかを先に確かめる
+  if(retry && await already("ui_sessions", "session_id", it.sid)) return true;   // 前回の送信は届いていた。二重に入れない
+  await ins("ui_sessions", it.row);
+  return true;
+}
+// ★2026-10-07: 人数アプリの送信待ち（回答＝ui_responses、操作ログ＝ui_sessions）。人数アプリが途中まで送っていたかもしれないので、届いていないかを先に確かめる
+const BOOT_AT=Date.now();
+async function sendIdxLeft(){
+  // 人数アプリから移った直後は、人数アプリが打ち切った送信がまだ届く途中かもしれないので少し待つ
+  const wait=5000-(Date.now()-BOOT_AT);
+  if(wait>0){ if(idxLeft()) setTimeout(flush, wait+300); return; }
+  for(const it of lsArr(IDX_OUTBOX).filter(x=>x && x.ready)){
+    if(it.rec && !await already("ui_responses", "client_id", it.cid)) await ins("ui_responses", it.rec);
+    lsSet(IDX_OUTBOX, JSON.stringify(lsArr(IDX_OUTBOX).filter(x=>x.cid!==it.cid)));
+  }
+  for(const r of lsArr(IDX_SESS)){
+    if(!await already("ui_sessions", "session_id", r.session_id)) await ins("ui_sessions", r);
+    lsSet(IDX_SESS, JSON.stringify(lsArr(IDX_SESS).filter(x=>x.session_id!==r.session_id)));
+  }
+}
+// 返事が来ないまま止まらないよう20秒で打ち切る（届いていたかは次に select で確かめる）
+function tmo(p){ return Promise.race([p, new Promise((_, j)=>setTimeout(()=>j(new Error("timeout")), 20000))]); }
+async function already(table, col, v){
+  const { data, error } = await tmo(sb.from(table).select(col).eq(col, v).limit(1));
+  if(error) throw error;
+  return !!(data && data.length);
+}
+async function ins(table, row){
+  const { error } = await tmo(sb.from(table).insert(Object.assign({}, row, { client_submitted_at:new Date().toISOString() })));
+  if(error) throw error;
+}
+// 送信後の位置とりを終えて「送る」状態にする
+function finalize(sid, quiet){
+  const f=fins.find(x=>x.sid===sid); if(!f) return;
+  fins=fins.filter(x=>x!==f); clearTimeout(f.timer);
+  updRec(sid, it=>{
+    const c=it.row.context;
+    c.trajectory=f.traj;
+    Object.assign(c, repPoint(f.traj, f.send_sec));
+    if(it.state==="rec") it.state="pend";
+  });
+  renderLog(); setStatus();
+  if(quiet) return;
+  flush().then(()=>{
+    const x=getRec(sid), ok=!!(x && x.state==="ok");
+    toast(ok ? "送信しました" : "端末に保存しました（あとで自動で送ります）", ok ? "#16a34a" : "#f59e0b");
+  });
+}
+function finalizeAll(){ fins.slice().forEach(f=>finalize(f.sid, true)); }
 
-  app.appendChild(el("p","note",
-    "・タップ1回が1人です。押しすぎたら「1つ戻す」で消せます。\n"+
-    "・記録は押すたびに端末へ保存されます。電波は要りません。\n"+
-    "・終わったら最後の画面で記録を書き出して、松本に送ってください。"));
+/* ---------------- 1バス停ぶんの操作 ---------------- */
+// ★2026-10-07: 指が残ったまま2回目が当たるのを防ぐ。1回目で画面が作り直されると、2回目が新しい画面のボタンに当たる
+//   （「送信」の2回押しで次のバス停を0人で送る、「変える」の2回押しで一覧の上のバス停を選ぶ、＋1の連打の指がずれて送る）
+const SEND_AFTER_SHOW = 1000, SEND_AFTER_TAP = 700, PICK_AFTER_OPEN = 500;
+let shownAt=0, lastTapAt=0, sheetAt=0;
+function bump(k, delta){
+  const d=run.draft;
+  if(delta<0 && d[k]<=0) return;   // 0未満にしない
+  firstOp();
+  d[k]+=delta; d.taps++;
+  d.cnt[k+(delta>0?"_plus":"_minus")]++;
+  ev(k+(delta>0?"+1":"-1"), { value:d[k] });
+  saveRun(); showVals();
+  lastTapAt=Date.now();
+  if(delta>0 && navigator.vibrate) navigator.vibrate(8);
+}
+function pickStop(i){
+  if(Date.now()-sheetAt < PICK_AFTER_OPEN) return;
+  closeSheet();
+  let d=run.draft;
+  if(d && i===d.cur) return;
+  const prev = run.sent[i] ? lastSent(i) : null;
+  if(prev){
+    // ★2026-10-07: 送ったバス停の送り直し。数えている途中の値は退避し、送り直しが済んだら戻す
+    if(d && !d.resend) run.stash=d;
+    newDraft(i, prev);
+  }else{
+    // 送り直しをやめた（まだ送っていないバス停を選んだ）。退避していた途中の値に戻す
+    if(d && d.resend){
+      run.draft=d=run.stash; run.stash=null;
+      if(d) ev("screen_view", { stop:stopObj(d.cur), screen_w:innerWidth, screen_h:innerHeight, restored:true });
+    }
+    if(!d) newDraft(i, null);   // 終点の画面から選んだ
+    else if(i!==d.cur){         // 停留所の取り違えの直し。値は持ち越す
+      firstOp(); d.taps++;
+      ev("stop_change", { from:stopObj(d.cur), to:stopObj(i) });
+      d.cur=i;
+    }
+  }
+  saveRun(); renderStop(false);
+}
+function send(){
+  const d=run.draft, now0=Date.now();
+  if(now0-shownAt < SEND_AFTER_SHOW || now0-lastTapAt < SEND_AFTER_TAP) return;
+  let zero=null;
+  if(d.board===0 && d.alight===0){
+    zero = confirm("乗った人・降りた人とも0人で送りますか？") ? "ok" : "cancel";
+    if(zero==="cancel"){ firstOp(); d.taps++; ev("send", { board:0, alight:0, zero_confirm:"cancel" }); saveRun(); return; }
+  }
+  firstOp(); d.taps++;
+  ev("send", { board:d.board, alight:d.alight, zero_confirm:zero });
+  const now=Date.now(), sec=Math.floor(now/1000), prac=isPractice();
+  const resend=!!run.sent[d.cur];   // この往路で送ったバス停を選び直した（分析では同じ run・同じバス停の最後の記録を使う）
+  const sid=uuid(), traj=d.traj.slice();
+  const row = {
+    session_id: sid,
+    started_at: d.started_at,
+    outcome: "submit",
+    variant: { study:"count", round:null, leg:LEG, group:null, label:LABEL, method:"flow", app:"counter", practice:prac },
+    context: Object.assign({
+      run_id: run.run_id, dir: DIR, stop: stopObj(d.cur), stop_suggested: stopObj(d.sug),
+      stop_changed: d.cur!==d.sug, resend: resend, board: d.board, alight: d.alight,
+      posture: getDaily(POSTURE_KEY), trajectory: traj }, repPoint(traj, sec), {
+      screen_w: innerWidth, screen_h: innerHeight, app_version: VERSION }),
+    summary: { t_total: now-d.shown_at, t_first: d.first_at-d.shown_at, taps_total: d.taps,
+               board_plus: d.cnt.board_plus, board_minus: d.cnt.board_minus,
+               alight_plus: d.cnt.alight_plus, alight_minus: d.cnt.alight_minus },
+    events: d.events
+  };
+  updRecs(a=>a.push({ sid, uid:user ? user.id : null, state:"rec", at:now, run_id:run.run_id, stop:STOPS[d.cur], board:d.board, alight:d.alight,
+                       practice:prac, row }));
+  // 練習は次のバス停に進めない（のりばで練習しても、本番は今のバス停から始まるように）
+  if(!prac){
+    // 前に送ったバス停を選び直して送ったときは、次に出すバス停を変えない。★2026-10-07: 戻すこともしない（終点のあとに送っても終点の画面に戻る）
+    if(!resend) run.next=Math.max(run.next, d.cur+1);
+    run.sent[d.cur]=(run.sent[d.cur]||0)+1;
+  }
+  // ★2026-10-07: 送り直しが済んだら、退避していた数えている途中のバス停に戻す
+  run.draft = (d.resend && run.stash) ? run.stash : null; run.stash=null;
+  if(run.draft) ev("screen_view", { stop:stopObj(run.draft.cur), screen_w:innerWidth, screen_h:innerHeight, restored:true });
+  saveRun();
+  // 送ったあと約4秒は位置をとり続けてから送る
+  const f={ sid, until:now+POST_MS, send_sec:sec, traj:traj.slice() };
+  f.timer=setTimeout(()=>finalize(sid, false), POST_MS);
+  fins.push(f);
+  render(true);
 }
 
-/* ---------------- 画面2：計測 ---------------- */
-function renderCount(){
-  const app = document.getElementById("app");
-  const R = ROLES[run.role];
-  const s = run.stops[run.i];
-  app.innerHTML = "";
+/* ---------------- 画面 ---------------- */
+function updateHeader(){
+  $("legTag").textContent = "計数研究　" + (DIR==="out" ? "ゆき" : "かえり");
+  $("sess").innerHTML = user ? `調査員<b>${esc(((user.email||"").split("@")[0]||"").toUpperCase())}</b>` : "";
+  $("outBtn").style.display = user ? "" : "none";
+}
+function setStatus(){
+  const s=$("status"); const parts=[];
+  const n=user ? pendN() : recs().filter(x=>x.state==="pend").length + idxLeft();   // ★2026-10-07: 人数アプリの送信待ちも数える
+  if(n) parts.push(`未送信 ${n}件`);   // 狭い画面で位置情報の長い文に隠れないよう先頭に出す
+  if(geoMsg) parts.push(geoMsg);
+  if(!configured) parts.push(NOTCONF);
+  parts.push(VERSION);   // 版番号を常に表示する。どの版を使っていたかを端末側でも確認できるように
+  s.textContent=parts.join(" · ");
+  s.className="statusbar"+((geoWarn || !configured) ? " warn" : "");
+  showEndNote();
+}
+// ★2026-10-07: 終点の画面。未送信が残っていたら大きく出す（自動で送るのはこの画面を開いているあいだだけ。参加は1回きりで、閉じると届かない）
+function showEndNote(){
+  const el=$("endNote"); if(!el || !user) return;
+  const n=pendN(), rec=myRecs().some(x=>x.state==="rec");
+  el.className="endnote"+(n ? " warn" : "");
+  el.textContent = n ? `未送信が ${n}件あります。電波のある所でこの画面を開いたままにしてください` : rec ? "送信中…" : "すべて送信しました";
+}
+function render(fresh){
+  updateHeader();
+  closeSheet();
+  if(!user){ keepAwake(false); renderLogin(); return; }
+  ensureRun();
+  if(run.next>=STOPS.length && !run.draft){ keepAwake(false); renderEnd(); return; }
+  renderStop(fresh);
+}
+function expBarInner(){
+  const pos=getDaily(POSTURE_KEY);
+  return `<div class="posture${pos?"":" unset"}"><button class="pz${pos==="sit"?" on":""}" data-p="sit">着席</button><button class="pz${pos==="stand"?" on":""}" data-p="stand">立席</button></div>` +
+         `<button id="pracBtn" class="prac${isPractice()?" on":""}">練習</button>`;
+}
+// 練習中は画面の先頭に大きく出す（小さなボタンだけだと切り忘れる）
+function renderPracBanner(){
+  const el=$("pracwrap"); if(!el) return;
+  el.innerHTML = isPractice() ? `<button id="pracBanner" class="pbanner">練習モード｜この記録は分析に使いません（タップで終了）</button>` : "";
+  const b=$("pracBanner"); if(b) b.onclick=()=>{ setDaily(PRACTICE_KEY, null); renderExpBar(); };
+}
+function renderExpBar(){
+  const el=$("expbar");
+  if(el){
+    el.innerHTML=expBarInner();
+    el.querySelectorAll(".pz").forEach(b=>{ b.onclick=()=>{ setDaily(POSTURE_KEY, b.dataset.p); renderExpBar(); }; });
+    $("pracBtn").onclick=()=>{ setDaily(PRACTICE_KEY, isPractice()?null:"1"); renderExpBar(); };
+  }
+  renderPracBanner();
+}
+function renderStop(fresh){
+  ensureDraft();
+  main.innerHTML = `
+    <div class="scroll"><div class="inner">
+      <div id="pracwrap"></div>
+      <div class="expbar" id="expbar"></div>
+      <section class="blk${fresh?" fresh":""}">
+        <div class="lbl"><span class="no">1</span>バス停</div>
+        <div class="stoprow"><div class="stopname" id="stopName"></div><button class="chg" id="chgBtn">変える</button></div>
+        <div class="renote" id="reNote" hidden></div>
+      </section>
+      <section class="blk board">
+        <div class="lbl"><span class="no">2</span>乗ってきた人</div>
+        <div class="ctr"><button class="minus" id="bMinus">−1</button><div class="val"><span class="vin"><b id="bVal">0</b><span>人</span></span></div><button class="plus" id="bPlus">＋1</button></div>
+      </section>
+      <section class="blk alight">
+        <div class="lbl"><span class="no">3</span>降りた人</div>
+        <div class="ctr"><button class="minus" id="aMinus">−1</button><div class="val"><span class="vin"><b id="aVal">0</b><span>人</span></span></div><button class="plus" id="aPlus">＋1</button></div>
+      </section>
+      <button class="btn primary" id="sendBtn"><span class="no">4</span>送信</button>
+      ${run.sent[STOPS.length-1] ? `<button class="btn ghost" id="toEndBtn">終点の画面に戻る</button>` : ""}
+      <div class="log" id="log"></div>
+      <button class="linkbtn" id="dlBtn">記録をJSONで保存</button>
+    </div></div>`;
+  renderExpBar();
+  showStop(); showVals();
+  shownAt=Date.now();
+  $("chgBtn").onclick=openSheet;
+  $("bPlus").onclick=()=>bump("board", 1);   $("bMinus").onclick=()=>bump("board", -1);
+  $("aPlus").onclick=()=>bump("alight", 1);  $("aMinus").onclick=()=>bump("alight", -1);
+  $("sendBtn").onclick=send;
+  // 終点を送ったあとの送り直しをやめるとき。入力途中の値は送らずに捨てる
+  if($("toEndBtn")) $("toEndBtn").onclick=()=>{ run.draft=null; run.stash=null; run.next=STOPS.length; saveRun(); render(); };
+  $("dlBtn").onclick=exportJson;
+  renderLog(); setStatus();
+  startSampling();
+  keepAwake(true);
+}
+function showStop(){
+  const d=run.draft, el=$("stopName"); if(!el) return;
+  el.innerHTML = `${esc(STOPS[d.cur])}<small>${d.cur+1}／${STOPS.length}</small>`;
+  // ★2026-10-07: 送り直しであることと前回の値を出す（前回の値から始まるので、数え漏れた人だけ＋1すればよい）
+  const re=$("reNote");
+  if(re){ re.hidden=!d.resend; re.textContent = d.resend ? `送り直し（前回 乗${d.prev.board}／降${d.prev.alight}）` : ""; }
+}
+function showVals(){
+  const d=run.draft;
+  $("bVal").textContent=String(d.board); $("aVal").textContent=String(d.alight);
+  $("bMinus").disabled = d.board<=0;      $("aMinus").disabled = d.alight<=0;
+}
+function renderEnd(){
+  main.innerHTML = `
+    <div class="scroll"><div class="inner">
+      <div id="pracwrap"></div>
+      <div class="endbox"><div class="endt">終点です。<br>おつかれさまでした</div><div class="endnote" id="endNote"></div></div>
+      <button class="btn ghost" id="restartBtn">最初からやり直す</button>
+      <button class="btn ghost" id="redoBtn">バス停を選んで送り直す</button>
+      <div class="log" id="log"></div>
+      <button class="linkbtn" id="dlBtn">記録をJSONで保存</button>
+    </div></div>`;
+  renderPracBanner();
+  $("restartBtn").onclick=()=>{ newRun(); render(); };
+  // 終点のあとでも送り直せるように一覧を開く。run.next は終点のあとのまま
+  // （ほかのバス停を送り直しても、そのまま終点の画面に戻る）
+  $("redoBtn").onclick=openSheet;
+  $("dlBtn").onclick=exportJson;
+  renderLog(); setStatus();
+  startSampling();
+}
+// 記録一覧（新しい順）。各バス停の乗/降だけを出す（合計は出さない）
+function renderLog(){
+  const el=$("log"); if(!el) return;
+  const items=myRecs().slice().reverse();
+  const st={ ok:["ok","送信済"], pend:["pend","未送信"], rec:["rec","記録中"] };
+  el.innerHTML = `<div class="lhead"><span>記録 ${items.length}</span><span>送信状況</span></div>` +
+    (items.length ? items.map(x=>{ const s=st[x.state]||["",""];
+      return `<div class="logrow"><span class="lt">${hhmm(x.at)}</span>
+        <span class="lmid"><div class="lstop">${esc(x.stop)}${x.practice?`<span class="ptag">練習</span>`:""}</div>
+        <div class="lcount">乗 ${x.board}／降 ${x.alight}</div></span>
+        <span class="lstat ${s[0]}">${s[1]}</span></div>`; }).join("")
+    : `<div class="empty">まだ記録がありません</div>`);
+}
+// バス停の一覧（順番どおり）
+function openSheet(){
+  const cur=run.draft ? run.draft.cur : -1, sh=$("sheet");
+  sheetAt=Date.now();
+  sh.innerHTML = `<div class="sheetin">
+      <div class="sheethead"><b>バス停を選ぶ</b><button class="iconbtn" id="sheetClose">閉じる</button></div>
+      <div class="sheetlist">${STOPS.map((n,i)=>`<button class="sp${i===cur?" on":""}" data-i="${i}"><span class="spn">${i+1}</span><span class="spname">${esc(n)}</span>${run.sent[i]?`<span class="spsent">送信済</span>`:""}</button>`).join("")}</div>
+    </div>`;
+  sh.hidden=false;
+  sh.onclick=(e)=>{ if(e.target===sh) closeSheet(); };
+  $("sheetClose").onclick=closeSheet;
+  sh.querySelectorAll(".sp").forEach(b=>{ b.onclick=()=>pickStop(+b.dataset.i); });
+  const on=sh.querySelector(".sp.on"); if(on && on.scrollIntoView) on.scrollIntoView({ block:"center" });
+}
+function closeSheet(){ const sh=$("sheet"); sh.hidden=true; sh.innerHTML=""; }
 
-  const head = el("div","head");
-  head.appendChild(el("div","idx", R.name + "　|　" + (run.i+1) + " / " + run.stops.length
-                      + (run.bin ? "　|　" + run.bin : "")));
-  head.appendChild(el("div","stop", s.name));
-  const nx = run.stops[run.i+1];
-  head.appendChild(el("div","next", nx ? "次：" + nx.name : "ここが終点です"));
-  const bar = el("div","bar"); const fill = el("i");
-  fill.style.width = Math.round(run.i / (run.stops.length-1) * 100) + "%";
-  bar.appendChild(fill); head.appendChild(bar);
-  app.appendChild(head);
-
-  const wrap = el("div","tapwrap");
-  const tap = el("button","tap");
-  tap.style.background = R.color;
-  const n = el("div","n", String(s.taps.length));
-  const t = el("div","t", R.verb + "　＋1");
-  tap.appendChild(n); tap.appendChild(t);
-  tap.onclick = ()=>{
-    s.taps.push(Date.now()); save();
-    n.textContent = String(s.taps.length);
-    if(navigator.vibrate) navigator.vibrate(8);
-  };
-  wrap.appendChild(tap);
-  app.appendChild(wrap);
-
-  const row = el("div","row");
-  const undo = el("button","btn ghost","1つ戻す");
-  undo.onclick = ()=>{
-    if(!s.taps.length){ toast("この停留所はまだ0です"); return; }
-    s.taps.pop(); save(); n.textContent = String(s.taps.length);
-  };
-  const next = el("button","btn", nx ? "次の停留所へ" : "終わる");
-  next.onclick = ()=>{
-    s.closed_at = Date.now(); save();
-    if(nx){ run.i++; save(); renderCount(); }
-    else { run.done = true; run.ended_at = Date.now(); save(); keepAwake(false); renderDone(); }
-  };
-  row.appendChild(undo); row.appendChild(next);
-  app.appendChild(row);
-
-  const back = el("div","row");
-  const prev = el("button","btn ghost","← 前の停留所");
-  prev.disabled = run.i === 0;
-  prev.onclick = ()=>{ if(run.i>0){ run.i--; save(); renderCount(); } };
-  const fin = el("button","btn ghost","記録を見る");
-  fin.onclick = ()=>{ renderDone(true); };
-  back.appendChild(prev); back.appendChild(fin);
-  app.appendChild(back);
-
-  app.appendChild(el("div","mini",
-    "この停留所の合計 " + s.taps.length + " 人　／　ここまでの合計 " + totalSoFar() + " 人"));
+// 予備：端末内の全記録をJSONで書き出す
+function exportJson(){
+  const blob=new Blob([JSON.stringify(recs(), null, 2)], { type:"application/json" });
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="counter_records_" + new Date().toISOString().slice(0,19).replace(/[:T]/g,"-") + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
 }
 
-function totalSoFar(){ return run.stops.reduce((a,s)=>a+s.taps.length, 0); }
-
-/* ---------------- 画面3：終了・書き出し ---------------- */
-function renderDone(peek){
-  const app = document.getElementById("app");
-  const R = ROLES[run.role];
-  app.innerHTML = "";
-  app.appendChild(el("h1", null, peek ? "途中経過" : "記録おわり"));
-  app.appendChild(el("p","sub", R.name + "　|　" + (run.bin || "便の記入なし") + "　|　"
-    + (run.dir==="out" ? "南口→桃山台" : "桃山台→南口")));
-
-  const tot = el("div","total");
-  tot.appendChild(el("span", null, R.verb + "の合計　"));
-  const b = el("b", null, String(totalSoFar()) + " 人");
-  tot.appendChild(b);
-  app.appendChild(tot);
-
-  if(run.role !== "recount"){
-    app.appendChild(el("p","note",
-      "※ 乗車係と降車係で合計を見せ合ってください。\n"+
-      "　 始発から乗っていれば「乗車の合計 − 降車の合計 ＝ 0」になるはずです。\n"+
-      "　 0にならなくても数を書き直さないでください。ずれたこと自体が記録になります。"));
-  }
-
-  const sc = el("div","scroll");
-  const tb = el("table");
-  const hr = el("tr");
-  ["#","停留所", "人数"].forEach((h,i)=>{ const th = el("th", i===2?"n":null, h); hr.appendChild(th); });
-  tb.appendChild(hr);
-  run.stops.forEach(s=>{
-    const tr = el("tr");
-    tr.appendChild(el("td", null, String(s.ix+1)));
-    tr.appendChild(el("td", null, s.name + (s.closed_at ? "　" + hhmm(s.closed_at) : "")));
-    tr.appendChild(el("td","n", String(s.taps.length)));
-    tb.appendChild(tr);
-  });
-  sc.appendChild(tb);
-  app.appendChild(sc);
-
-  if(peek){
-    const back = el("button","btn","計測にもどる");
-    back.onclick = ()=>renderCount();
-    app.appendChild(back);
-    return;
-  }
-
-  app.appendChild(el("label", null, "書き出し（この文字をまるごと松本に送ってください）"));
-  const ta = el("textarea");
-  ta.readOnly = true;
-  ta.value = asCSV();
-  app.appendChild(ta);
-
-  const row = el("div","row");
-  const cp = el("button","btn","コピーする");
-  cp.onclick = async ()=>{
-    try{ await navigator.clipboard.writeText(ta.value); toast("コピーしました"); }
-    catch(e){ ta.select(); toast("長押しでコピーしてください"); }
-  };
-  const dl = el("button","btn ghost","ファイルに保存");
-  dl.onclick = ()=>{
-    const blob = new Blob([asCSV(), "\n\n", JSON.stringify(run)], {type:"text/plain;charset=utf-8"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "乗降計測_" + (run.bin||"便").replace(/[\\/:*?"<>|]/g,"_") + "_" + R.name + ".txt";
-    a.click(); URL.revokeObjectURL(a.href);
-  };
-  row.appendChild(cp); row.appendChild(dl);
-  app.appendChild(row);
-
-  app.appendChild(el("div", null, "")).style.height = "4px";
-  const reset = el("button","btn warn","新しい便をはじめる");
-  reset.onclick = ()=>{
-    if(!confirm("この記録を消して、新しい便をはじめます。\n書き出しは済んでいますか？")) return;
-    clearRun(); renderSetup();
-  };
-  app.appendChild(reset);
-  app.appendChild(el("p","note danger",
-    "★「新しい便をはじめる」を押すと、この記録は端末から消えます。\n"+
-    "　 先にコピーかファイル保存を済ませてください。"));
+/* ---------------- ログイン（index.html の normLogin / submitAuth と同じ。新規登録は無し） ---------------- */
+const ID_DOMAIN = "id.local";
+function normLogin(v){ v=(v||"").trim(); return (v && !v.includes("@")) ? v.toLowerCase()+"@"+ID_DOMAIN : v; }
+function toHalf(v){   // 全角で打たれたIDを半角に直す
+  return (v||"").replace(/[！-～]/g, function(c){ return String.fromCharCode(c.charCodeAt(0)-0xFEE0); })
+                .replace(/　/g, " ").trim();
 }
-
-/* タップの時刻まで含めて書き出す。あとから「1人数えるのに何秒かかったか」が出せる */
-function asCSV(){
-  const R = ROLES[run.role];
-  const L = [];
-  L.push("# 乗降計測 " + VERSION);
-  L.push("# 役割," + R.name);
-  L.push("# 便," + (run.bin||""));
-  L.push("# 方向," + (run.dir==="out" ? "南口→桃山台" : "桃山台→南口"));
-  L.push("# 開始," + new Date(run.started_at).toLocaleString("ja-JP"));
-  if(run.ended_at) L.push("# 終了," + new Date(run.ended_at).toLocaleString("ja-JP"));
-  L.push("# 合計," + totalSoFar());
-  L.push("run_id,順番,停留所,人数,確定時刻,タップ時刻（ミリ秒）");
-  run.stops.forEach(s=>{
-    L.push([run.run_id, s.ix+1, '"'+s.name+'"', s.taps.length,
-            s.closed_at ? new Date(s.closed_at).toLocaleTimeString("ja-JP") : "",
-            '"'+s.taps.join(" ")+'"'].join(","));
-  });
-  return L.join("\n");
+const ID_RE = /^[A-Za-z0-9_-]{1,20}$/;
+function renderLogin(){
+  main.innerHTML=`
+    <div class="login">
+      <h1>乗降アプリ</h1>
+      <p>カードの ID と パスワード でログインしてください。</p>
+      <div class="authform">
+        <input class="afield" id="fId" type="text" inputmode="latin" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="ID（カードに書いてある文字）">
+        <input class="afield" id="fPass" type="password" autocomplete="current-password" placeholder="パスワード（6文字以上）">
+        <label class="pwshow"><input type="checkbox" id="fShow"> パスワードを表示して確かめる</label>
+        <button class="btn" id="authBtn">ログイン</button>
+        <p id="authNote"></p>
+      </div>
+    </div>`;
+  $("fShow").onchange=(e)=>{ $("fPass").type = e.target.checked ? "text" : "password"; };
+  $("fId").addEventListener("blur", ()=>{ $("fId").value=toHalf($("fId").value); });
+  $("authBtn").onclick=submitAuth;
+  setStatus();
+}
+function authNote(msg){ const n=$("authNote"); if(n) n.textContent=msg||""; }
+async function submitAuth(){
+  if(!configured){ toast(NOTCONF,"#dc2626"); return; }
+  const fid=$("fId"); fid.value=toHalf(fid.value);
+  const rawId=fid.value.trim(), pass=$("fPass").value||"";
+  const email=normLogin(rawId);
+  authNote("");
+  if(!email){ authNote("IDを入力してください"); return; }
+  if(!rawId.includes("@") && !ID_RE.test(rawId)){ authNote("IDは半角英数・ハイフン・アンダースコアで20文字までにしてください"); return; }
+  if(pass.length<6){ authNote("パスワードは6文字以上にしてください"); return; }
+  const btn=$("authBtn"); btn.disabled=true; btn.textContent="処理中…";
+  try{
+    const { error } = await sb.auth.signInWithPassword({ email, password:pass });
+    if(error){
+      const m=(error.message||"").toLowerCase();
+      if(m.includes("not confirmed")||m.includes("confirm")) authNote("このアカウントはまだ有効になっていません。実験者に伝えてください。");
+      else authNote("IDまたはパスワードが違います");
+      throw error;
+    }
+  }catch(e){
+    if(!$("authNote") || !$("authNote").textContent) authNote(e.message||"error");
+  }finally{
+    const b=$("authBtn"); if(b){ b.disabled=false; b.textContent="ログイン"; }
+  }
 }
 
 /* ---------------- 起動 ---------------- */
-(function boot(){
-  const old = load();
-  if(old && !old.done && old.stops){ run = old; keepAwake(true); renderCount(); }
-  else { renderSetup(); }
-})();
+async function boot(){
+  // 前に記録中のまま閉じた記録は、とれたところまでの位置で送る（★2026-10-07: flushOnce で。ほかのタブで記録中のものを横取りしないよう）
+  $("outBtn").onclick=async()=>{
+    // 乗車中の誤タップ対策（index.html と同じ）
+    if(!confirm("ログアウトします。次に使うときはIDとパスワードの入力が必要です。よろしいですか？")) return;
+    finalizeAll();
+    await Promise.race([flush(), new Promise(r=>setTimeout(r,3000))]);   // 送れるものは先に送る（ログアウト後は送れない）
+    if(sb){ try{ await sb.auth.signOut(); }catch(e){} }
+    setDaily(POSTURE_KEY, null); setDaily(PRACTICE_KEY, null);
+    // ★2026-10-07: ログインは人数アプリと共有しているので、人数アプリの着席/立席・練習・回目・区間も消す（index.html のログアウトと同じ）
+    ["uistudy_posture_v1","uistudy_practice_v1","uistudy_round_v1","uistudy_leg_v1","uistudy_leg_at_v1"].forEach(k=>lsSet(k, null));
+    user=null; run=null; render();
+  };
+  updateHeader();
+  if(!configured){ render(); return; }
+  sb.auth.onAuthStateChange((evName, sess)=>{
+    const prevUid = user ? user.id : null;
+    user = sess ? sess.user : null;
+    const uid = user ? user.id : null;
+    // ログイン/ログアウトが実際に変わったときだけ画面を作り直す（トークン更新などで入力中の画面を壊さない）
+    if(uid!==prevUid){ run=null; render(); }
+    else updateHeader();
+    if(user) setTimeout(flush, 0);   // このコールバックの中で Supabase を待つと固まることがあるので、外に出す
+  });
+  const { data:{ session } } = await sb.auth.getSession();
+  const prevUid = user ? user.id : null;
+  user = session ? session.user : null;
+  if(!prevUid || !user || prevUid!==user.id) render();
+  if(user) flush();
+
+  // 画面を離れたら送信後の位置とりを打ち切って送る／戻ったら測位を再開して未送信を送り直す
+  document.addEventListener("visibilitychange", ()=>{
+    if(document.hidden){ finalizeAll(); stopSampling(); flush(); }
+    else if(user){ reloadRun(); startSampling(); flush(); if(run && run.next<STOPS.length) keepAwake(true); }
+  });
+  window.addEventListener("pagehide", ()=>finalizeAll());
+  window.addEventListener("online", ()=>flush());
+  // ★2026-10-07: ほかのタブで記録・往路が変わったら読み直す
+  window.addEventListener("storage", (e)=>{
+    if(e.key===RUN_KEY) reloadRun();
+    if(e.key===REC_KEY || e.key===IDX_OUTBOX || e.key===IDX_SESS){ renderLog(); setStatus(); }
+  });
+  // ★2026-10-07: 未送信があるあいだは20秒ごとにも送り直す（電波が戻っても online が来ない端末がある。終点の画面は開いたままにしてもらう）
+  setInterval(()=>{ if(user && !document.hidden && (pendN() || myRecs().some(x=>x.state==="rec"))) flush(); }, 20000);
+}
+boot();
 </script>
 </body>
 </html>
