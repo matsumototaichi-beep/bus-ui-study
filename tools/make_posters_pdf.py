@@ -5,7 +5,6 @@
     python tools/make_posters_pdf.py
 
 ★UI研究/QRポスター.pdf を作る。A4縦×2枚（1回目 / 2回目）。
-docs/qr_posters.html と同じ内容。
 """
 import os, io, pathlib
 import segno

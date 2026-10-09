@@ -33,22 +33,21 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | `counter.html` | 乗降アプリ（計数研究のかえり） |
 | `stops.js` | バス停辞書736件・阪急バス（`window.HANKYU_STOPS`） |
 | `viewer.html` | 軌跡ビューア（元アプリから流用） |
-| `HANDOFF.md` | 引き継ぎ。§8 が決定の表 |
+| `HANDOFF.md` | 引き継ぎ。§8 が決定の表、§9 が次にやること |
 | `UI_STUDY_SPEC.md` | 研究の問い・ログ仕様・分析計画 |
-| `DESIGN_PHILOSOPHY.md` | UIの設計思想・変更台帳 |
+| `DESIGN_PHILOSOPHY.md` | UIの設計思想・変更台帳（変えたことの記録） |
 | `LITERATURE.md` | 文献メモ（本文をどこまで読んだか） |
 | `WORKFLOW.md` | 教授との共有・文献調査のルール |
 | `docs/実験の進め方.docx` | 当日の運用 |
 | `docs/questionnaire/` | UI研究のアンケート4つ（1回目_桃山台・1回目_南口・2回目_桃山台・2回目_南口）の設問一覧.xlsx・GoogleForms生成.gs・紙の予備 |
-| `docs/qr_posters.html` | QRポスター2枚（1回目／2回目） |
-| `docs/counting_sheet.html` | 記録用紙（乗降アプリが使えないときの予備） |
 | `docs/login_prep.md` / `docs/login_paths.md` | ログインの準備／管理者ログイン |
 | `docs/テーブル作成.sql` | Supabase のテーブル |
 | `tools/` | 下の表 |
-| `docs/log/` | 日ごとの記録 |
-| `docs/old/` | 今は使わない古い文書 |
+| `docs/log/` | 日ごとの記録（`2026-09-12.md` は教授との打ち合わせ） |
+| `docs/old/` | 今は使わない古い文書（一覧は `docs/old/README.md`。バス会社の承諾条件は `docs/old/HANDOFF_hankyu.md` §1） |
+| `exports/` | 下見（2026-09-18）のデータ。個人に関わるので git に入れない（`.gitignore`） |
 | `../★乗降人数計算/` | 計数研究（1から数える vs 乗降で数える）の案内・配布用紙・QR・アンケート・アンケートURL.xlsx・ショートカット |
-| `../★UI研究/` | 参加者向け案内_Ui研究.docx（松本が直接編集）・配布用紙（1回目・2回目）・QRポスター.pdf・配布カード.pdf・配布カード.html・accounts.csv・アンケートURL.xlsx・人数アプリ／乗降アプリのショートカット |
+| `../★UI研究/` | 参加者向け案内_Ui研究.docx（松本が直接編集）と .pdf・配布用紙（1回目・2回目）・QRポスター.pdf・配布カード.pdf・accounts.csv・アンケートURL.xlsx・人数アプリのショートカット |
 
 | `tools/` | 作るもの |
 |---|---|
@@ -63,12 +62,10 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 
 `stops.js` の出典：国土数値情報 バス停留所データ P11／国土交通省・大阪府・令和4年度〈2022年〉・PDL1.0＝出典明記で編集加工可。
 2026-09-17 に奈良県+京都府版〈平成22年・非商用〉から差し替え。実施事業者が阪急バスに変わったため。
+2026-09-19 に、バス停1つの名前の変更と1つの追加を入れた（`DESIGN_PHILOSOPHY.md` §5）。
 
-## これからやること（順序）
-1. ~~Supabaseにテーブル作成~~ → **2026-09-18 完了**（`ui_responses` / `ui_sessions` / `ui_report_feed`。2026-10-06 に新プロジェクトへ切り替え）
-2. ~~**ログ計装**~~ → 完了：操作イベント（タップ・所要時間・訂正回数など）の記録
-3. ~~**UI条件（バリアント）の割当**~~ → 完了：QR の回（1回目／2回目）・ゆき/かえり・アカウントの組からアプリが決め、study / round / leg / group / label を付けて記録（2026-10-07。組は 2026-10-08 にアカウントごとの表へ。`HANDOFF.md` §8 #24〜27・#41）
-4. **エクスポートと分析**：JSON出力 → Python(pandas)で条件間比較
+## これからやること
+→ `HANDOFF.md` §9
 
 ## 公開URL
 **2026-09-18 に公開**：https://matsumototaichi-beep.github.io/bus-ui-study/（GitHub Pages・HTTPS）

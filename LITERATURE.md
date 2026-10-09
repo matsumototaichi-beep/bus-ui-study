@@ -1,7 +1,7 @@
 # 文献メモ（どこまで本文を読んだかを記録する）
 
-ルール（`WORKFLOW.md` §3）：**アブストや検索結果の要約だけで研究の方向性を決めない**。
-本文を読んだものと、読んでいないもの（アブストのみ・二次情報）を区別して書く。
+調べ方のルールは `WORKFLOW.md` §3。
+このファイルには、本文を読んだものと、読んでいないもの（アブストのみ・二次情報）を区別して書く。
 
 凡例：**◎全文** ／ **○該当章を本文で読んだ** ／ **△アブストのみ** ／ **×二次情報のみ**（検索要約・他論文での引用）
 
@@ -12,16 +12,17 @@
 | # | 文献 | 読んだ範囲 | 計画での使い道 |
 |---|---|---|---|
 | 1 | Boyle, D. K. (1998). *TCRP Synthesis 29: Passenger Counting Technologies and Procedures*. Transportation Research Board. | ○ 要旨・第1章・第3章（手作業／自動計数機）・第4章（データ検証）・第6章の精度の記述・第8章（結論） | 基準値 R2（乗降カウント）の根拠と限界 |
-| 2 | Zimmerman, J., Tomasic, A., Garrod, C., Yoo, D., Hiruncharoenvate, C., Aziz, R., Thiruvengadam, N. R., Huang, Y., & Steinfeld, A. (2011). Field trial of Tiramisu: Crowd-sourcing bus arrival times to spur co-design. In *Proceedings of the SIGCHI Conference on Human Factors in Computing Systems* (pp. 1677–1686). ACM. https://doi.org/10.1145/1978942.1979187 | ◎ 全文 | 乗客によるバスの混み具合報告の先行事例。フィールド実験の規模と苦労 |
+| 2 | Zimmerman, J., Tomasic, A., Garrod, C., Yoo, D., Hiruncharoenvate, C., Aziz, R., Thiruvengadam, N. R., Huang, Y., & Steinfeld, A. (2011). Field trial of Tiramisu: Crowd-sourcing bus arrival times to spur co-design. In *Proceedings of the SIGCHI Conference on Human Factors in Computing Systems* (pp. 1677–1686). ACM. https://doi.org/10.1145/1978942.1979187 | ◎ 全文 | 乗客によるバスの混み具合報告の、最も近い先行事例。フィールド実験の規模と苦労 |
 | 3 | Izard, V., & Dehaene, S. (2008). Calibrating the mental number line. *Cognition*, 106(3), 1221–1247. https://doi.org/10.1016/j.cognition.2007.06.004 | ○ 序論・実験1・実験2の結果（プレプリント p.1–13）。総合考察とモデルの節は未読 | 「混雑時は数えられない」への答え／初期値・目安表示が回答をずらす根拠 |
-| 4 | van Berkel, N., Ferreira, D., & Kostakos, V. (2017). The Experience Sampling Method on Mobile Devices. *ACM Computing Surveys*, 50(6), 93. | ○ §3.1（研究の規模）・§4.3〜4.6（割り込み・提示・回答率・データ品質）。歴史・ソフトウェアの章は未読 | 参加者数・期間・回答率の相場、参加者との信頼関係づくり、データの除外基準 |
-| 5 | Fryer, L. K., & Nakao, K. (2020). The future of survey self-report: An experiment contrasting Likert, VAS, Slide, and Swipe touch interfaces. *Frontline Learning Research*, 8(3), 10–25. https://doi.org/10.14786/flr.v8i3.501（DOI の登録情報では題名が "The How of Survey Self-report..." になっているが、論文に印刷された題名はこちら） | ◎ 全文 | スマホの回答形式の比較実験。**慣れ（学習効果）が実際に起きた**証拠 |
+| 4 | van Berkel, N., Ferreira, D., & Kostakos, V. (2017). The Experience Sampling Method on Mobile Devices. *ACM Computing Surveys*, 50(6), 93. | ○ §3.1（研究の規模）・§4.3〜4.6（割り込み・提示・回答率・データ品質）。歴史・ソフトウェアの章は未読 | 参加者数・期間・回答率の相場、謝礼なしでの募集の工夫、参加者との信頼関係づくり、データの除外基準 |
+| 5 | Fryer, L. K., & Nakao, K. (2020). The future of survey self-report: An experiment contrasting Likert, VAS, Slide, and Swipe touch interfaces. *Frontline Learning Research*, 8(3), 10–25. https://doi.org/10.14786/flr.v8i3.501（DOI の登録情報では題名が "The How of Survey Self-report..." になっているが、論文に印刷された題名はこちら） | ◎ 全文 | スマホの回答形式の比較実験。**慣れ（学習効果）が実際に起きた**証拠。「慣れちゃったらどうするのか」への答え（練習・カウンターバランス・試行番号の統制） |
 | 6 | Caine, K. (2016). Local standards for sample size at CHI. *CHI '16*, 981–992. | ○ 要旨・Results 節（表を含む）・検出力に関する考察（p.988） | 「参加者10人で成り立つか」への答え |
 | 7 | 奈良交通「CI-CAのご利用方法」（公式Webページ） | ◎ 本文（HTML）を直接確認（2026-09-12） | 基準値 R3（IC乗降記録）の可否 |
 | 8 | Liu, M., & Conrad, F. G. (2019). Where should I start? On default values for slider questions in web surveys. *Social Science Computer Review*, 37(2), 248–269. | △ アブストのみ ＋ × #5 の中での引用 | **判断には使っていない**。本文入手が課題 |
 | 9 | Pi, X., Qian, Z., Steinfeld, A., & Huang, Y. (2018). Understanding human perception of bus fullness: An empirical study of crowdsourced fullness ratings and automatic passenger count data. *Transportation Research Record*, 2672(8), 475–484. | △ アブストのみ（公開PDFなし・出版社は有料） | 「乗客が感じる混み具合」と「実人数」の関係。**クラス設計の妥当性の議論に最重要**。大学図書館で本文入手を |
-| 10 | Trick, L. M., & Pylyshyn, Z. W. (1994). Why are small and large numbers enumerated differently? *Psychological Review*, 101(1), 80–102. | × 検索結果の要約のみ | 数え上げ1人あたりの時間。**本文を読むまで論文には書かない** |
-| 11 | Tversky, A., & Kahneman, D. (1974). Judgment under uncertainty: Heuristics and biases. *Science*, 185(4157), 1124–1131. | 未読（この会話では本文を確認していない） | アンカリング効果の古典。引用するなら本文を読む |
+| 10 | Trick, L. M., & Pylyshyn, Z. W. (1994). Why are small and large numbers enumerated differently? *Psychological Review*, 101(1), 80–102. | × 検索結果の要約のみ（要約では1人あたり約250〜350ms） | 数え上げ1人あたりの時間。**本文を読むまで論文には書かない** |
+| 11 | Tversky, A., & Kahneman, D. (1974). Judgment under uncertainty: Heuristics and biases. *Science*, 185(4157), 1124–1131. | 未読（この会話では本文を確認していない） | アンカリング効果の古典。`UI_STUDY_SPEC.md` で引用しているので、使うなら本文を読む |
+| 12 | NAVITIME の経路検索：学園前駅〔北〕→NAIST 約25分・450円 | × 検索要約のみ | 奈良交通で実施する前提だったときの、費用試算のバス運賃の仮置き。確かめるなら奈良交通「奈良バスなび」で |
 
 ---
 
@@ -62,7 +63,7 @@
 - 大学院生81名・644回答。回答のたびに4種の入力形式（Likert型・VAS・スライダー・スワイプ）をランダムに割り当て（p.14–15）。
 - 回答時間は Likert型が最短だったが有意差なし（p.18）。
 - **使ううちに、新しい形式と Likert型の時間差が急速に縮んだ＝学習効果**（p.19–20）。
-- 限界として、**カウンターバランスされていない**こと、同じ人の複数回答を独立扱いしたことを挙げ、**統制された環境でカウンターバランスした設計**を勧めている（p.20）。→ 本計画の §3.2 の根拠。
+- 限界として、**カウンターバランスされていない**こと、同じ人の複数回答を独立扱いしたことを挙げ、**統制された環境でカウンターバランスした設計**を勧めている（p.20）。→ 計画書（`docs/old/EXPERIMENT_PLAN.md`）§3.2 の根拠。
 
 ### 6. Caine（2016）
 - CHI 2014 の全論文の参加者数：**最も多いのは12名**（要旨）。
@@ -98,5 +99,5 @@
 ## 次に読むべきもの
 1. **Pi et al. (2018)** — 乗客が感じる混み具合と実人数の関係。クラス設計の議論の要。図書館で本文を入手
 2. **Liu & Conrad (2019)** — 初期値が回答を引き寄せる効果の直接の先行研究
-3. **Trick & Pylyshyn (1994)** — 数え上げの速さ。§9 の個人試行の数字と比べるため
+3. **Trick & Pylyshyn (1994)** — 数え上げの速さ。`docs/old/EXPERIMENT_PLAN.md` §9 の個人試行の数字と比べるため
 4. **TCRP Synthesis 77** — 1998年版の更新。手作業計数の精度の数値があるか
