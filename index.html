@@ -200,21 +200,31 @@
   /* 人数を入れている間は、帯を今までの1行の高さに戻す。帯が高くなると、縦に長い数字キーの画面だけ
      「わからない」などが送信の行の下に隠れ、入力方式の比較が崩れるため。押せば直し方が出るのは同じ */
   .statusbar.act.slim{display:block; min-height:0; line-height:normal; white-space:nowrap;}
-  /* 直し方の画面（下から出す） */
+  /* 直し方の画面（下から出す）。★uiStudy-0.9.5: 手順は1つだけ大きく出し、375×667 でスクロールせずにボタンまで見える長さにした */
   .gh{position:fixed; inset:0; z-index:60; background:rgba(2,6,23,.78); display:flex; align-items:flex-end; justify-content:center;}
   .gh[hidden]{display:none;}
   .ghin{width:100%; max-width:480px; max-height:92%; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
-        background:var(--panel); color:var(--ink); border-radius:16px 16px 0 0; padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));}
-  .ghin h2{margin:0 0 6px; font-size:17px;}
-  .ghlead{margin:0 0 10px; font-size:13.5px; line-height:1.5; color:var(--muted);}
-  .ghbox{margin:0 0 10px; padding:9px 11px; border:1px solid #f59e0b; border-radius:10px; font-size:13.5px; line-height:1.5;}
-  .ghdev{margin:4px 0 4px; font-size:12px; font-weight:800; color:var(--muted);}
-  .ghsteps{margin:0 0 10px; padding-left:1.5em; font-size:14px; line-height:1.55;}
-  .ghsteps li{margin:0 0 6px;}
-  .ghmore{margin:0 0 6px; font-size:13px;}
-  .ghmore summary{padding:12px 0; color:var(--muted); font-weight:700; cursor:pointer;}
-  .ghmsg{min-height:18px; margin:2px 0 8px; font-size:14px; font-weight:800; line-height:1.45; color:#fbbf24;}
+        background:var(--panel); color:var(--ink); border-radius:16px 16px 0 0; padding:14px 16px calc(10px + env(safe-area-inset-bottom,0px));}
+  .ghin h2{margin:0 0 4px; font-size:17px;}
+  .ghlead{margin:0 0 8px; font-size:13.5px; line-height:1.5; color:var(--muted);}
+  .ghbox{margin:0 0 10px; padding:9px 11px; border:1px solid #f59e0b; border-radius:10px; font-size:14px; line-height:1.55;}
+  /* 手順（1つ）。「設定」→「…」をひと続きで出す。項目の途中では折り返さない（1項目が1行より長いときだけ中で折り返す） */
+  .ghpath{margin:0 0 8px; padding:9px 12px; border:1px solid rgba(37,99,235,.6); border-radius:10px; background:rgba(37,99,235,.14);
+          font-size:16px; font-weight:700; line-height:1.6;}
+  .ghin h2 + .ghpath{margin-top:8px;}   /* 拒否のときは見出しのすぐ下が手順 */
+  .ghpath .ghc{display:inline-block; max-width:100%;}
+  .ghpath .ghar{color:var(--muted); font-weight:400;}
+  .ghpath.sm{margin:0 0 6px; padding:0; border:none; background:none; font-size:13.5px; line-height:1.5;}
+  .ghafter{margin:0 0 4px; font-size:14px; line-height:1.5;}
+  .ghdev{margin:6px 0 2px; font-size:12px; font-weight:800; color:var(--muted);}
+  .ghsteps{margin:0 0 6px; padding-left:1.4em; font-size:13.5px; line-height:1.5;}
+  .ghsteps li{margin:0 0 4px;}
+  .ghmore{margin:0; font-size:13px;}
+  .ghmore summary{padding:10px 0; color:var(--muted); font-weight:700; cursor:pointer;}
+  .ghmsg{min-height:18px; margin:2px 0 6px; font-size:14px; font-weight:800; line-height:1.45; color:#fbbf24;}
+  .ghmsg:empty{min-height:0; margin:0 0 6px;}
   .ghbtns{display:flex; flex-direction:column; gap:8px;}
+  .ghbtns + .ghmore{margin-top:4px;}
   .ghbtns button{min-height:48px; border-radius:12px; font-size:15px; font-weight:800; font-family:inherit;}
   .ghbtns button[hidden]{display:none;}
   .ghretry{border:none; background:#2563eb; color:#fff;}
@@ -333,7 +343,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.9.4";
+const APP_VERSION = "uiStudy-0.9.5";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -802,31 +812,43 @@ const T = {
     // ★uiStudy-0.9.4: 拒否・大まかなときは帯を押せる。押すと直し方の画面（geo）を出す
     gpsDenied:"位置情報がオフです。ここを押して直し方を見る",
     gpsCoarse:"位置が大まかです（正確な位置情報がオフかもしれません）",
+    // ★uiStudy-0.9.5: 直し方の画面を短くした（松本 2026-10-09「位置情報をオンにしてみたいな説明書きが長すぎて、余計な手順が多くてやる気にならない」）。
+    //   手順は1つだけ（step・precise。配列は「→」でつないで出す）。ほかの確かめ方は「それでも直らないとき」にたたむ
+    //   拒否のときは見出しの下の一言を出さない（帯・見出しと同じことの言い直しになるため）。大まかなときだけ lead_coarse を出す
     geo:{
       title:"位置情報をオンにする", title_coarse:"正確な位置情報をオンにする",
-      lead_denied:"位置情報がオフになっています。次の順に確かめ、直したら「もう一度ためす」を押してください。",
-      // iPhone は、一度拒否したページでは読み込み直すまで拒否のまま。直したあとは読み込み直してもらう
-      lead_denied_ios:"位置情報がオフになっています。次の順に確かめ、直したら「ページを読み込み直す」を押してください。",
-      lead_coarse:"位置が大まかにしかわかりません。「正確な位置情報」をオンにして、「もう一度ためす」を押してください。",
-      inapp:(app,dev)=>`${app} の中で開いています。ここでは位置情報が使えないことがあります。メニューの「${dev==="android"?"ブラウザで開く":"Safariで開く"}」などで開き直し、もう一度ログインしてください。`,
-      dev:{ ios:"iPhone・iPad", android:"Android", other:"そのほかの端末" },
-      steps:{
+      lead_coarse:"位置が大まかにしかわかりません。",
+      // iOS 18 以降は「このアプリの使用中」。iOS 17 以前は「このAppの使用中」だが、同じ位置にあるので書き分けない
+      step:{
+        ios:["「設定」","「プライバシーとセキュリティ」","「位置情報サービス」","「Safari Webサイト」","「このアプリの使用中」"],
+        android:["アドレスバー左のアイコン","「権限」か「サイトの設定」","「位置情報」","「許可」"],
+        other:"ブラウザの設定で、このサイトの位置情報を「許可」にする。",
+      },
+      precise:{
+        ios:["「設定」","「プライバシーとセキュリティ」","「位置情報サービス」","「Safari Webサイト」","「正確な位置情報」をオン"],
+        android:["「設定」","「アプリ」","「Chrome」","「権限」","「位置情報」","「正確な現在地情報を使用」をオン"],
+        other:"端末の設定で、正確な位置情報をオンにする。",
+      },
+      // b は押すボタンの名前（iPhone で拒否なら「ページを読み込み直す」、ほかは「もう一度ためす」）。
+      //   iPhone は、一度拒否したページでは読み込み直すまで拒否のまま
+      after:(b)=>`直したら「${b}」を押し、位置情報の利用を聞かれたら「許可」を選んでください。`,
+      after_coarse:(b)=>`直したら「${b}」を押してください。`,
+      still:"それでも直らないとき",
+      still_steps:{
         ios:[
-          "「設定」→「プライバシーとセキュリティ」→「位置情報サービス」で、「位置情報サービス」をオンにする。",
-          "「設定」→「プライバシーとセキュリティ」→「位置情報サービス」→「Safari Webサイト」で、「このアプリの使用中」を選ぶ（iOS 17 は「このAppの使用中」）。「正確な位置情報」もオンにする。",
-          "「設定」→「アプリ」→「Safari」→「位置情報」で、「確認」か「許可」を選ぶ（iOS 17 以前は「設定」→「Safari」→「位置情報」）。",
-          "Safari に戻り、アドレスバーの左のボタン（「ぁあ」など）→「Webサイトの設定」→「位置情報」で、「確認」か「許可」を選ぶ。",
+          "「設定」→「プライバシーとセキュリティ」→「位置情報サービス」で、いちばん上のスイッチをオンにする。",
+          // ボタンの絵と途中の項目名は iOS の版で違う（17「ぁあ」→「Webサイトの設定」、18・26 は「…」→「用のWebサイト設定」、
+          //   27「ウェブサイトの設定」）。どの版も「検索フィールドの左側」にあるので、場所で書く
+          "Safari のアドレスバーの左のボタンから、このサイトの設定を開き、「位置情報」で「確認」を選ぶ。",
         ],
         android:[
           "「設定」→「位置情報」で、「位置情報を使用」をオンにする。",
-          "Chrome のアドレスバーの左のアイコン →「権限」で、「位置情報」を許可する。",
-          "「設定」→「アプリ」→「Chrome」→「権限」→「位置情報」で、「アプリの使用中のみ許可」を選ぶ。「正確な現在地情報を使用」もオンにする。",
+          "「設定」→「アプリ」→「Chrome」→「権限」→「位置情報」で、「アプリの使用中のみ許可」を選ぶ。",
         ],
-        other:[
-          "端末の位置情報をオンにする。",
-          "ブラウザの設定で、このサイトの位置情報を「許可」にする。",
-        ],
+        other:[ "端末の位置情報をオンにする。" ],
       },
+      inapp:(app,dev)=>`${app} の中で開いています。メニューの${dev==="android" ? "「ブラウザで開く」などから Chrome で" : "「Safariで開く」などから"}開き直し、もう一度ログインしてください。`,
+      dev:{ ios:"iPhone・iPad", android:"Android", other:"そのほかの端末" },
       more:"ほかの端末の手順",
       retry:"もう一度ためす", reload:"ページを読み込み直す", close:"閉じる",
       trying:"確かめています…",
@@ -903,28 +925,33 @@ const T = {
     gpsCoarse:"Location is approximate (Precise Location may be off)",
     geo:{
       title:"Turn on location", title_coarse:"Turn on Precise Location",
-      lead_denied:"Location is off. Check these in order, then tap “Try again”.",
-      lead_denied_ios:"Location is off. Check these in order, then tap “Reload the page”.",
-      lead_coarse:"Your location is only approximate. Turn on “Precise Location”, then tap “Try again”.",
-      inapp:(app,dev)=>`This page is open inside ${app}. Location may not work here. Use its menu (“Open in ${dev==="android"?"browser":"Safari"}”) to reopen the page, then sign in again.`,
-      dev:{ ios:"iPhone / iPad", android:"Android", other:"Other devices" },
-      steps:{
+      lead_coarse:"Your location is only approximate.",
+      step:{
+        ios:["Settings","Privacy & Security","Location Services","Safari Websites","“While Using the App”"],
+        android:["Icon at the left of the address bar","“Permissions” or “Site settings”","“Location”","“Allow”"],
+        other:"In your browser settings, set location for this site to “Allow”.",
+      },
+      precise:{
+        ios:["Settings","Privacy & Security","Location Services","Safari Websites","turn on “Precise Location”"],
+        android:["Settings","Apps","Chrome","Permissions","Location","turn on “Use precise location”"],
+        other:"Turn on precise location in your device settings.",
+      },
+      after:(b)=>`Then tap “${b}”. If asked about your location, tap “Allow”.`,
+      after_coarse:(b)=>`Then tap “${b}”.`,
+      still:"Still not working?",
+      still_steps:{
         ios:[
-          "Settings → Privacy & Security → Location Services: turn on “Location Services”.",
-          "Settings → Privacy & Security → Location Services → Safari Websites: choose “While Using the App”. Turn on “Precise Location” too.",
-          "Settings → Apps → Safari → Location: choose “Ask” or “Allow” (iOS 17 or earlier: Settings → Safari → Location).",
-          "Back in Safari, tap the button at the left of the address bar (“aA”) → “Website Settings” → “Location”: choose “Ask” or “Allow”.",
+          "Settings → Privacy & Security → Location Services: turn on the switch at the top.",
+          "In Safari, tap the button at the left of the address bar, open the settings for this site, and choose “Ask” for “Location”.",
         ],
         android:[
           "Settings → Location: turn on “Use location”.",
-          "In Chrome, tap the icon at the left of the address bar → “Permissions” and allow “Location”.",
-          "Settings → Apps → Chrome → Permissions → Location: choose “Allow only while using the app”. Turn on “Use precise location” too.",
+          "Settings → Apps → Chrome → Permissions → Location: choose “Allow only while using the app”.",
         ],
-        other:[
-          "Turn on location on your device.",
-          "In your browser settings, set location for this site to “Allow”.",
-        ],
+        other:[ "Turn on location on your device." ],
       },
+      inapp:(app,dev)=>`This page is open inside ${app}. Reopen it ${dev==="android" ? "in Chrome from the menu (“Open in browser” or similar)" : "from the menu (“Open in Safari” or similar)"}, then sign in again.`,
+      dev:{ ios:"iPhone / iPad", android:"Android", other:"Other devices" },
       more:"Steps for other devices",
       retry:"Try again", reload:"Reload the page", close:"Close",
       trying:"Checking…",
@@ -1152,25 +1179,34 @@ function openGeoHelp(){
   // iPhone で拒否のときは、「もう一度ためす」を出さず「ページを読み込み直す」を主なボタンにする。
   // 一度拒否したページでは、設定を直しても読み込み直すまで拒否が返るため（geoResume の注を参照）
   const reloadFirst = (dev==="ios" && !coarse);
-  // 大まかなときは「正確な位置情報」の手順を先頭に出す（どの手順も「設定」から書いてあるので、先頭に来ても通じる）
-  const PRECISE = { ios:1, android:2 };
-  const steps=(d)=>{
-    const s=t.steps[d].slice();
-    if(coarse && PRECISE[d]!=null) s.unshift(s.splice(PRECISE[d],1)[0]);
-    return `<div class="ghdev">${t.dev[d]}</div><ol class="ghsteps">${s.map(x=>`<li>${x}</li>`).join("")}</ol>`;
+  // ★uiStudy-0.9.5: 手順は1つだけ大きく出す（拒否なら step、大まかなら precise）。配列は「→」でつなぐ
+  const path=(d)=>{
+    const s=(coarse ? t.precise : t.step)[d];
+    return Array.isArray(s) ? s.map((x,i)=>`<span class="ghc">${i ? `<span class="ghar">→ </span>` : ""}${x}</span>`).join(" ") : s;
   };
+  // 手順のあとの一言は、押すボタンを名前で書く（ボタンは2つあるので「下のボタン」では決まらない）
+  const mainBtn = reloadFirst ? t.reload : t.retry;
+  // アプリ（LINE など）の中では、Safari / Chrome で開き直す一言だけにする。拒否のときは見出しの下の一言を出さない
+  const body = app ? `<div class="ghbox" id="ghInApp">${t.inapp(app, dev)}</div>` :
+    `${coarse ? `<p class="ghlead" id="ghLead">${t.lead_coarse}</p>` : ""}
+      <div class="ghpath" id="ghStep">${path(dev)}</div>
+      <p class="ghafter" id="ghAfter">${coarse ? t.after_coarse(mainBtn) : t.after(mainBtn)}</p>`;
+  // アプリの中では青いボタンを出さない。開き直すのはアプリのメニューなので、ページのボタンを本文の操作に見せない（押したときの動きは同じ）
+  const mainCls = app ? "ghreload" : "ghretry";
+  // たたんだもの（ボタンの下）。「それでも直らないとき」は拒否のときだけ。ほかの端末も手順1つ
+  const more = app ? "" :
+    (coarse ? "" : `<details class="ghmore" id="ghStill"><summary>${t.still}</summary><ul class="ghsteps">${t.still_steps[dev].map(x=>`<li>${x}</li>`).join("")}</ul></details>`) +
+    `<details class="ghmore" id="ghOther"><summary>${t.more}</summary>${["ios","android","other"].filter(d=>d!==dev).map(d=>`<div class="ghdev">${t.dev[d]}</div><div class="ghpath sm">${path(d)}</div>`).join("")}</details>`;
   g.innerHTML = `<div class="ghin" role="dialog" aria-modal="true" aria-labelledby="ghTitle">
       <h2 id="ghTitle">${coarse ? t.title_coarse : t.title}</h2>
-      <p class="ghlead">${coarse ? t.lead_coarse : reloadFirst ? t.lead_denied_ios : t.lead_denied}</p>
-      ${app ? `<div class="ghbox" id="ghInApp">${t.inapp(app, dev)}</div>` : ""}
-      ${steps(dev)}
-      <details class="ghmore"><summary>${t.more}</summary>${["ios","android","other"].filter(d=>d!==dev).map(steps).join("")}</details>
+      ${body}
       <p class="ghmsg" id="ghMsg" aria-live="polite"></p>
       <div class="ghbtns">
-        <button type="button" class="ghretry" id="ghRetry"${reloadFirst ? " hidden" : ""}>${t.retry}</button>
-        <button type="button" class="${reloadFirst ? "ghretry" : "ghreload"}" id="ghReload"${reloadFirst ? "" : " hidden"}>${t.reload}</button>
+        <button type="button" class="${mainCls}" id="ghRetry"${reloadFirst ? " hidden" : ""}>${t.retry}</button>
+        <button type="button" class="${reloadFirst ? mainCls : "ghreload"}" id="ghReload"${reloadFirst ? "" : " hidden"}>${t.reload}</button>
         <button type="button" class="ghclose" id="ghClose">${t.close}</button>
       </div>
+      ${more}
     </div>`;
   g.hidden=false;
   g.onclick=(e)=>{ if(e.target===g) closeGeoHelp(); };

@@ -20,7 +20,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | 回答テーブル | `responses` | **`ui_responses`** |
 | 一覧ビュー | `report_feed` | **`ui_report_feed`** |
 | ローカル退避キー | `bus_outbox_v1` | **`uistudy_outbox_v1`** |
-| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.4`**（2026-10-08時点。乗降アプリは `counter-2.0.1`） |
+| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.5`**（2026-10-09時点。乗降アプリは `counter-2.0.2`） |
 
 > **2026-10-06 に Supabase を元アプリとは別のプロジェクト（`wwavbfdojschxohvvpzb`）に切り替えた**（前のプロジェクトは削除されていた）。
 > テーブルは `docs/テーブル作成.sql`（`ui_responses` / `ui_sessions` / `ui_report_feed`）で作る。
