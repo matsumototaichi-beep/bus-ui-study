@@ -188,9 +188,41 @@
 
   .statusbar{flex:0 0 auto; padding:6px 12px calc(6px + env(safe-area-inset-bottom,0px)); font-size:12px; color:var(--muted); text-align:center; border-top:1px solid var(--line); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .statusbar.warn{background:#7c2d12; color:#fed7aa;}
+  /* ★uiStudy-0.9.4: 位置情報が拒否されている・大まかなときは、帯を押して直し方の画面を出す
+     （押せる高さ 44px 以上。人数を入れている間だけ、下の .slim で1行の高さに戻す） */
+  .statusbar.caution{background:#78350f; color:#fde68a;}
+  .statusbar.act{display:flex; align-items:center; justify-content:center; white-space:normal; line-height:1.35;
+                 min-height:calc(44px + env(safe-area-inset-bottom,0px)); cursor:pointer;}
+  .statusbar.act .sbmsg{font-weight:800; text-decoration:underline; text-underline-offset:2px;}
+  .statusbar.act .sbmsg::after{content:" ›";}
+  .statusbar.act:active{filter:brightness(1.2);}
+  .statusbar .sbnw{white-space:nowrap;}   /* 版の文字（uiStudy-0.9.4）などを途中で折り返さない */
+  /* 人数を入れている間は、帯を今までの1行の高さに戻す。帯が高くなると、縦に長い数字キーの画面だけ
+     「わからない」などが送信の行の下に隠れ、入力方式の比較が崩れるため。押せば直し方が出るのは同じ */
+  .statusbar.act.slim{display:block; min-height:0; line-height:normal; white-space:nowrap;}
+  /* 直し方の画面（下から出す） */
+  .gh{position:fixed; inset:0; z-index:60; background:rgba(2,6,23,.78); display:flex; align-items:flex-end; justify-content:center;}
+  .gh[hidden]{display:none;}
+  .ghin{width:100%; max-width:480px; max-height:92%; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+        background:var(--panel); color:var(--ink); border-radius:16px 16px 0 0; padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));}
+  .ghin h2{margin:0 0 6px; font-size:17px;}
+  .ghlead{margin:0 0 10px; font-size:13.5px; line-height:1.5; color:var(--muted);}
+  .ghbox{margin:0 0 10px; padding:9px 11px; border:1px solid #f59e0b; border-radius:10px; font-size:13.5px; line-height:1.5;}
+  .ghdev{margin:4px 0 4px; font-size:12px; font-weight:800; color:var(--muted);}
+  .ghsteps{margin:0 0 10px; padding-left:1.5em; font-size:14px; line-height:1.55;}
+  .ghsteps li{margin:0 0 6px;}
+  .ghmore{margin:0 0 6px; font-size:13px;}
+  .ghmore summary{padding:12px 0; color:var(--muted); font-weight:700; cursor:pointer;}
+  .ghmsg{min-height:18px; margin:2px 0 8px; font-size:14px; font-weight:800; line-height:1.45; color:#fbbf24;}
+  .ghbtns{display:flex; flex-direction:column; gap:8px;}
+  .ghbtns button{min-height:48px; border-radius:12px; font-size:15px; font-weight:800; font-family:inherit;}
+  .ghbtns button[hidden]{display:none;}
+  .ghretry{border:none; background:#2563eb; color:#fff;}
+  .ghreload,.ghclose{border:1px solid var(--line); background:transparent; color:var(--ink);}
 
-  .toast{position:fixed; left:50%; bottom:44px; transform:translateX(-50%) translateY(12px); opacity:0; background:#16a34a; color:#fff; padding:10px 18px; border-radius:12px; font-size:14px; font-weight:700; transition:all .2s ease; pointer-events:none; z-index:30;}
-  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  /* 画面の幅いっぱいまで使って中央に出す（乗降アプリと同じ）。left:50% だと幅が画面の半分になり、短い文でも3行に折り返す */
+  .toast{position:fixed; left:12px; right:12px; bottom:44px; margin:0 auto; width:fit-content; transform:translateY(12px); opacity:0; background:#16a34a; color:#fff; padding:10px 18px; border-radius:12px; font-size:14px; font-weight:700; text-align:center; transition:all .2s ease; pointer-events:none; z-index:30;}
+  .toast.show{opacity:1; transform:translateY(0);}
 
   /* login screen */
   .login{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:24px; text-align:center;}
@@ -286,6 +318,7 @@
 
 <div class="statusbar" id="status"></div>
 <div class="toast" id="toast"></div>
+<div class="gh" id="geoHelp" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="stops.js"></script>
@@ -300,7 +333,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.9.3";
+const APP_VERSION = "uiStudy-0.9.4";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -712,10 +745,14 @@ let countdownTimer = null;
 const logEntries = [];      // 画面表示用(新しい順)
 
 /* ---------------- i18n ---------------- */
+// ★uiStudy-0.9.4: 参加者が見る文を整えた（「クラス」→「混み具合」、「選択」→「選ぶ」、送ったときの toast を乗降アプリと同じ文に）。
+//   案内・配布用紙・実験の進め方・login_prep.md が引用している文言（ボタン名・画面の表示・エラー）は変えていない
 const T = {
   ja:{
     auth_title:"バス混雑度 計測",
-    auth_intro:"バス車内の混み具合を答えていただく卒業研究です。<b>好きなIDとパスワード</b>を決めて登録してください（メールアドレスは使いません）。回答はクラスと人数だけ、位置と時刻は自動で記録されます。",
+    // ★2026-10-08: アカウントは事前に作ってカードで渡す（docs/login_paths.md §5、配布用紙・案内も「カードの ID とパスワードでログイン」）。
+    //   「好きなIDとパスワードを決めて登録」は自分で登録していたころの文で、「新規登録」を押させてしまうので乗降アプリと同じ文にした
+    auth_intro:"バス車内の混み具合を答えていただく卒業研究です。<b>カードの ID とパスワード</b>でログインしてください。回答は混み具合と人数だけです。位置と時刻は自動で記録します。",
     tab_login:"ログイン", tab_signup:"新規登録",
     ph_id:"ID（カードに書いてある文字）", ph_email:"メールアドレス", ph_pass:"パスワード（6文字以上）",
     id_hint:"このIDとパスワードは、別の日にもう一度使います。配布カードに必ず書いてください。",
@@ -730,7 +767,7 @@ const T = {
     err_id_format:"IDは半角英数・ハイフン・アンダースコアで20文字までにしてください",
     err_confirm_on:"登録はできましたが、サーバー側でメール確認が必要な設定のままです。実験者に伝えてください。",
     login_wait:"処理中…",
-    pick:"混雑度を選択", records:"記録", none:"まだ記録がありません",
+    pick:"混み具合を選ぶ", records:"記録", none:"まだ記録がありません",
     classes:[
       {lbl:"ガラガラ", rng:"0〜5人"},{lbl:"やや空き", rng:"6〜15人"},{lbl:"席が埋まる", rng:"16〜30人"},
       {lbl:"立ち客", rng:"31〜45人"},{lbl:"混雑", rng:"46〜60人"},{lbl:"満員近い", rng:"61人〜"},
@@ -741,12 +778,12 @@ const T = {
     unknown:"わからない",
     back:"戻る", already_registered:"このIDは使われています。別のIDにしてください。",
     next_label:"次に停まるバス停（任意）",
-    next_ph:"バス停名を選択（任意）",
+    next_ph:"バス停を選ぶ（任意）",
     stop_selected:"選択済み", stop_clear:"取消",
     stop_source:"バス停データ出典：国土数値情報 バス停留所データ（国土交通省・大阪府・令和4年度）",
     stop_pick_hint:"候補から選んでください", count_range:"目安",
     send:"送信", skip:"スキップ", ppl:"人",
-    saved:"保存しました", queued:"端末に保存（後で自動送信）", finishing:"軌跡を記録中",
+    saved:"送信しました", queued:"端末に保存しました（あとで自動で送ります）", finishing:"軌跡を記録中",
     saveNow:"今すぐ保存", recording:"記録中", pendingN:(n)=>`未送信 ${n}件`,
     st_ok:"送信済", st_pend:"未送信", st_rec:"記録中", log_head:"送信状況",
     sit:"着席", stand:"立席",
@@ -757,11 +794,47 @@ const T = {
     leg_confirm_kaeri:"「かえり　桃山台駅 → 吹田駅」に切り替えます。よろしいですか？",
     leg_confirm_yuki:"「ゆき　吹田駅 → 桃山台駅」に戻します。よろしいですか？",
     leg_hint:"桃山台駅で降りたら「かえりに切り替える」を押してください",
-    leg_switched:(l)=>`${l}に切り替えました`, leg_busy:"回答中は切り替えできません",
+    leg_switched:(l)=>`${l}に切り替えました`, leg_busy:"回答中は切り替えられません",
     test_acct:"確認用アカウント", test_group:(g)=>g==="odd" ? "奇数組で表示中 → 偶数組へ" : "偶数組で表示中 → 奇数組へ",
     leg_confirm_counter:"かえりは乗降アプリで数えます。乗降アプリを開きますか？",
     gpsOn:"位置情報 取得中…", gpsOk:"位置情報 OK", gpsNo:"位置情報が取得できません（許可が必要）",
     gpsSlow:"位置情報を取得中…（少し時間がかかっています）",
+    // ★uiStudy-0.9.4: 拒否・大まかなときは帯を押せる。押すと直し方の画面（geo）を出す
+    gpsDenied:"位置情報がオフです。ここを押して直し方を見る",
+    gpsCoarse:"位置が大まかです（正確な位置情報がオフかもしれません）",
+    geo:{
+      title:"位置情報をオンにする", title_coarse:"正確な位置情報をオンにする",
+      lead_denied:"位置情報がオフになっています。次の順に確かめ、直したら「もう一度ためす」を押してください。",
+      // iPhone は、一度拒否したページでは読み込み直すまで拒否のまま。直したあとは読み込み直してもらう
+      lead_denied_ios:"位置情報がオフになっています。次の順に確かめ、直したら「ページを読み込み直す」を押してください。",
+      lead_coarse:"位置が大まかにしかわかりません。「正確な位置情報」をオンにして、「もう一度ためす」を押してください。",
+      inapp:(app,dev)=>`${app} の中で開いています。ここでは位置情報が使えないことがあります。メニューの「${dev==="android"?"ブラウザで開く":"Safariで開く"}」などで開き直し、もう一度ログインしてください。`,
+      dev:{ ios:"iPhone・iPad", android:"Android", other:"そのほかの端末" },
+      steps:{
+        ios:[
+          "「設定」→「プライバシーとセキュリティ」→「位置情報サービス」で、「位置情報サービス」をオンにする。",
+          "「設定」→「プライバシーとセキュリティ」→「位置情報サービス」→「Safari Webサイト」で、「このアプリの使用中」を選ぶ（iOS 17 は「このAppの使用中」）。「正確な位置情報」もオンにする。",
+          "「設定」→「アプリ」→「Safari」→「位置情報」で、「確認」か「許可」を選ぶ（iOS 17 以前は「設定」→「Safari」→「位置情報」）。",
+          "Safari に戻り、アドレスバーの左のボタン（「ぁあ」など）→「Webサイトの設定」→「位置情報」で、「確認」か「許可」を選ぶ。",
+        ],
+        android:[
+          "「設定」→「位置情報」で、「位置情報を使用」をオンにする。",
+          "Chrome のアドレスバーの左のアイコン →「権限」で、「位置情報」を許可する。",
+          "「設定」→「アプリ」→「Chrome」→「権限」→「位置情報」で、「アプリの使用中のみ許可」を選ぶ。「正確な現在地情報を使用」もオンにする。",
+        ],
+        other:[
+          "端末の位置情報をオンにする。",
+          "ブラウザの設定で、このサイトの位置情報を「許可」にする。",
+        ],
+      },
+      more:"ほかの端末の手順",
+      retry:"もう一度ためす", reload:"ページを読み込み直す", close:"閉じる",
+      trying:"確かめています…",
+      still_off:"まだオフです。設定を直したあとなら「ページを読み込み直す」を押してください。",
+      still_coarse:"まだ大まかです。「正確な位置情報」がオンか確かめてください。",
+      wait:"位置を探しています。少し待ってから、もう一度押してください。",
+      fixed:"位置情報がオンになりました", busy:"回答を送ってから押してください",
+    },
     who:(h)=>`調査員 <b>${h}</b>`, langLabel:"EN",
     notconf:"バックエンド未設定（管理者に連絡）",
     nav_report:"報告", nav_feed:"データ一覧", brand_tag:"スタッフ調査",
@@ -781,7 +854,7 @@ const T = {
   },
   en:{
     auth_title:"Bus Crowding Survey",
-    auth_intro:"Data collection for a graduation research study on bus crowding reports. Pick <b>any ID and password</b> to register (no email needed). You only choose the crowding level and count — your location and time are recorded automatically.",
+    auth_intro:"Data collection for a graduation research study on bus crowding reports. Sign in with <b>the ID and password on your card</b>. You only choose the crowding level and count — your location and time are recorded automatically.",
     tab_login:"Sign in", tab_signup:"Sign up",
     ph_id:"ID (printed on your card)", ph_email:"Email address", ph_pass:"Password (6+ characters)",
     id_hint:"You will need this ID and password again on another day. Write them on your card.",
@@ -810,7 +883,7 @@ const T = {
     stop_source:"Bus-stop data: MLIT National Land Numerical Information (Osaka Pref., FY2022)",
     stop_pick_hint:"Choose one from the list", count_range:"guide",
     send:"Submit", skip:"Skip", ppl:"",
-    saved:"Saved", queued:"Saved on your device (will send later)", finishing:"Recording your path",
+    saved:"Sent", queued:"Saved on your device (will send later)", finishing:"Recording your path",
     saveNow:"Save now", recording:"Recording", pendingN:(n)=>`${n} unsent`,
     st_ok:"Sent", st_pend:"Not sent", st_rec:"Recording", log_head:"Status",
     sit:"Seated", stand:"Standing",
@@ -826,6 +899,40 @@ const T = {
     leg_confirm_counter:"On the return trip you count with the boarding/alighting app. Open it?",
     gpsOn:"Getting location…", gpsOk:"Location OK", gpsNo:"Location unavailable (permission required)",
     gpsSlow:"Getting location… (taking a little while)",
+    gpsDenied:"Location is off. Tap here to see how to fix it",
+    gpsCoarse:"Location is approximate (Precise Location may be off)",
+    geo:{
+      title:"Turn on location", title_coarse:"Turn on Precise Location",
+      lead_denied:"Location is off. Check these in order, then tap “Try again”.",
+      lead_denied_ios:"Location is off. Check these in order, then tap “Reload the page”.",
+      lead_coarse:"Your location is only approximate. Turn on “Precise Location”, then tap “Try again”.",
+      inapp:(app,dev)=>`This page is open inside ${app}. Location may not work here. Use its menu (“Open in ${dev==="android"?"browser":"Safari"}”) to reopen the page, then sign in again.`,
+      dev:{ ios:"iPhone / iPad", android:"Android", other:"Other devices" },
+      steps:{
+        ios:[
+          "Settings → Privacy & Security → Location Services: turn on “Location Services”.",
+          "Settings → Privacy & Security → Location Services → Safari Websites: choose “While Using the App”. Turn on “Precise Location” too.",
+          "Settings → Apps → Safari → Location: choose “Ask” or “Allow” (iOS 17 or earlier: Settings → Safari → Location).",
+          "Back in Safari, tap the button at the left of the address bar (“aA”) → “Website Settings” → “Location”: choose “Ask” or “Allow”.",
+        ],
+        android:[
+          "Settings → Location: turn on “Use location”.",
+          "In Chrome, tap the icon at the left of the address bar → “Permissions” and allow “Location”.",
+          "Settings → Apps → Chrome → Permissions → Location: choose “Allow only while using the app”. Turn on “Use precise location” too.",
+        ],
+        other:[
+          "Turn on location on your device.",
+          "In your browser settings, set location for this site to “Allow”.",
+        ],
+      },
+      more:"Steps for other devices",
+      retry:"Try again", reload:"Reload the page", close:"Close",
+      trying:"Checking…",
+      still_off:"Still off. If you have changed the settings, tap “Reload the page”.",
+      still_coarse:"Still approximate. Check that “Precise Location” is on.",
+      wait:"Looking for your location. Wait a moment and tap again.",
+      fixed:"Location is on", busy:"Submit your answer first",
+    },
     who:(h)=>`Surveyor <b>${h}</b>`, langLabel:"日本語",
     notconf:"Backend not configured (contact the administrator)",
     nav_report:"Report", nav_feed:"Data", brand_tag:"Staff survey",
@@ -859,14 +966,25 @@ function handleName(){
   const m=user.user_metadata||{};
   return m.display_name || m.name || (user.email||"").split("@")[0] || user.id.slice(0,8);
 }
+// ★uiStudy-0.9.4: msg を渡さないときは位置情報の状態（geoState）を出す。拒否・大まかのときは帯を押せる
 function setStatus(msg,warn){
   const s=$("status"); const n=outbox().length;
-  let base = msg||"";
-  if(n>0) base = (base?base+" · ":"") + T[lang].pendingN(n);
+  let caution=false, act=false;
+  if(!msg && geoState){ const g=geoView(); msg=g.msg; warn=g.warn; caution=g.caution; act=g.act; }
+  let rest = "";
+  if(n>0) rest += " · " + T[lang].pendingN(n);
   // 版番号を常に表示する。実験中にどの版を使っていたかを端末側でも確認できるように
-  base = (base?base+" · ":"") + APP_VERSION;
-  s.textContent = base;
-  s.className = "statusbar" + (warn?" warn":"");
+  rest += " · " + APP_VERSION;
+  if(act){
+    const tail = (n>0 ? [T[lang].pendingN(n)] : []).concat(APP_VERSION).map(x=>` · <span class="sbnw">${x}</span>`).join("");
+    s.innerHTML = `<span class="sbin"><span class="sbmsg">${msg}</span>${tail}</span>`;
+    s.setAttribute("role","button"); s.tabIndex=0; s.setAttribute("aria-haspopup","dialog");
+  } else {
+    s.textContent = msg ? msg+rest : rest.slice(3);
+    s.removeAttribute("role"); s.removeAttribute("tabindex"); s.removeAttribute("aria-haspopup");
+  }
+  // 人数を入れている間（answering）は1行の高さ（slim）。CSS の .statusbar.act.slim を参照
+  s.className = "statusbar" + (warn?" warn":"") + (caution?" caution":"") + (act?" act":"") + (act && answering ? " slim" : "");
 }
 
 /* ---------------- outbox (端末退避＆再送) ---------------- */
@@ -895,38 +1013,202 @@ async function flushOutbox(){
 
 /* ---------------- GPS 軌跡サンプリング ---------------- */
 let watchId=null, lastSampleTs=0, geoOk=false;
-function startSampling(){
+// ★uiStudy-0.9.4: 位置情報の状態を1か所で持つ（帯の表示・直し方の画面・自動の再開に使う）。乗降アプリ（counter.html）と同じ
+//   null（まだ測っていない）| "on"（取得中）| "ok" | "slow"（時間がかかっている）| "denied"（拒否）| "coarse"（大まか）| "none"（端末が非対応）
+// iPhone の Safari は、端末やブラウザの設定で位置情報が切られていると、許可を聞かずに拒否する（error.code===1）。
+// ページから設定は開けないので、帯を押せるようにして直し方を見せ、直ったら測位をやり直す。
+let geoState=null, geoDeniedAt=0, geoCoarseN=0, geoWanted=false;
+const GEO_COARSE_M = 1000, GEO_COARSE_N = 3;   // 精度が 1000m より悪い点が3回続いたら「大まか」
+const GEO_RETRY_MS = 10000;                    // 拒否のあと、画面の描き直しのたびに聞き直さない（押したとき・画面に戻ったときは聞き直す）
+function setGeo(st){
+  if(geoState===st) return;
+  geoState=st; setStatus();
+  // 直し方の画面を開いたまま直ったら（設定から戻った・許可が変わった）、閉じて知らせる
+  if(st==="ok" && geoHelpOpen()){ closeGeoHelp(); toast(geoText().fixed); }
+}
+function geoView(){
+  const t=T[lang];
+  switch(geoState){
+    case "on":     return { msg:t.gpsOn };
+    case "ok":     return { msg:t.gpsOk };
+    case "slow":   return { msg:t.gpsSlow };
+    case "denied": return { msg:t.gpsDenied, warn:true, act:true };
+    case "coarse": return { msg:t.gpsCoarse, caution:true, act:true };
+    case "none":   return { msg:t.gpsNo, warn:true };
+  }
+  return { msg:"" };
+}
+// 位置がとれた（watch・一発測位・もう一度ためす のどれでも）。精度を見て OK か「大まか」かを決める
+function geoFix(p){
+  const acc = p && p.coords ? p.coords.accuracy : null;
+  if(acc!=null && acc>GEO_COARSE_M) geoCoarseN++; else geoCoarseN=0;
+  if(geoCoarseN>=GEO_COARSE_N) setGeo("coarse");
+  else if(geoState!=="coarse" || geoCoarseN===0) setGeo("ok");   // 大まかの表示は、精度が戻ったときだけ消す
+  // 拒否で watch を止めていたあとに一発測位が通った（許可された）ら、測位をやり直す
+  if(watchId==null && geoWanted && !document.hidden) startSampling(true);
+}
+// 拒否された。watch を止めて watchId を空にする（残すと startSampling が二度と watchPosition を呼ばない）
+function geoDenied(){
+  stopSampling();
+  geoDeniedAt=Date.now(); geoCoarseN=0;
+  setGeo("denied");
+  geoAutoHelp();
+}
+function onGeoPos(p){
+  geoOk=true; geoFix(p);
+  const now=Date.now();
+  if(now-lastSampleTs < SAMPLE_MS-300) return;   // 約2.5秒間隔に間引き
+  lastSampleTs=now;
+  const c=p.coords;
+  const hdg=(c.heading!=null && !isNaN(c.heading)) ? Math.round(c.heading) : null;   // 進行方位(度)
+  const spd=(c.speed!=null && !isNaN(c.speed)) ? +c.speed.toFixed(1) : null;          // 速度(m/s)
+  const pt={ t:nowSec(), lat:+c.latitude.toFixed(6), lng:+c.longitude.toFixed(6), acc:Math.round(c.accuracy), hdg:hdg, spd:spd };
+  // 常時: 直近30秒をpreBufferに保持（前倒し用）
+  preBuffer.push({ ...pt, _ms:now });
+  const cut=now-30000; while(preBuffer.length && preBuffer[0]._ms<cut) preBuffer.shift();
+  // 回答中なら軌跡にも追加
+  if(pending && pending.trajectory){
+    pending.trajectory.push(pt);
+    if(pending.cid) syncPendingToOutbox(false);
+  }
+  setStatus();   // 未送信の件数も描き直す
+}
+// force: 拒否の直後でも聞き直す（「もう一度ためす」・画面に戻ったとき・許可が変わったとき）
+function startSampling(force){
   if(watchId!=null) return;
-  if(!navigator.geolocation){ setStatus(T[lang].gpsNo,true); return; }
-  setStatus(T[lang].gpsOn);
+  if(!navigator.geolocation){ setGeo("none"); return; }
+  geoWanted=true;
+  if(geoState==="denied" && !force && Date.now()-geoDeniedAt<GEO_RETRY_MS) return;
+  if(!geoState) setGeo("on");
   watchId = navigator.geolocation.watchPosition(
-    (p)=>{
-      geoOk=true;
-      const now=Date.now();
-      if(now-lastSampleTs < SAMPLE_MS-300) return;   // 約2.5秒間隔に間引き
-      lastSampleTs=now;
-      const c=p.coords;
-      const hdg=(c.heading!=null && !isNaN(c.heading)) ? Math.round(c.heading) : null;   // 進行方位(度)
-      const spd=(c.speed!=null && !isNaN(c.speed)) ? +c.speed.toFixed(1) : null;          // 速度(m/s)
-      const pt={ t:nowSec(), lat:+c.latitude.toFixed(6), lng:+c.longitude.toFixed(6), acc:Math.round(c.accuracy), hdg:hdg, spd:spd };
-      // 常時: 直近30秒をpreBufferに保持（前倒し用）
-      preBuffer.push({ ...pt, _ms:now });
-      const cut=now-30000; while(preBuffer.length && preBuffer[0]._ms<cut) preBuffer.shift();
-      // 回答中なら軌跡にも追加
-      if(pending && pending.trajectory){
-        pending.trajectory.push(pt);
-        if(pending.cid) syncPendingToOutbox(false);
-      }
-      setStatus(T[lang].gpsOk);
-    },
+    onGeoPos,
     (e)=>{   // 許可拒否と、車内でありがちなタイムアウト/一時的な取得不可を区別
-      if(e && e.code===1) setStatus(T[lang].gpsNo,true);     // PERMISSION_DENIED
-      else setStatus(T[lang].gpsSlow,false);                 // TIMEOUT / POSITION_UNAVAILABLE
+      if(e && e.code===1) geoDenied();       // PERMISSION_DENIED
+      else setGeo("slow");                   // TIMEOUT / POSITION_UNAVAILABLE
     },
     { enableHighAccuracy:true, maximumAge:3000, timeout:15000 }
   );
 }
 function stopSampling(){ if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; } }
+function restartSampling(){ stopSampling(); startSampling(true); }
+// 画面に戻ったとき（設定アプリから戻ったときなど）。Android の Chrome などは戻ったあと少し遅れて許可が変わることがあるので、拒否のままなら少しあとにもう一度聞く。
+// iPhone の Safari（iPhone のほかのブラウザも同じ中身）は、一度拒否したページでは読み込み直すまで拒否を返し続ける
+// （WebKit の Geolocation::startRequest。許可に変わっても作り直さない）。聞き直しても害はないので端末を問わず行い、
+// iPhone では直し方の画面の「ページを読み込み直す」で直してもらう（openGeoHelp）
+function geoResume(){
+  startSampling(true);
+  setTimeout(()=>{ if(!document.hidden && user && geoState==="denied" && watchId==null) startSampling(true); }, 1200);
+}
+// 許可の状態が見られるブラウザでは、変わったら自動で測位をやり直す（設定で許可した → 帯が OK に戻る）。見られなければ watch のエラーで見分ける。
+// iPhone の Safari は、許可に変わっても同じページでは拒否のままなので、ここでは直らない（読み込み直しが要る。geoResume を参照）
+function watchGeoPermission(){
+  try{
+    if(!(navigator.permissions && navigator.permissions.query)) return;
+    navigator.permissions.query({ name:"geolocation" }).then((st)=>{
+      const on=()=>{
+        if(!geoWanted || document.hidden) return;
+        if(st.state==="granted"){ if(geoState==="denied" || watchId==null) restartSampling(); }
+        else if(st.state==="denied"){ if(geoState!=="denied") geoDenied(); }
+      };
+      try{ st.addEventListener("change", on); }catch(e){ st.onchange=on; }
+    }).catch(()=>{});
+  }catch(e){}
+}
+
+/* ---------------- 位置情報の直し方（帯を押すと出す。拒否に気づいたら、その日1回だけ自動で出す） ---------------- */
+const GEOHELP_KEY = "geo_help_auto_v1";   // 自動で出した日（人数アプリ・乗降アプリで共通）
+let geoHelpAuto=false, geoHelpWhy="denied";
+function geoText(){ return T[lang].geo; }
+// 回答の途中は自動で出さない（人数を入れている・送ったあとの位置を記録している）
+function geoBusy(){ return !!pending || answering; }
+function geoDevice(){
+  const ua=navigator.userAgent||"";
+  // iPadOS は Mac の Safari と名乗るので、タッチの有無で見分ける
+  if(/iPhone|iPad|iPod/.test(ua) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1)) return "ios";
+  return /Android/i.test(ua) ? "android" : "other";
+}
+// LINE などのアプリの中のブラウザ（見分けられる範囲で）
+function geoInApp(){
+  const ua=navigator.userAgent||"";
+  if(/\bLine\//.test(ua)) return "LINE";
+  if(/Instagram/.test(ua)) return "Instagram";
+  if(/FBAN|FBAV|FB_IAB/.test(ua)) return "Facebook";
+  if(/Discord/i.test(ua)) return "Discord";
+  if(/MicroMessenger/i.test(ua)) return "WeChat";
+  return null;
+}
+function geoHelpOpen(){ const g=$("geoHelp"); return !!(g && !g.hidden); }
+function geoAutoHelp(){
+  if(geoState!=="denied" || geoHelpOpen() || geoHelpAuto || !user || view!=="report" || geoBusy()) return;
+  geoHelpAuto=true;                              // localStorage が使えなくても、ページを開いている間は1回まで
+  if(getDaily(GEOHELP_KEY)) return;
+  setDaily(GEOHELP_KEY, "1");
+  openGeoHelp();
+}
+function openGeoHelp(){
+  const g=$("geoHelp"), t=geoText(), dev=geoDevice(), app=geoInApp();
+  geoHelpWhy = (geoState==="coarse") ? "coarse" : "denied";
+  const coarse = geoHelpWhy==="coarse";
+  // iPhone で拒否のときは、「もう一度ためす」を出さず「ページを読み込み直す」を主なボタンにする。
+  // 一度拒否したページでは、設定を直しても読み込み直すまで拒否が返るため（geoResume の注を参照）
+  const reloadFirst = (dev==="ios" && !coarse);
+  // 大まかなときは「正確な位置情報」の手順を先頭に出す（どの手順も「設定」から書いてあるので、先頭に来ても通じる）
+  const PRECISE = { ios:1, android:2 };
+  const steps=(d)=>{
+    const s=t.steps[d].slice();
+    if(coarse && PRECISE[d]!=null) s.unshift(s.splice(PRECISE[d],1)[0]);
+    return `<div class="ghdev">${t.dev[d]}</div><ol class="ghsteps">${s.map(x=>`<li>${x}</li>`).join("")}</ol>`;
+  };
+  g.innerHTML = `<div class="ghin" role="dialog" aria-modal="true" aria-labelledby="ghTitle">
+      <h2 id="ghTitle">${coarse ? t.title_coarse : t.title}</h2>
+      <p class="ghlead">${coarse ? t.lead_coarse : reloadFirst ? t.lead_denied_ios : t.lead_denied}</p>
+      ${app ? `<div class="ghbox" id="ghInApp">${t.inapp(app, dev)}</div>` : ""}
+      ${steps(dev)}
+      <details class="ghmore"><summary>${t.more}</summary>${["ios","android","other"].filter(d=>d!==dev).map(steps).join("")}</details>
+      <p class="ghmsg" id="ghMsg" aria-live="polite"></p>
+      <div class="ghbtns">
+        <button type="button" class="ghretry" id="ghRetry"${reloadFirst ? " hidden" : ""}>${t.retry}</button>
+        <button type="button" class="${reloadFirst ? "ghretry" : "ghreload"}" id="ghReload"${reloadFirst ? "" : " hidden"}>${t.reload}</button>
+        <button type="button" class="ghclose" id="ghClose">${t.close}</button>
+      </div>
+    </div>`;
+  g.hidden=false;
+  g.onclick=(e)=>{ if(e.target===g) closeGeoHelp(); };
+  $("ghRetry").onclick=geoRetry; $("ghReload").onclick=geoReload; $("ghClose").onclick=closeGeoHelp;
+  try{ $(reloadFirst ? "ghReload" : "ghRetry").focus({ preventScroll:true }); }catch(e){}
+}
+function closeGeoHelp(){
+  const g=$("geoHelp"); if(!g || g.hidden) return;
+  g.hidden=true; g.innerHTML="";
+  const s=$("status"); if(s && s.classList.contains("act")) try{ s.focus({ preventScroll:true }); }catch(e){}
+}
+// 「もう一度ためす」。押したその処理の中で getCurrentPosition を呼ぶ（許可の確認を出せるのは、利用者の操作の中だけのブラウザがある）
+function geoRetry(){
+  const t=geoText(), say=(m)=>{ const el=$("ghMsg"); if(el) el.textContent=m; };
+  if(!navigator.geolocation) return;
+  say(t.trying);
+  navigator.geolocation.getCurrentPosition((p)=>{
+    stopSampling();                        // 古い watch を捨てて測位をやり直す
+    const acc=p.coords ? p.coords.accuracy : null;
+    onGeoPos(p);                           // この点も軌跡に入れる。状態が OK になれば setGeo が画面を閉じる
+    startSampling(true);
+    if(geoHelpOpen()) say(geoHelpWhy==="coarse" && acc>GEO_COARSE_M ? t.still_coarse : "");
+    if(geoHelpOpen() && geoState==="ok"){ closeGeoHelp(); toast(t.fixed); }
+  }, (e)=>{
+    if(e && e.code===1){
+      geoDenied();
+      say(t.still_off);
+      const r=$("ghReload"); if(r) r.hidden=false;   // 一度拒否したページでは、読み込み直すまで拒否を返し続けるブラウザがある（iPhone はかならずそう）
+    } else { say(t.wait); restartSampling(); }
+  }, { enableHighAccuracy:true, maximumAge:0, timeout:15000 });
+}
+// 読み込み直す前に、送信後の記録中の回答を確定させる（toCounter と同じ）。人数を入れている途中は止める
+async function geoReload(){
+  if(answering){ const el=$("ghMsg"); if(el) el.textContent=geoText().busy; return; }   // toast は画面の下に隠れるので、画面の中に出す
+  if(pending){ commitVariant(pending.variant); syncPendingToOutbox(true);
+    await Promise.race([finalizeNow(true), new Promise(r=>setTimeout(r,3000))]); }
+  location.reload();
+}
 
 /* ---------------- 回答フロー ---------------- */
 function pickClass(cls){
@@ -963,7 +1245,7 @@ function grabOneShot(){
       pending.trajectory.unshift(pt);
       if(pending.cid) syncPendingToOutbox(false);
     }
-    geoOk=true; setStatus(T[lang].gpsOk);
+    geoOk=true; geoFix(p);
   }, ()=>{}, { enableHighAccuracy:true, maximumAge:10000, timeout:15000 });
 }
 
@@ -1102,6 +1384,7 @@ function renderCount(){
       </div>
     </div>`;
   answering = true;             // 人数入力画面を表示中（背景の再描画から保護）
+  setStatus();                  // ★uiStudy-0.9.4: 拒否・大まかの帯を1行の高さにする（一覧に戻ると renderMain が元の高さに戻す）
   wireStopField("nextInput","nextList","nextSel","next_stop");
   const cval=$("cval");
   const show=()=>{
@@ -1321,6 +1604,7 @@ function renderMain(){
   setStatus();
   pickerShownAt = performance.now();   // ★UI研究: クラス選択画面が出た時刻
   startSampling();   // 一覧表示中は測位を回してpreBufferを温める（前倒し）
+  geoAutoHelp();     // ★uiStudy-0.9.4: 回答の途中で拒否に気づいていたら、一覧に戻ったここで直し方を出す（その日1回まで）
 }
 
 /* ---------------- 画面ルーター & ナビ ---------------- */
@@ -1597,6 +1881,12 @@ async function boot(){
   setInterval(()=>{ if(view==="report" && !answering) renderLegBar(); }, 30000);
   $("navReport").onclick=()=>setView("report");
   $("navFeed").onclick=()=>setView("feed");
+  // ★uiStudy-0.9.4: 位置情報が拒否・大まかなときは、帯を押すと直し方の画面を出す
+  const stEl=$("status");
+  stEl.addEventListener("click", ()=>{ if(stEl.classList.contains("act")) openGeoHelp(); });
+  stEl.addEventListener("keydown", (e)=>{ if(stEl.classList.contains("act") && (e.key==="Enter" || e.key===" ")){ e.preventDefault(); openGeoHelp(); } });
+  document.addEventListener("keydown", (e)=>{ if(e.key==="Escape" && geoHelpOpen()) closeGeoHelp(); });
+  watchGeoPermission();
 
   if(!configured){ render(); return; }
 
@@ -1629,7 +1919,7 @@ async function boot(){
   document.addEventListener("visibilitychange", ()=>{
     // 背景化: 送信後の記録中(pending & 人数入力は終了)だけ確定。人数入力中は保持したまま測位停止。
     if(document.hidden){ if(pending && !answering) finalizeNow(true); stopSampling(); }
-    else if(user){ startSampling(); flushOutbox(); flushSessions(); if(view==="report" && !answering) renderLegBar(); }  // 復帰: 測位再開＆再送
+    else if(user){ geoResume(); flushOutbox(); flushSessions(); if(view==="report" && !answering) renderLegBar(); }  // 復帰: 測位再開＆再送（★0.9.4: 拒否のあとでも聞き直す）
   });
   window.addEventListener("pagehide", ()=>{ if(pending) finalizeNow(true); });
 }

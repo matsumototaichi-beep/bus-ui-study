@@ -20,7 +20,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | 回答テーブル | `responses` | **`ui_responses`** |
 | 一覧ビュー | `report_feed` | **`ui_report_feed`** |
 | ローカル退避キー | `bus_outbox_v1` | **`uistudy_outbox_v1`** |
-| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.3`**（2026-10-08時点。乗降アプリは `counter-2.0.0`） |
+| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.4`**（2026-10-08時点。乗降アプリは `counter-2.0.1`） |
 
 > **2026-10-06 に Supabase を元アプリとは別のプロジェクト（`wwavbfdojschxohvvpzb`）に切り替えた**（前のプロジェクトは削除されていた）。
 > テーブルは `docs/テーブル作成.sql`（`ui_responses` / `ui_sessions` / `ui_report_feed`）で作る。
@@ -39,7 +39,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | `LITERATURE.md` | 文献メモ（本文をどこまで読んだか） |
 | `WORKFLOW.md` | 教授との共有・文献調査のルール |
 | `docs/実験の進め方.docx` | 当日の運用 |
-| `docs/questionnaire/` | アンケート（設問一覧.xlsx・GoogleForms生成.gs・紙の予備） |
+| `docs/questionnaire/` | UI研究のアンケート4つ（1回目_桃山台・1回目_南口・2回目_桃山台・2回目_南口）の設問一覧.xlsx・GoogleForms生成.gs・紙の予備 |
 | `docs/qr_posters.html` | QRポスター2枚（1回目／2回目） |
 | `docs/counting_sheet.html` | 記録用紙（乗降アプリが使えないときの予備） |
 | `docs/login_prep.md` / `docs/login_paths.md` | ログインの準備／管理者ログイン |
@@ -47,8 +47,8 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | `tools/` | 下の表 |
 | `docs/log/` | 日ごとの記録 |
 | `docs/old/` | 今は使わない古い文書 |
-| `../★乗降人数計算/` | 計数研究（1から数える vs 乗降で数える）の案内・QR・ショートカット |
-| `../★UI研究/` | 参加者向け案内_Ui研究.docx（松本が直接編集）・QRポスター.pdf・配布カード.pdf・配布カード.html・accounts.csv・アンケートURL.txt・人数アプリ／乗降アプリのショートカット |
+| `../★乗降人数計算/` | 計数研究（1から数える vs 乗降で数える）の案内・配布用紙・QR・アンケート・アンケートURL.xlsx・ショートカット |
+| `../★UI研究/` | 参加者向け案内_Ui研究.docx（松本が直接編集）・配布用紙（1回目・2回目）・QRポスター.pdf・配布カード.pdf・配布カード.html・accounts.csv・アンケートURL.xlsx・人数アプリ／乗降アプリのショートカット |
 
 | `tools/` | 作るもの |
 |---|---|
@@ -56,10 +56,10 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | `make_posters_pdf.py` | `../★UI研究/QRポスター.pdf` |
 | `make_cards_pdf.py` | `../★UI研究/配布カード.pdf` |
 | `create_accounts.py` | 参加者アカウント・`../★UI研究/accounts.csv` |
-| `make_forms.py` / `make_questionnaire.py` | `docs/questionnaire/` |
+| `make_forms.py` / `make_questionnaire.py` | `docs/questionnaire/`（UI研究のアンケート4つ） |
 | `make_count_qr.py` | `../★乗降人数計算/QRポスター_計数研究.pdf`・`乗降アプリQR.png` |
 | `make_count_forms.py` | `../★乗降人数計算/計数研究アンケート生成.gs`・`計数研究アンケート.docx` |
-| `make_handouts.py` | 配布用紙（`../★UI研究/` に1回目・2回目、`../★乗降人数計算/` に計数研究）。アンケートURLは各フォルダの `アンケートURL.xlsx` から読む |
+| `make_handouts.py` | 配布用紙（`../★UI研究/` に1回目・2回目、`../★乗降人数計算/` に計数研究）。UI研究の用紙には桃山台駅と南口のアンケートのQRが載る。アンケートURLは各フォルダの `アンケートURL.xlsx` から読む |
 
 `stops.js` の出典：国土数値情報 バス停留所データ P11／国土交通省・大阪府・令和4年度〈2022年〉・PDL1.0＝出典明記で編集加工可。
 2026-09-17 に奈良県+京都府版〈平成22年・非商用〉から差し替え。実施事業者が阪急バスに変わったため。
@@ -67,7 +67,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 ## これからやること（順序）
 1. ~~Supabaseにテーブル作成~~ → **2026-09-18 完了**（`ui_responses` / `ui_sessions` / `ui_report_feed`。2026-10-06 に新プロジェクトへ切り替え）
 2. ~~**ログ計装**~~ → 完了：操作イベント（タップ・所要時間・訂正回数など）の記録
-3. ~~**UI条件（バリアント）の割当**~~ → 完了：QR の回（1回目／2回目）・ゆき/かえり・IDの1文字目からアプリが決め、study / round / leg / group / label を付けて記録（2026-10-07。`HANDOFF.md` §8 #24〜27）
+3. ~~**UI条件（バリアント）の割当**~~ → 完了：QR の回（1回目／2回目）・ゆき/かえり・アカウントの組からアプリが決め、study / round / leg / group / label を付けて記録（2026-10-07。組は 2026-10-08 にアカウントごとの表へ。`HANDOFF.md` §8 #24〜27・#41）
 4. **エクスポートと分析**：JSON出力 → Python(pandas)で条件間比較
 
 ## 公開URL

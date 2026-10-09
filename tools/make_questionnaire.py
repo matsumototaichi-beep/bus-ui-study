@@ -4,10 +4,12 @@
     python tools/make_questionnaire.py
 
 設問の正本は docs/questionnaire/設問一覧.xlsx。
-docs/questionnaire/ に アンケート_1回目.docx と アンケート_2回目.docx が出る。
+docs/questionnaire/ に フォームと同じ4つが出る。
+  アンケート_1回目_桃山台.docx / アンケート_1回目_南口.docx / アンケート_2回目_桃山台.docx / アンケート_2回目_南口.docx
 """
 import os, sys
-from openpyxl import load_workbook
+sys.dont_write_bytecode = True          # tools/ に .pyc を増やさない
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from docx import Document
 from docx.shared import Pt, Mm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
@@ -15,9 +17,8 @@ from docx.oxml.ns import qn
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTDIR = os.path.join(ROOT, "docs", "questionnaire")
-XLSX = os.path.join(OUTDIR, "設問一覧.xlsx")
 FONT = "Yu Gothic"
-NCOL = 9          # 9列目「何が分かるか」は用紙に出さない
+OWARI = "ご協力ありがとうございました。"     # 「回答後」の行がないときの結び
 
 
 def setup(doc):
@@ -56,8 +57,8 @@ def emit(doc, row, first):
     youshi, setsu, no, kata, bun, sel, must, hosoku = row[:8]
     choices = [x.strip() for x in (sel or "").split("／") if x.strip()]
 
-    if kata == "表紙":
-        return                      # 題名と説明文は build() で出す
+    if kata in ("表紙", "回答後"):
+        return                      # 題名・説明文・結びは build() で出す
     if kata in ("ページ", "説明"):
         if kata == "ページ" and not first[0]:
             doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
@@ -100,27 +101,21 @@ def build(rows):
     first = [True]
     for row in rows:
         emit(doc, row, first)
-    p(doc, "ご協力ありがとうございました。", size=11, bold=True,
+    # ★2026-10-08: 結びは「回答後」の行（フォームで送信したあとに出る文）と同じにする
+    owari = [r[4] for r in rows if r[3] == "回答後" and r[4]]
+    p(doc, owari[0] if owari else OWARI, size=11, bold=True,
       align=WD_ALIGN_PARAGRAPH.CENTER, before=10)
     return doc
 
 
 def main():
-    if not os.path.exists(XLSX):
-        sys.exit("%s がありません。先に python tools/make_forms.py --bank を流してください。" % XLSX)
-    ws = load_workbook(XLSX)["設問"]
-    rows = []
-    for r in range(5, ws.max_row + 1):
-        vals = [ws.cell(row=r, column=c).value for c in range(1, NCOL + 1)]
-        if not any(vals):
-            continue
-        rows.append([("" if v is None else str(v)) for v in vals])
-
-    for youshi, fname in (("1回目", "アンケート_1回目.docx"), ("2回目", "アンケート_2回目.docx")):
+    import make_forms as mf
+    rows = mf.read_bank()
+    for youshi in mf.YOUSHI:
         sub = [r for r in rows if r[0] == youshi]
-        path = os.path.join(OUTDIR, fname)
+        path = os.path.join(OUTDIR, "アンケート_%s.docx" % youshi)
         build(sub).save(path)
-        print("書き出しました: %s（%d問）" % (path, len([r for r in sub if r[2]])))
+        print("書き出しました: %s（%d問）" % (path, mf.count_q(rows, youshi)))
 
 
 if __name__ == "__main__":

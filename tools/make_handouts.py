@@ -1,20 +1,25 @@
 # -*- coding: utf-8 -*-
 """当日、参加者ひとりずつに配る用紙（A4 両面1枚）を Word と PDF にする
 
-    python tools/make_handouts.py
+    python tools/make_handouts.py                  本番。アンケートの URL がそろった用紙だけ書き出す
+    python tools/make_handouts.py --draft <フォルダ>  下書き。URL がないところは仮の QR にして、3枚とも <フォルダ> へ
+        <フォルダ> はこのリポジトリの外にする（URL がそろったアンケートは本物の URL が入るため。中なら止まる）
 
-3種類を書き出す。
+本番で書き出すもの
   ../★UI研究/配布用紙_UI研究_1回目.docx / .pdf
   ../★UI研究/配布用紙_UI研究_2回目.docx / .pdf
   ../★乗降人数計算/配布用紙_計数研究.docx / .pdf
 
 表＝時間割・お願い・当日の流れ・アプリのQR
 裏＝桃山台駅ですること・数え方・答え方・アンケートのQR
+   UI研究は アンケートが2つ（桃山台駅で ゆき、南口で かえり）。計数研究は南口で1つ
 
 ログインの ID とパスワードは載せない（今までどおり配布カードを別に渡す）。
 アンケートの URL はこのリポジトリに書かない（public のため。知らない人の回答が混ざる）。
-実行のたびに アンケートURL.xlsx（シート「アンケートURL」の「回答用URL（参加者に送る）」）から読む。
-PDF は Word で書き出す（Word が要る）。2ページちょうどでなければ止まる。
+実行のたびに アンケートURL.xlsx（シート「アンケートURL」）の「回答用URL（配布用紙のQR）」
+または「回答用URL（参加者に送る）」の列と「問数」の列から読む。「使わなくなったもの」より下は読まない。
+PDF は Word で書き出す（Word が要る）。一時フォルダで作り、3枚とも2ページちょうどのときだけ
+書き出し先へ写す（2ページでなければ、書き出し先の前の版に触らずに止まる）。
 ** で挟んだところが太字になる。
 
 ★2026-10-07: 当日の説明を減らし、桃山台駅に着いてから迷わないように作った。
@@ -25,11 +30,26 @@ PDF は Word で書き出す（Word が要る）。2ページちょうどでな�
   「よろしいですか？」→「OK」（UI研究）、桃山台駅で乗ってきた人から数えること（計数研究）を足した。
   乗らないバスに「同じ [2] 南口行きでも、ほかの時刻」を分けて書いた。位置情報は「記録します」と書いた。
   「よろしいですか？」「計数研究　かえり」が行の途中で分かれないように \n で改行した。
+★2026-10-08(2): UI研究のアンケートを区間ごとに分けた（1回の往復で、桃山台駅と南口の2回答える）。
+  裏の「桃山台駅ですること」に ゆき のアンケートの QR と、答えたら人数アプリに戻ることを足し、
+  南口の QR は「アンケート　かえり」にした。
+  --draft を足した（フォームを作る前に、仮の QR で形を確かめる）。
+  文は yomiyasu・natural-japanese の2つのスキルで見直して減らした（意味と手順の順番は変えていない）。
+  同じことを2回書いていたところを1回にした（表の流れ10の「かえりに切り替える」は裏の1に任せる。
+  裏の「困ったときは…」は表のお願いと同じなので消した）。
+  位置情報を聞かれずに拒否されたときの直し方は、アプリの帯と直し方の画面が伝えるので、用紙には書かない。
+★2026-10-08(3): 見直しの指摘で直した。--draft にリポジトリの中のフォルダを渡したら止まる。
+  用紙は一時フォルダで作り、2ページだと確かめてから書き出し先へ写す。位置情報の2文目の「位置情報から」を
+  参加者向け案内に合わせて戻した。「…に答える（6問・1分ほど）。」と句点を打ち、
+  「昼は約60分、夕方は約38分」「発車までに2番のりばへ」と、語の間の空白をなくした。
 """
+import argparse
 import os
+import shutil
 import sys
 import subprocess
 import tempfile
+from collections import namedtuple
 
 import openpyxl
 import segno
@@ -58,20 +78,46 @@ BODY = 11.5           # 本文の文字の大きさ pt
 
 
 # ---------------------------------------------------------------- アンケートURL
+# UI研究の表は「回答用URL（配布用紙のQR）」、計数研究の表は「回答用URL（参加者に送る）」
+URL_HEADS = ("回答用URL（配布用紙のQR）", "回答用URL（参加者に送る）")
+FORMS = "https://docs.google.com/forms/"
+# --draft で URL がまだのときに使う仮の URL（名前は QR で読めるように英数字にする）
+DRAFT_URL = FORMS + "d/e/DRAFT-%s/viewform"
+DRAFT_NAME = {"1回目_桃山台": "ui1-momoyamadai", "1回目_南口": "ui1-minamiguchi",
+              "2回目_桃山台": "ui2-momoyamadai", "2回目_南口": "ui2-minamiguchi",
+              "計数研究": "count"}
+
+Survey = namedtuple("Survey", "url qsize draft")      # draft=True なら仮の URL
+
+
 def survey(xlsx, name):
-    """アンケートURL.xlsx から (回答用URL, 問数) を読む。URL はファイルに残さない"""
+    """アンケートURL.xlsx から (回答用URL, 問数) を読む。URL がまだ書かれていなければ URL は None。
+    URL はファイルに残さない"""
     wb = openpyxl.load_workbook(xlsx, read_only=True, data_only=True)
     ws = wb["アンケートURL"]
     rows = [list(r) for r in ws.iter_rows(values_only=True)]
     wb.close()
-    head = next(r for r in rows if "回答用URL（参加者に送る）" in r)
-    ui, qi = head.index("回答用URL（参加者に送る）"), head.index("問数")
-    for r in rows:
-        if r and r[0] == name:
-            url = (r[ui] or "").strip()
-            if not url.startswith("https://docs.google.com/forms/"):
-                sys.exit("アンケートの URL が読めません: %s の「%s」" % (xlsx, name))
-            return url, (r[qi] or "").strip()
+    hi = next((i for i, r in enumerate(rows) if any(h in r for h in URL_HEADS)), None)
+    if hi is None or "問数" not in rows[hi]:
+        sys.exit("見出しの行（%s・問数）が見つかりません: %s" % ("／".join(URL_HEADS), xlsx))
+    head = rows[hi]
+    ui = next(head.index(h) for h in URL_HEADS if h in head)
+    qi = head.index("問数")
+    for r in rows[hi + 1:]:
+        first = str(r[0] or "").strip()
+        if first.startswith("使わなくなったもの"):
+            break                                   # ここより下（旧フォーム）は読まない
+        if first != name:
+            continue
+        qsize = str(r[qi] or "").strip()
+        if not qsize:
+            sys.exit("問数が書かれていません: %s の「%s」" % (xlsx, name))
+        url = str(r[ui] or "").strip()
+        if not url or url.startswith("（"):        # 「（フォームを作ったら書く）」
+            return None, qsize
+        if not url.startswith(FORMS):
+            sys.exit("アンケートの URL が読めません: %s の「%s」" % (xlsx, name))
+        return url, qsize
     sys.exit("アンケートの行がありません: %s の「%s」" % (xlsx, name))
 
 
@@ -197,25 +243,28 @@ def steps(where, items, size=BODY, first=False, start=1, after=3):
         write(par, text, size)
 
 
-def qr_box(cell, png, title, url):
-    """右の列に QR と、その下に名前と小さく URL"""
+def qr_box(cell, png, title, url, draft=False):
+    """右の列に QR と、その下に名前と小さく URL。仮の QR には赤で「仮」と入れる"""
     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
     par = fmt(cell.paragraphs[0], BODY, 0, 0, WD_ALIGN_PARAGRAPH.CENTER)
     par.paragraph_format.line_spacing = None      # 画像の行は固定の行間にしない（切れるため）
     par.add_run().add_picture(png, width=Mm(QR_MM))
     for line in title.split("\n"):
         p(cell, line, size=12, bold=True, after=0, align=WD_ALIGN_PARAGRAPH.CENTER)
+    if draft:
+        p(cell, "仮のQR（本番では使えない）", size=10, bold=True, color=RED, after=0,
+          align=WD_ALIGN_PARAGRAPH.CENTER)
     p(cell, url, size=6.5, color=GRAY, after=0, align=WD_ALIGN_PARAGRAPH.CENTER)
 
 
-def with_qr(doc, png, title, url, fill):
+def with_qr(doc, png, title, url, fill, draft=False):
     """左に手順など、右に QR の2列（枠線なし）。fill(左のセル) で左を書く"""
     w = [PAGE_W - QR_MM - 8, QR_MM + 8]
     t = new_table(doc, w, grid=False)
     left, right = add_row(t, w)
     left.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
     fill(left)
-    qr_box(right, png, title, url)
+    qr_box(right, png, title, url, draft)
     gap(doc)
 
 
@@ -255,12 +304,30 @@ def requests(doc, card=False):
         ("持ちもの", "充電したスマホ　／　ICカードか小銭" + ("　／　配布カード（ID とパスワード）" if card else "")),
         ("乗るバス", "上の時刻の便だけに乗ってください"),
         ("運賃", "実費をお支払いします"),
-        ("位置情報", "実験中はスマホの位置情報の共有を許可していただき、**記録します**。"
-                     "位置情報からバスの便などの運行情報を把握するためです。"),
-        ("アプリ", "**画面の指示に従って操作してください**"),
+        # 参加者向け案内の「許可していただきます」「位置情報から…把握するためです」を受けた同意の文なので、
+        #   2文とも言い回しを保つ（「把握する」だけ「知る」にした。「位置情報から」は記録する目的なので残す）
+        ("位置情報", "実験中は位置情報の共有を許可していただき、**記録します**。\n"
+                     "位置情報からバスの便などの運行情報を知るためです。"),
+        ("アプリ", "**画面の指示どおりに操作してください**"),
         ("困ったとき", "松本にチャットで連絡してください"),
         ("やめたいとき", "いつでもやめられます。松本にチャットで連絡してください"),
     ], [30, PAGE_W - 30])
+
+
+# 表の「当日の流れ」で、UI研究と計数研究に共通の手順
+CARD = "南口に集合。**配布カード**（ID とパスワード）を受け取る"
+READ_QR = "右の**QR**をスマホのカメラで読む"
+LOGIN = "「**ログイン**」タブ（「新規登録」ではない）で、カードの ID とパスワードを入れる"
+# ★2026-10-08(2): iPhone の Safari では、許可を聞かれずに拒否されることがある。そのときは
+#   アプリ（uiStudy-0.9.4）が押せる帯「位置情報がオフです。ここを押して直し方を見る」を出し、
+#   直し方の画面もその日1回は自動で開く。同じことを用紙に書かない
+GEO = "位置情報の利用を聞かれたら「**許可**」"
+PRACTICE = ("のりばで練習：「**練習**」を押す → 待っている人の数を\n"
+            "**2回**答える → 画面の上の「**練習モード**」をタップして終える")
+BOARD = "実験者が指定したバスに乗る（のりば2、**[2]** のバス）"
+SEAT = "座ったら「**着席**」、立っていたら「**立席**」を押す。変わったら押し直す"
+# 「かえりに切り替える」は裏の1に書くので、表では裏へ案内するだけにする
+SWITCH = "桃山台駅で降りたら、**裏**を見る"
 
 
 # 桃山台で乗り間違えないために（docs/old/operation_plan.md「5. 乗り間違いを防ぐ」）
@@ -274,7 +341,8 @@ KAERI_BUS = [
                      "ほかの番号のバス（行き先が南口でも）\n「ＪＲ吹田駅（北口）」行き"),
 ]
 KAERI_STEPS = [
-    "かえりのバスまで　昼 **約60分**／夕方 **約38分**。発車までに **2番のりば** へ",
+    # Word では ** は太字になるだけなので、太字の前後に空白を入れない（「のりば へ」と助詞の前が空かないように）
+    "かえりのバスまで、昼は**約60分**、夕方は**約38分**。\n発車までに**2番のりば**へ",
     "下のバスに乗る。**終点まで乗る**",
     # ★2026-10-08: 桃山台では実験者がいないので、かえりでも押すことを裏に書く
     #   （人数アプリはゆきの値が残る。乗降アプリは別の保存先で、未設定から始まる）
@@ -282,76 +350,73 @@ KAERI_STEPS = [
 ]
 
 
-def goal(doc, png, url, title, qsize, size=12.5):
+def goal(doc, sv, title, answer, size=12.5, qr=None):
     """見出しも QR の左に入れる（計数研究の裏が1ページに収まるように。3種類とも同じ形にする）"""
     def fill(c):
         h2(c, "南口に着いたら", before=0, first=True)
         steps(c, [
-            "右のQRから**アンケート**に答える（%s）" % qsize,
+            answer % sv.qsize,
             "答えたら解散です。おつかれさまでした",
         ], size=size, after=4)
-        p(c, "困ったときは、松本にチャットで連絡してください。", size=11, color=GRAY, before=8, after=0)
-    with_qr(doc, png, title, url, fill)
+    with_qr(doc, qr(sv.url), title, sv.url, fill, sv.draft)
 
 
 # ---------------------------------------------------------------- UI研究
-def ui_doc(rnd, qr, survey_url, qsize):
+def ui_doc(rnd, qr, yuki, kaeri):
+    """yuki＝桃山台駅で答えるアンケート、kaeri＝南口で答えるアンケート（どちらも Survey）"""
     doc = setup("配布用紙 UI研究 %d回目" % rnd)
     header(doc, [("UI研究", 15), ("%d回目" % rnd, 26)])
     timetable(doc)
     requests(doc, card=(rnd == 2))
 
     h2(doc, "当日の流れ")
-    first = ("南口に集合。**配布カード**を受け取る（ID とパスワードが書いてあります）" if rnd == 1 else
-             "南口に集合。1回目にもらった**配布カード**を用意する")
+    first = CARD if rnd == 1 else "南口に集合。1回目にもらった**配布カード**を用意する"
     app_url = BASE + "?round=%d" % rnd
     with_qr(doc, qr(app_url), "人数アプリ　%d回目" % rnd, app_url, lambda c: steps(c, [
-        first,
-        "右の**QR**をスマホのカメラで読む",
-        "「**ログイン**」タブ（「新規登録」ではない）で、カードの ID とパスワードを入れる",
+        first, READ_QR, LOGIN,
         "「**ゆき　吹田駅 → 桃山台駅**」を選び、画面を実験者に見せる",
-        "位置情報の利用を聞かれたら「**許可**」",
-        "のりばで練習：「**練習**」を押す → のりばで待っている人の数を**2回**答える → "
-        "画面の上の「**練習モード**」をタップして終える",
-        "実験者が指定したバスに乗る（のりば2、**[2]** のバス）",
-        "座ったら「**着席**」、立っていたら「**立席**」を押す。変わったら押し直す",
-        "バスがバス停を発車するたびに、人数を答える（**数え方は裏**）",
-        "桃山台駅で降りたら、画面右上の「**かえりに切り替える**」を押す（**裏へ**）",
+        GEO, PRACTICE, BOARD, SEAT,
+        "バス停を発車するたびに、人数を答える（**数え方は裏**）",
+        SWITCH,
     ], first=True))
 
-    # ---- 裏（計数研究より書くことが少ないので、文字を大きくする）
-    big = 13
+    # ---- 裏（★2026-10-08(2): 桃山台駅で ゆき のアンケートに答える。手順が QR の左に入るので文字を 12.5pt にした）
+    big = 12.5
     h2(doc, "桃山台駅ですること", new_page=True, before=0)
     # 「よろしいですか？」で「キャンセル」を押すと、ゆきのままになる（index.html の switchLeg）
-    steps(doc, ["バスを降りたら、アプリの画面右上の「**かえりに切り替える**」を押す。\n"
-                "「よろしいですか？」と出たら「**OK**」"] + KAERI_STEPS + [
+    # 紙の QR をカメラで読むとフォームは別のタブで開き、人数アプリは裏に回る。桃山台駅には実験者がいないので、
+    #   答えたあとアプリに戻ることを書く（5・6 はアプリでの操作）
+    with_qr(doc, qr(yuki.url), "アンケート　ゆき", yuki.url, lambda c: steps(c, [
+        "降りたら、画面右上の「**かえりに切り替える**」を押す。\n「よろしいですか？」と出たら「**OK**」",
+        "かえりのバスを待つあいだに、右のQRから\n**アンケート（ゆき）**に答える（%s）。\n"
+        "答えたら人数アプリに戻る" % yuki.qsize,
+    ] + KAERI_STEPS + [
         "かえりのバスでも、バス停を発車するたびに人数を答える",
-    ], size=big, after=4)
-    gap(doc, 2)
+    ], size=big, first=True, after=4), yuki.draft)
     table(doc, KAERI_BUS, [36, PAGE_W - 36], size=big, label_fill=WARN_FILL)
 
-    h2(doc, "数え方", before=9)
+    h2(doc, "数え方", before=7)
     table(doc, [
         ("数に入れる人", "車内にいる人全員。**自分も入れる**"),
         ("入れない人", "運転士"),
         ("いつ", "バス停を**発車したら**数えて答え、**次のバス停までに送る**"),
     ], [36, PAGE_W - 36], size=big)
 
-    h2(doc, "人数の答え方", before=9)
+    h2(doc, "人数の答え方", before=7)
     steps(doc, [
         "混み具合を6つから選ぶ",
         "車内の人数を入れる",
         "次に停まるバス停を選ぶ",
         "「**送信**」を押す",
-    ], size=big, after=4)
-    gap(doc, 12)
+    ], size=big, after=3)
+    gap(doc, 6)
 
-    goal(doc, qr(survey_url), survey_url, "アンケート　%d回目" % rnd, qsize, size=big)
+    goal(doc, kaeri, "アンケート　かえり", "右のQRから**アンケート（かえり）**に答える\n（%s）", size=big, qr=qr)
     return doc
 
 
 # ---------------------------------------------------------------- 計数研究
-def count_doc(qr, survey_url, qsize):
+def count_doc(qr, sv):
     doc = setup("配布用紙 計数研究")
     header(doc, [("計数研究", 24)])
     timetable(doc)
@@ -360,17 +425,11 @@ def count_doc(qr, survey_url, qsize):
     h2(doc, "当日の流れ")
     yuki_url = BASE + "?study=count"
     with_qr(doc, qr(yuki_url), "ゆき　人数アプリ", yuki_url, lambda c: steps(c, [
-        "南口に集合。**配布カード**を受け取る（ID とパスワードが書いてあります）",
-        "右の**QR**をスマホのカメラで読む",
-        "「**ログイン**」タブ（「新規登録」ではない）で、カードの ID とパスワードを入れる",
+        CARD, READ_QR, LOGIN,
         "画面の上に「**計数研究　ゆき**」と出たら、実験者に見せる",
-        "位置情報の利用を聞かれたら「**許可**」",
-        "のりばで練習：「**練習**」を押す → のりばで待っている人の数を**2回**答える → "
-        "画面の上の「**練習モード**」をタップして終える",
-        "実験者が指定したバスに乗る（のりば2、**[2]** のバス）",
-        "座ったら「**着席**」、立っていたら「**立席**」を押す。変わったら押し直す",
-        "バスがバス停を発車するたびに、車内の人数を**1から数えて**答える（**数え方は裏**）",
-        "桃山台駅で降りたら、画面右上の「**かえりに切り替える**」を押す（**裏へ**）",
+        GEO, PRACTICE, BOARD, SEAT,
+        "バス停を発車するたびに、車内の人数を**1から数えて**答える（**数え方は裏**）",
+        SWITCH,
     ], first=True))
 
     # ---- 裏
@@ -394,8 +453,8 @@ def count_doc(qr, survey_url, qsize):
         ("数える人", "車内にいる人全員。**自分も入れる**",
          "**乗ってきた人・降りた人**。自分たちも数える（桃山台駅で乗るとき・終点で降りるとき）"),
         ("数えない人", "運転士", None),
-        ("いつ", "バス停を**発車したら**、**1から数えて**答え、次のバス停までに送る",
-         "バスがバス停に**停車したら**数える"),
+        ("いつ", "**発車したら**、**1から数えて**答え、\n次のバス停までに送る",
+         "バス停に**停車したら**数える"),
         ("答え方", ["混み具合を6つから選ぶ", "車内の人数を入れる", "次に停まるバス停を選ぶ",
                     "「**送信**」を押す"],
          ["バス停を確かめる。違ったら「**変える**」",
@@ -406,7 +465,7 @@ def count_doc(qr, survey_url, qsize):
     ], [25, 65, PAGE_W - 90], head=("", "ゆき（人数アプリ）", "かえり（乗降アプリ）"), size=11.5)
 
     gap(doc, 4)
-    goal(doc, qr(survey_url), survey_url, "アンケート　計数研究", qsize)
+    goal(doc, sv, "アンケート　計数研究", "右のQRから**アンケート**に答える（%s）", size=12.5, qr=qr)
     return doc
 
 
@@ -464,7 +523,7 @@ def export_pdf(paths):
                            capture_output=True, env=env)
     out = r.stdout.decode("cp932", "replace")
     if r.returncode != 0:
-        sys.exit("Word で PDF にできませんでした（PDF を開いたままなら閉じてください）\n" + out
+        sys.exit("Word で PDF にできませんでした（書き出し先のファイルは変えていません）\n" + out
                  + r.stderr.decode("cp932", "replace"))
     pages = {}
     for line in out.splitlines():
@@ -475,11 +534,64 @@ def export_pdf(paths):
 
 
 # ---------------------------------------------------------------- 実行
-def main():
-    ui = os.path.join(UI_DIR, "アンケートURL.xlsx")
-    ct = os.path.join(COUNT_DIR, "アンケートURL.xlsx")
-    s1, s2, sc = survey(ui, "1回目"), survey(ui, "2回目"), survey(ct, "計数研究")
+def inside(path, folder):
+    """path が folder そのもの、または folder の中なら True（大文字・小文字と区切りの違いは見ない）"""
+    path, folder = (os.path.normcase(os.path.realpath(x)) for x in (path, folder))
+    try:
+        return os.path.commonpath([path, folder]) == folder
+    except ValueError:              # ドライブが違う
+        return False
 
+
+def main():
+    ap = argparse.ArgumentParser(description="当日に配る用紙（A4 両面1枚）を Word と PDF にする")
+    ap.add_argument("--draft", metavar="フォルダ",
+                    help="下書き。URL がないアンケートは仮の QR にして、3枚ともこのフォルダに書き出す")
+    a = ap.parse_args()
+
+    out_ui, out_ct = UI_DIR, COUNT_DIR
+    if a.draft:
+        out_ui = out_ct = os.path.abspath(a.draft)
+        real = {os.path.normcase(os.path.abspath(d)) for d in (UI_DIR, COUNT_DIR)}
+        if os.path.normcase(out_ui) in real:
+            sys.exit("--draft には本番のフォルダ（★UI研究・★乗降人数計算）以外を指定してください")
+        # ★2026-10-08(3): 下書きにも本物のアンケート URL が入る（URL がそろったもの）。public のリポジトリの中には置かない
+        if inside(out_ui, ROOT):
+            sys.exit("--draft にはリポジトリ（%s）の外のフォルダを指定してください。"
+                     "下書きにも本物のアンケートの URL が入るためです" % os.path.basename(ROOT))
+        os.makedirs(out_ui, exist_ok=True)
+
+    def get(xlsx, name):
+        url, qsize = survey(xlsx, name)
+        if url:
+            return Survey(url, qsize, False)
+        if a.draft:
+            return Survey(DRAFT_URL % DRAFT_NAME[name], qsize, True)
+        return None
+
+    ui_x = os.path.join(UI_DIR, "アンケートURL.xlsx")
+    ct_x = os.path.join(COUNT_DIR, "アンケートURL.xlsx")
+    plans = []          # (書き出す docx, 作る関数, 仮の QR があるか)
+    for rnd in (1, 2):
+        names = ["%d回目_桃山台" % rnd, "%d回目_南口" % rnd]
+        sv = [get(ui_x, n) for n in names]
+        path = os.path.join(out_ui, "配布用紙_UI研究_%d回目.docx" % rnd)
+        if None in sv:
+            print("書き出しません: %s（アンケートの URL がまだ: %s）"
+                  % (os.path.basename(path)[:-5], "、".join(n for n, s in zip(names, sv) if s is None)))
+            continue
+        plans.append((path, lambda qr, rnd=rnd, sv=sv: ui_doc(rnd, qr, *sv), any(s.draft for s in sv)))
+    sc = get(ct_x, "計数研究")
+    path = os.path.join(out_ct, "配布用紙_計数研究.docx")
+    if sc is None:
+        print("書き出しません: 配布用紙_計数研究（アンケートの URL がまだ: 計数研究）")
+    else:
+        plans.append((path, lambda qr: count_doc(qr, sc), sc.draft))
+    if not plans:
+        sys.exit("書き出せる用紙がありません。アンケートURL.xlsx に URL を書くか、--draft で下書きにしてください")
+
+    # ★2026-10-08(3): docx と PDF は一時フォルダで作り、3枚とも2ページだと確かめてから書き出し先へ写す。
+    #   2ページに収まらないときは、書き出し先にある前の版（印刷に使える版）に触らずに止まる
     with tempfile.TemporaryDirectory() as tmp:
         made = {}
 
@@ -490,23 +602,35 @@ def main():
                 made[url] = path
             return made[url]
 
-        jobs = [
-            (os.path.join(UI_DIR, "配布用紙_UI研究_1回目.docx"), ui_doc(1, qr, *s1)),
-            (os.path.join(UI_DIR, "配布用紙_UI研究_2回目.docx"), ui_doc(2, qr, *s2)),
-            (os.path.join(COUNT_DIR, "配布用紙_計数研究.docx"), count_doc(qr, *sc)),
-        ]
-        for path, doc in jobs:
-            doc.save(path)
+        work = []
+        for path, make, _ in plans:
+            w = os.path.join(tmp, os.path.basename(path))
+            make(qr).save(w)
+            work.append(w)
 
-    paths = [j[0] for j in jobs]
-    pages = export_pdf(paths)
-    bad = False
-    for path, n in zip(paths, pages):
-        print("%s  %s ページ" % (os.path.basename(path)[:-5] + "（.docx / .pdf）", n))
-        bad = bad or n != 2
-    if bad:
-        sys.exit("2ページ（表・裏）に収まっていません。文字を減らすか小さくしてください")
-    print("書き出しました: " + UI_DIR + " と " + COUNT_DIR)
+        pages = export_pdf(work)
+        bad = False
+        for (path, _, draft), n in zip(plans, pages):
+            print("%s  %s ページ%s" % (os.path.basename(path)[:-5] + "（.docx / .pdf）", n,
+                                     "　仮のQRあり" if draft else ""))
+            bad = bad or n != 2
+        if bad:
+            sys.exit("2ページ（表・裏）に収まっていません。文字を減らすか小さくしてください"
+                     "（書き出し先のファイルは変えていません）")
+
+        pairs = [(w[:-5] + ext, path[:-5] + ext)
+                 for (path, _, _), w in zip(plans, work) for ext in (".docx", ".pdf")]
+        for _, dst in pairs:                 # 開いたままのファイルがあれば、1つも写さずに止まる
+            if os.path.exists(dst):
+                try:
+                    open(dst, "r+b").close()
+                except OSError:
+                    sys.exit("%s を開いたままなら閉じてください（書き出し先のファイルは変えていません）" % dst)
+        for src, dst in pairs:
+            shutil.copyfile(src, dst)
+
+    paths = [pl[0] for pl in plans]
+    print("書き出しました: " + "、".join(sorted({os.path.dirname(x) for x in paths})))
 
 
 if __name__ == "__main__":
