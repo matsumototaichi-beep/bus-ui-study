@@ -343,7 +343,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.9.5";
+const APP_VERSION = "uiStudy-0.9.6";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -386,11 +386,13 @@ const URL_STUDY = (URL_QS.get("study")||"").toLowerCase()==="count" ? "count"
 const STUDY_KEY = "uistudy_round_v1";    // "r1" | "r2" | "count"（日付つき）
 const LEG_KEY   = "uistudy_leg_v1";      // "yuki" | "kaeri"（日付つき）
 const LEGAT_KEY = "uistudy_leg_at_v1";   // ゆきを選んだ時刻(ms)。桃山台で切り替えの案内を出すため
+// ★uiStudy-0.9.6: いまの区間にした決め方と時刻（"pick@ms" | "switch@ms" | "back@ms"。日付つき）。データに残すだけで、画面には使わない
+const LEGSET_KEY = "uistudy_leg_set_v1";
 // URL から消えても（再読込・ホーム画面から開き直し）その日のうちは保持する。
 // 別のQRを読んだら区間を選び直させる（同じ日に1回目と2回目をする人がいるため）
 function rememberUrlStudy(){
   if(!URL_STUDY) return;
-  if(getDaily(STUDY_KEY) !== URL_STUDY){ setDaily(LEG_KEY, null); setDaily(LEGAT_KEY, null); }
+  if(getDaily(STUDY_KEY) !== URL_STUDY){ setDaily(LEG_KEY, null); setDaily(LEGAT_KEY, null); setDaily(LEGSET_KEY, null); }
   setDaily(STUDY_KEY, URL_STUDY);
 }
 // 最後に読んだQRを優先する（古いタブを開いたままでも、新しいQRの回目に従う）
@@ -402,10 +404,18 @@ function curLeg(){
   const v=getDaily(LEG_KEY); return (v==="yuki"||v==="kaeri") ? v : null;
 }
 function needLeg(){ return !!roundNo() && !curLeg(); }
-function setLeg(leg){
+// by: "pick"（区間を選ぶ画面で選んだ）| "switch"（かえりに切り替えた）| "back"（ゆきに戻した）
+function setLeg(leg, by){
   setDaily(LEG_KEY, leg);
   // 「ゆきに戻す」（誤操作の取り消し）では最初にゆきを選んだ時刻を残す。案内が遅れないように
   if(leg==="yuki" && !getDaily(LEGAT_KEY)) setDaily(LEGAT_KEY, String(Date.now()));
+  // ★uiStudy-0.9.6: 区間をいつ・どう決めたかを残す（variant.leg_by / leg_at）。
+  //   かえりに切り替え忘れた回答を、桃山台駅のアンケートの送信時刻と突き合わせて見つけるため
+  setDaily(LEGSET_KEY, (by||"pick")+"@"+Date.now());
+}
+function legSet(){
+  const v=getDaily(LEGSET_KEY)||"", i=v.indexOf("@"), ms=parseInt(v.slice(i+1),10);
+  return (i>0 && ms) ? { by:v.slice(0,i), at:new Date(ms).toISOString() } : { by:null, at:null };
 }
 function legElapsedMin(){ const a=parseInt(getDaily(LEGAT_KEY)||"",10); return a ? (Date.now()-a)/60000 : 0; }
 // 組＝ログインIDの1文字目。A=1, B=2, … が奇数なら奇数組。アルファベット以外で始まるIDは奇数組
@@ -442,9 +452,10 @@ function studyTag(){
   if(studyMode()==="count") return { study:"count", round:null, leg:"yuki", group:null, label:"計数研究ゆき" };
   const r=roundNo();
   if(!r) return { study:null, round:null, leg:null, group:null, label:null };
-  const leg=curLeg();
+  const leg=curLeg(), ls=legSet();
   return { study:"ui", round:r, leg:leg, group:idGroup(), test_account:isTestAccount(),
-           label: r+"回目"+(leg==="kaeri" ? "かえり" : leg==="yuki" ? "ゆき" : "") };
+           label: r+"回目"+(leg==="kaeri" ? "かえり" : leg==="yuki" ? "ゆき" : ""),
+           leg_by: ls.by, leg_at: ls.at };   // ★uiStudy-0.9.6: いまの区間にした決め方と時刻（setLeg を参照）
 }
 function activeConds(){
   const fixed = condInput();
@@ -487,7 +498,13 @@ function peekVariant(){
   return Object.assign({ input: c.input, count_init: c.count_init, seq: n, offset: off,
            unknown_ui: condUnknown(),         // ★要因B：「わからない」ボタンを出したか
            url_fixed: { input: URL_INPUT, unknown: URL_UNKNOWN }, // ★テスト用URLで固定されていたか
-           practice: prac }, studyTag());     // ★study / round / leg / group / label
+           practice: prac,
+           // ★uiStudy-0.9.6: 混み具合を押した時点でログインしていたID（カードの文字。例 "A"）。
+           //   surveyor_id は「送った瞬間にログインしていた人」なので、未送信の回答を別の人のログインで送ると食い違う。答えた人はこちらで見る
+           login_id: loginId() || null,
+           // ★uiStudy-0.9.6: 開いたURLの指定（"r1"=?round=1 / "r2"=?round=2 / "count"=?study=count / null=指定なし）。
+           //   round と違えば、回はその日に覚えた値（別のQR・別のタブ）から来ている
+           url_study: URL_STUDY }, studyTag());     // ★study / round / leg / group / label
 }
 // 送信/スキップが確定した回答についてだけ呼ぶ。カウンタを実際に1つ進める。
 // n===variant.seq のときだけ進めるので、同じ variant を誤って2回コミットしても多重には進まない。
@@ -604,7 +621,7 @@ function switchLeg(to){
   if(!confirm(to==="kaeri" ? t.leg_confirm_kaeri : t.leg_confirm_yuki)) return;
   // 送信後の軌跡記録中の回答は、前の区間のラベルのまま先に確定させる
   if(pending){ commitVariant(pending.variant); finalizeNow(true); }
-  setLeg(to);
+  setLeg(to, to==="kaeri" ? "switch" : "back");
   renderMain();
   toast(t.leg_switched(to==="kaeri" ? t.leg_kaeri : t.leg_yuki));
 }
@@ -620,7 +637,7 @@ function renderLegPick(){
         <button class="legbig kaeri" data-leg="kaeri"><span class="lgn">${t.leg_kaeri}</span><span class="lgr">${t.leg_kaeri_route}</span></button>
       </div>
     </div>`;
-  main.querySelectorAll(".legbig").forEach(b=>{ b.onclick=()=>{ setLeg(b.dataset.leg); renderMain(); }; });
+  main.querySelectorAll(".legbig").forEach(b=>{ b.onclick=()=>{ setLeg(b.dataset.leg, "pick"); renderMain(); }; });
   setStatus();
 }
 // 人数画面を開いてから最初に値を操作するまでの時間（＝考えていた時間の目安）を1回だけ記録する
@@ -662,7 +679,8 @@ function finishSession(outcome, extra){
       lang: lang, app_version: APP_VERSION,
       posture: LOG.posture,                           // セッション開始時点の値
       practice: LOG.practice,                         // true なら練習＝分析から外す
-      response_cid: pending ? pending.cid : null
+      response_cid: pending ? pending.cid : null,
+      device_id: deviceId()                           // ★uiStudy-0.9.6: 端末ごとのでたらめな番号（deviceId を参照）
     }, extra || {}),
     summary: {
       t_total: t_total,            // クラスタップ→確定までの所要時間(ms)
@@ -679,25 +697,58 @@ function finishSession(outcome, extra){
 }
 
 /* --- セッションのローカル退避と送信 --- */
-function uiSessions(){ try{ return JSON.parse(localStorage.getItem(UISTUDY_KEY) || "[]"); }catch(e){ return []; } }
-function saveUiSessions(a){ try{ localStorage.setItem(UISTUDY_KEY, JSON.stringify(a)); }catch(e){} }
+// ★uiStudy-0.9.6: 端末に保存できない（Cookie 全ブロック等で localStorage が例外を出す・容量が足りない）ときは、
+//   未送信の操作ログと回答をメモリに控える（getDaily の DAILY_MEM と同じ考え方）。
+//   以前は保存に失敗すると操作ログが1件も送られず、その回答の条件と操作時間がすべて消えていた
+const STORE_MEM = {};
+function loadArr(k){
+  let raw=null;
+  if(k in STORE_MEM) raw=STORE_MEM[k];
+  else{ try{ raw=localStorage.getItem(k); }catch(e){} }
+  try{ const a=JSON.parse(raw || "[]"); return Array.isArray(a) ? a : []; }catch(e){ return []; }
+}
+function saveArr(k, a){
+  const s=JSON.stringify(a);
+  try{ localStorage.setItem(k, s); delete STORE_MEM[k]; }catch(e){ STORE_MEM[k]=s; }
+}
+function uiSessions(){ return loadArr(UISTUDY_KEY); }
+function saveUiSessions(a){ saveArr(UISTUDY_KEY, a); }
 function saveSession(rec){ const a = uiSessions(); a.push(rec); saveUiSessions(a); flushSessions(); }
 
-async function flushSessions(){
+// ★uiStudy-0.9.6: 端末ごとのでたらめな番号（乗降アプリと同じキー）。操作ログの context.device_id に入れる。
+//   同じIDが2台から送っている・カードを取り違えた、を見つけるため。人を特定する情報は含まない。ログアウトしても消さない
+const DEVICE_KEY = "uistudy_device_v1";
+let deviceIdMem = null;
+function deviceId(){
+  if(deviceIdMem) return deviceIdMem;
+  try{ deviceIdMem = localStorage.getItem(DEVICE_KEY); }catch(e){}
+  if(!deviceIdMem){ deviceIdMem = uuid(); try{ localStorage.setItem(DEVICE_KEY, deviceIdMem); }catch(e){} }
+  return deviceIdMem;
+}
+
+// ★uiStudy-0.9.6: 送る処理は同時に1本だけにする（乗降アプリの flush() と同じ作り）。走っている間に呼ばれたら、終わったあとにもう1周する。
+//   ページを開いたとき、起動の処理とログイン状態の知らせ（INITIAL_SESSION）が同時に再送を始め、同じ回答が2行入っていた
+const FLUSHING = {};
+function runOne(name, fn){
+  const f = FLUSHING[name] || (FLUSHING[name] = { p:null, again:false });
+  if(f.p){ f.again = true; return f.p; }
+  f.p = (async()=>{ try{ do{ f.again = false; await fn(); }while(f.again); } finally{ f.p = null; } })();
+  return f.p;
+}
+function flushSessions(){ return runOne("sessions", flushSessionsOnce); }
+async function flushSessionsOnce(){
   if(!user || !configured) return;
-  const a = uiSessions(); if(!a.length) return;
-  const keep = [];
-  for(const rec of a){
+  // 1件送れるたびに、端末の一覧を読み直してその1件だけ消す（送っている間に足された操作ログを上書きで消さない）
+  for(const rec of uiSessions()){
     try{
       const { error } = await sb.from("ui_sessions")
         .insert(Object.assign({}, rec, { client_submitted_at: new Date().toISOString() }));
       if(error) throw error;
+      saveUiSessions(uiSessions().filter(x=>x.session_id!==rec.session_id));
     }catch(err){
       console.error("[ui_sessions] insert失敗:", err?.code || "", err?.message || err);
-      keep.push(rec);
     }
   }
-  saveUiSessions(keep);
 }
 
 // 研究用: 未送信ぶんも含めローカルのセッションをJSONで書き出す
@@ -1015,8 +1066,9 @@ function setStatus(msg,warn){
 }
 
 /* ---------------- outbox (端末退避＆再送) ---------------- */
-function outbox(){ try{ return JSON.parse(localStorage.getItem(OUTBOX_KEY)||"[]"); }catch(e){ return []; } }
-function saveOutbox(a){ try{ localStorage.setItem(OUTBOX_KEY, JSON.stringify(a)); }catch(e){} }
+// ★uiStudy-0.9.6: 端末に保存できないときはメモリに控える（loadArr / saveArr を参照）
+function outbox(){ return loadArr(OUTBOX_KEY); }
+function saveOutbox(a){ saveArr(OUTBOX_KEY, a); }
 function outboxUpsert(item){ const a=outbox(); const i=a.findIndex(x=>x.cid===item.cid); if(i>=0)a[i]=item; else a.push(item); saveOutbox(a); }
 function outboxRemove(cid){ saveOutbox(outbox().filter(x=>x.cid!==cid)); }
 
@@ -1026,7 +1078,9 @@ async function insertRecord(rec){
   const { error } = await sb.from("ui_responses").insert(payload);
   if(error) throw error;
 }
-async function flushOutbox(){
+// ★uiStudy-0.9.6: 同時に1本だけ（runOne を参照）
+function flushOutbox(){ return runOne("outbox", flushOutboxOnce); }
+async function flushOutboxOnce(){
   if(!user) return;
   for(const item of outbox().filter(x=>x.ready)){
     try{ await insertRecord(item.rec); outboxRemove(item.cid);
@@ -1507,6 +1561,9 @@ function renderCount(){
 // 人数画面で「戻る」: 誤タップしたクラス選択を破棄してクラス一覧へ戻す
 function cancelPick(){
   answering=false;
+  // ★uiStudy-0.9.6: 人数画面で位置が取れると、回答は「送る前」の印で未送信の箱（outbox）に入る（onGeoPos → syncPendingToOutbox）。
+  //   戻るときは送らないので、箱からも消す。以前は送られないまま箱に残り、帯の「未送信 1件」が消えなかった（0.9.5 から）
+  if(pending && pending.cid) outboxRemove(pending.cid);
   pending=null;                 // 未送信の回答を破棄
   renderMain();                 // クラス選択画面へ
 }
@@ -1908,7 +1965,7 @@ async function boot(){
     // ★UI研究: 着席/立席・練習モードはその時々の状態なので、ログアウトのたびにリセットする
     setDaily(POSTURE_KEY, null); setDaily(PRACTICE_KEY, null);
     // ★2026-10-07: 回目・区間も消す（同じ端末で別の人がログインしても前の人の区間を引き継がない）
-    setDaily(STUDY_KEY, null); setDaily(LEG_KEY, null); setDaily(LEGAT_KEY, null); setDaily(TESTGROUP_KEY, null);
+    setDaily(STUDY_KEY, null); setDaily(LEG_KEY, null); setDaily(LEGAT_KEY, null); setDaily(LEGSET_KEY, null); setDaily(TESTGROUP_KEY, null);
     // ★2026-10-07: ログインは乗降アプリと共有しているので、乗降アプリの着席/立席・練習も消す
     setDaily("counter_posture_v1", null); setDaily("counter_practice_v1", null);
     user=null; authMode="login"; view="report"; render();
@@ -1957,7 +2014,12 @@ async function boot(){
     if(document.hidden){ if(pending && !answering) finalizeNow(true); stopSampling(); }
     else if(user){ geoResume(); flushOutbox(); flushSessions(); if(view==="report" && !answering) renderLegBar(); }  // 復帰: 測位再開＆再送（★0.9.4: 拒否のあとでも聞き直す）
   });
-  window.addEventListener("pagehide", ()=>{ if(pending) finalizeNow(true); });
+  window.addEventListener("pagehide", ()=>{
+    // ★uiStudy-0.9.6: 人数を入れている途中でページが閉じたら、先に操作ログを「途中で終わった」(outcome:"abandon", reason:"pagehide") として残す。
+    //   以前は回答（混み具合だけ・人数なし）だけが届き、操作ログが無いので条件の分からない行になっていた。回答はこれまでどおり送る
+    if(answering && pending && LOG) finishSession("abandon", { reason:"pagehide" });
+    if(pending) finalizeNow(true);
+  });
 }
 boot();
 </script>

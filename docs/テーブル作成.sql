@@ -16,19 +16,36 @@ create table if not exists public.ui_sessions (
   started_at          timestamptz,                           -- セッション開始(端末時刻)
   client_submitted_at timestamptz,                           -- 実送信時の端末時刻
   outcome             text,                                  -- submit | skip | abandon
-  variant             jsonb,                                 -- 割り当てたUI条件 {input, count_init, seq, offset, unknown_ui, url_fixed{input,unknown}, practice, study, round, leg, group, label}
+  variant             jsonb,                                 -- 割り当てたUI条件 {input, count_init, seq, offset, unknown_ui, url_fixed{input,unknown}, practice, study, round, leg, group, test_account, label,
+                                                             --   login_id, url_study, leg_by, leg_at}
                                                              --   input=要因A(stepper/numpad) / unknown_ui=要因B(「わからない」ボタンの有無)
                                                              --   count_init は2026-09-19に要因から外れ、以降は常に "none"（それ以前は "median" が混在）
+                                                             --   ★2026-10-10（uiStudy-0.9.6）から入る項目：
+                                                             --     login_id  = 混み具合を押した時点でログインしていたID（例 "A"）。答えた人はこれで見る。
+                                                             --                 surveyor_id は「送った瞬間にログインしていた人」なので、未送信の回答を別の人のログインで送ると食い違う
+                                                             --     url_study = 開いたURLの指定。"r1"(?round=1) / "r2"(?round=2) / "count"(?study=count) / null(指定なし)。
+                                                             --                 round と合わなければ、回はその日に覚えた値（別のQR・別のタブ）から来ている
+                                                             --     leg_by    = いまの区間にした決め方。"pick"(区間を選ぶ画面で選んだ) / "switch"(かえりに切り替えた) / "back"(ゆきに戻した)
+                                                             --     leg_at    = その時刻（UTC）。かえりに切り替え忘れた回答を、桃山台駅のアンケートの時刻と突き合わせて見つけるため
+                                                             --     （leg_by・leg_at は study="ui" の行だけに入る。0.9.5 までの行には、この4つは無い）
   context             jsonb,                                 -- congestion_class / exact_count / count_touched / count_unknown /
                                                              --   next_stop / gps_points / screen_w / screen_h / lang / app_version /
-                                                             --   posture / practice / response_cid
+                                                             --   posture / practice / response_cid / device_id / reason
                                                              --   （exp_code は2026-09-18、board_stop/dest_stop は2026-09-20に廃止）
+                                                             --   ★2026-10-10（uiStudy-0.9.6 / counter-2.0.3）から：
+                                                             --     device_id = 端末ごとのでたらめな番号（両アプリで共通。人を特定する情報は含まない）。
+                                                             --                 同じIDが2台から送っている・カードの取り違えを見つけるため。
+                                                             --                 端末に保存できない端末（Cookie をすべて止めた Safari など）では、開き直すたびに変わる
+                                                             --     reason    = "pagehide"：人数を入れている途中でページが閉じた（outcome は abandon）。
+                                                             --                 この行は同じ session_id でほぼ毎回2行届く。回答の行（人数は空）は、届かないことが多い
+                                                             --                 reason が無い abandon は「戻る」を押した
   summary             jsonb,                                 -- t_total/t_class/t_count/t_first/t_stop/taps_total/taps_value/corrections
   events              jsonb                                  -- 操作イベント列 [{dt,type,...}]
 );
 -- ★2026-10-07: 計数研究かえり（乗降アプリ counter.html）の行も入る。1バス停＝1行。スキーマは同じ
 --   variant {study:"count", leg:"kaeri", method:"flow", app:"counter", ...}
 --   context {run_id, stop{name,seq}, board, alight, resend, ...}。resend:true があれば同じ run_id・stop の最後の行を使う
+--   ★2026-10-10（counter-2.0.3）から variant.login_id（送信を押した時点のID）と context.device_id も入る
 
 create index if not exists ui_sessions_created_idx  on public.ui_sessions (created_at desc);
 create index if not exists ui_sessions_surveyor_idx on public.ui_sessions (surveyor_id);
@@ -45,6 +62,9 @@ create policy "ui select own" on public.ui_sessions
 
 -- 分析は SQL Editor（service_role）で全件参照:
 --   select json_agg(t) from (select * from ui_sessions order by id) t;
+-- 同じ session_id の行が2行入ることがある（送れたのに返事が届かず、あとで送り直したとき。人数を入れている途中で
+-- ページが閉じたときは、ほぼ毎回）。session_id ごとに1行にまとめる。
+--   ui_responses も同じで、client_id ごとに1行にまとめる
 
 -- ========== ui_responses ==========
 -- ============================================================

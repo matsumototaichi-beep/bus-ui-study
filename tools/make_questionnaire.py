@@ -3,7 +3,9 @@
 
     python tools/make_questionnaire.py
 
-設問の正本は docs/questionnaire/設問一覧.xlsx。
+★2026-10-10: 松本が Google フォームを手で直したので、正本は Google フォーム。
+紙は、その控え docs/questionnaire/フォームの中身_*.json（いちばん新しいもの。tools/read_forms.py が作る）から作る。
+題名・説明・問の文・答え方は、フォームのまま写す。設問一覧.xlsx（作ったときの版）は使わない。
 docs/questionnaire/ に フォームと同じ4つが出る。
   アンケート_1回目_桃山台.docx / アンケート_1回目_南口.docx / アンケート_2回目_桃山台.docx / アンケート_2回目_南口.docx
 """
@@ -108,14 +110,33 @@ def build(rows):
     return doc
 
 
+def rows_from_form(name, form):
+    """フォームの中身の控え（.json の1フォーム）を、build() が読む行（設問一覧.xlsx と同じ8列）にする。
+    問の文は番号ごとフォームのまま出す（番号の列は空にして、設問文に「問N …」をそのまま入れる）"""
+    rows = [(name, "表紙", "", "表紙", form["title"], "", "", form.get("description") or "")]
+    for it in form["items"]:
+        kata = it["type"]
+        if kata in ("ページ", "説明"):
+            rows.append((name, "", "", kata, it["title"], "", "", it.get("help") or ""))
+            continue
+        sel = "／".join(it.get("labels") or it.get("choices") or [])
+        rows.append((name, "", "", kata, it["title"], sel, "○" if it.get("required") else "", it.get("help") or ""))
+    return rows
+
+
 def main():
-    import make_forms as mf
-    rows = mf.read_bank()
-    for youshi in mf.YOUSHI:
-        sub = [r for r in rows if r[0] == youshi]
+    import json
+    import join_survey_app as J
+    src = J.latest_form_json()
+    with open(src, encoding="utf-8") as f:
+        forms = json.load(f)
+    print("もと: %s" % os.path.relpath(src, ROOT))
+    for youshi in J.FORMS:
+        rows = rows_from_form(youshi, forms[youshi])
         path = os.path.join(OUTDIR, "アンケート_%s.docx" % youshi)
-        build(sub).save(path)
-        print("書き出しました: %s（%d問）" % (path, mf.count_q(rows, youshi)))
+        build(rows).save(path)
+        n = sum(1 for r in rows if r[3] not in ("表紙", "ページ", "説明"))
+        print("書き出しました: %s（%d問）" % (path, n))
 
 
 if __name__ == "__main__":

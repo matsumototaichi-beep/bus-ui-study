@@ -260,7 +260,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
-const VERSION = "counter-2.0.2";
+const VERSION = "counter-2.0.3";
 // index.html と同じプロジェクト・同じ設定。同じサイトなのでログイン状態も共有される
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
@@ -370,6 +370,12 @@ function getDaily(k){ const raw=lsGet(k); if(!raw) return null; const i=raw.last
   return (i>0 && raw.slice(i+1)===todayStr()) ? raw.slice(0,i) : null; }
 function setDaily(k,v){ lsSet(k, v ? v+"|"+todayStr() : null); }
 function isPractice(){ return getDaily(PRACTICE_KEY)==="1"; }
+// ★counter-2.0.3: ログインしているID（カードの文字。例 "A"）。送る行の variant.login_id に入れる（index.html の loginId と同じ）
+function loginId(){ return ((user && user.email) || "").split("@")[0].toUpperCase(); }
+// ★counter-2.0.3: 端末ごとのでたらめな番号（人数アプリと同じキー）。送る行の context.device_id に入れる。
+//   同じIDが2台から送っている・カードを取り違えた、を見つけるため。人を特定する情報は含まない。ログアウトしても消さない
+const DEVICE_KEY = "uistudy_device_v1";
+function deviceId(){ let v=lsGet(DEVICE_KEY); if(!v){ v=uuid(); lsSet(DEVICE_KEY, v); } return v; }
 
 /* ---------------- 記録（1バス停＝1件） ---------------- */
 // ★2026-10-07: メモリに持たず毎回端末から読み直し、読む・変える・書くを updRecs の1か所で行う。
@@ -830,12 +836,14 @@ function send(){
     session_id: sid,
     started_at: d.started_at,
     outcome: "submit",
-    variant: { study:"count", round:null, leg:LEG, group:null, label:LABEL, method:"flow", app:"counter", practice:prac },
+    variant: { study:"count", round:null, leg:LEG, group:null, label:LABEL, method:"flow", app:"counter", practice:prac,
+               login_id: loginId() || null },   // ★counter-2.0.3: 送信を押した時点でログインしていたID
     context: Object.assign({
       run_id: run.run_id, dir: DIR, stop: stopObj(d.cur), stop_suggested: stopObj(d.sug),
       stop_changed: d.cur!==d.sug, resend: resend, board: d.board, alight: d.alight,
       posture: getDaily(POSTURE_KEY), trajectory: traj }, repPoint(traj, sec), {
-      screen_w: innerWidth, screen_h: innerHeight, app_version: VERSION }),
+      screen_w: innerWidth, screen_h: innerHeight, app_version: VERSION,
+      device_id: deviceId() }),   // ★counter-2.0.3
     summary: { t_total: now-d.shown_at, t_first: d.first_at-d.shown_at, taps_total: d.taps,
                board_plus: d.cnt.board_plus, board_minus: d.cnt.board_minus,
                alight_plus: d.cnt.alight_plus, alight_minus: d.cnt.alight_minus },
@@ -1092,7 +1100,7 @@ async function boot(){
     if(sb){ try{ await sb.auth.signOut(); }catch(e){} }
     setDaily(POSTURE_KEY, null); setDaily(PRACTICE_KEY, null);
     // ★2026-10-07: ログインは人数アプリと共有しているので、人数アプリの着席/立席・練習・回目・区間も消す（index.html のログアウトと同じ）
-    ["uistudy_posture_v1","uistudy_practice_v1","uistudy_round_v1","uistudy_leg_v1","uistudy_leg_at_v1","uistudy_testgroup_v1"].forEach(k=>lsSet(k, null));
+    ["uistudy_posture_v1","uistudy_practice_v1","uistudy_round_v1","uistudy_leg_v1","uistudy_leg_at_v1","uistudy_leg_set_v1","uistudy_testgroup_v1"].forEach(k=>lsSet(k, null));
     user=null; run=null; render();
   };
   // ★counter-2.0.1: 位置情報が拒否・大まかなときは、帯を押すと直し方の画面を出す

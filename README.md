@@ -20,7 +20,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | 回答テーブル | `responses` | **`ui_responses`** |
 | 一覧ビュー | `report_feed` | **`ui_report_feed`** |
 | ローカル退避キー | `bus_outbox_v1` | **`uistudy_outbox_v1`** |
-| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.5`**（2026-10-09時点。乗降アプリは `counter-2.0.2`） |
+| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.6`**（2026-10-10時点。乗降アプリは `counter-2.0.3`） |
 
 > **2026-10-06 に Supabase を元アプリとは別のプロジェクト（`wwavbfdojschxohvvpzb`）に切り替えた**（前のプロジェクトは削除されていた）。
 > テーブルは `docs/テーブル作成.sql`（`ui_responses` / `ui_sessions` / `ui_report_feed`）で作る。
@@ -39,7 +39,8 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | `LITERATURE.md` | 文献メモ（本文をどこまで読んだか） |
 | `WORKFLOW.md` | 教授との共有・文献調査のルール |
 | `docs/実験の進め方.docx` | 当日の運用 |
-| `docs/questionnaire/` | UI研究のアンケート4つ（1回目_桃山台・1回目_南口・2回目_桃山台・2回目_南口）の設問一覧.xlsx・GoogleForms生成.gs・紙の予備 |
+| `docs/questionnaire/` | UI研究のアンケート4つ（1回目_桃山台・1回目_南口・2回目_桃山台・2回目_南口）。**正本は Google フォーム**（2026-10-10 に松本が手で直した）。`フォームの中身_2026-10-11.md`・`.json` がその控え、`アンケート_*.docx` が紙の予備。`設問一覧.xlsx`・`GoogleForms生成.gs` は作ったときの版で、今のフォームと違う（**`createAll` は2度と実行しない**） |
+| `docs/分析の準備.md` | アンケートとアプリの記録を書き出して、1つの表につなぐ手順 |
 | `docs/login_prep.md` / `docs/login_paths.md` | ログインの準備／管理者ログイン |
 | `docs/テーブル作成.sql` | Supabase のテーブル |
 | `tools/` | 下の表 |
@@ -55,7 +56,10 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | `make_posters_pdf.py` | `../★UI研究/QRポスター.pdf` |
 | `make_cards_pdf.py` | `../★UI研究/配布カード.pdf` |
 | `create_accounts.py` | 参加者アカウント・`../★UI研究/accounts.csv` |
-| `make_forms.py` / `make_questionnaire.py` | `docs/questionnaire/`（UI研究のアンケート4つ） |
+| `read_forms.py` | UI研究のアンケートの今の中身を読み（読むだけ）、控え `docs/questionnaire/フォームの中身_*.json`・`.md` と比べる・作り直す |
+| `make_questionnaire.py` | 紙の予備 `docs/questionnaire/アンケート_*.docx`（今の中身の控えから作る） |
+| `make_forms.py` | 作ったときの版（2026-10-09）の設問一覧.xlsx・GoogleForms生成.gs。今のフォームとは違う |
+| `join_survey_app.py` | アンケートの答えとアプリの記録をつないだ表と、問題の一覧（`docs/分析の準備.md`）。確かめは `test_join_survey_app.py` |
 | `make_count_qr.py` | `../★乗降人数計算/QRポスター_計数研究.pdf`・`乗降アプリQR.png` |
 | `make_count_forms.py` | `../★乗降人数計算/計数研究アンケート生成.gs`・`計数研究アンケート.docx` |
 | `make_handouts.py` | 配布用紙（`../★UI研究/` に1回目・2回目、`../★乗降人数計算/` に計数研究）。UI研究の用紙には桃山台駅と南口のアンケートのQRが載る。アンケートURLは各フォルダの `アンケートURL.xlsx` から読む |

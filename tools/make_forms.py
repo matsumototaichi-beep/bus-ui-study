@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 """UI研究のアンケート（Google フォーム4つ）を作る
 
+★2026-10-10: 松本がフォーム4つを手で直した。正本は Google フォームで、控えは docs/questionnaire/フォームの中身_*.md・.json。
+  このファイル・設問一覧.xlsx・GoogleForms生成.gs は作ったときの版（10/9）で、今のフォームと違う。
+  createAll は2度と実行しない（古い問いのフォーム4つと回答表がもう1組できる）。紙の予備は make_questionnaire.py が控えから作る。
+
     python tools/make_forms.py --bank --force   設問一覧.xlsx を作り直す（このファイルの ROWS に戻る）
     python tools/make_forms.py                  Excel から GoogleForms生成.gs を作る
 
-設問の正本は docs/questionnaire/設問一覧.xlsx。文言を直すときはそこを直す。
+（10/9 まで）設問の正本は docs/questionnaire/設問一覧.xlsx だった。
 
 1回の往復で2回答える。桃山台駅で降りたらゆきの分、南口に着いたらかえりの分。
   1回目_桃山台（ゆき・数字キー）   … 共通5問 ＋ 自由記述（6問）
@@ -299,6 +303,8 @@ def emit_item(row, out):
 
 
 HEAD = [
+    "// ★2026-10-10: 松本がフォームを手で直したので、このスクリプトの問いは今のフォームと違う（作ったときの版）。",
+    "// ★createAll は2度と実行しない（古い問いのフォーム4つと回答表がもう1組できる）。今の中身は docs/questionnaire/フォームの中身_*.md",
     "// UI研究のアンケート（Google フォーム4つ）と、回答がたまるスプレッドシートを作るスクリプト",
     "// docs/questionnaire/設問一覧.xlsx から tools/make_forms.py で作る。設問は Excel を直して作り直す。",
     "//",
