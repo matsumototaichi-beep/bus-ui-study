@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""配布カードをA4のPDFにする（印刷を人に頼むとき用）
+"""ログインカードをA4のPDFにする（印刷を人に頼むとき用）
 
     python tools/make_cards_pdf.py
 
-★UI研究/accounts.csv を読んで、★UI研究/配布カード.pdf を作る。
+★UI研究/accounts.csv を読んで、★UI研究/ログインカード.pdf を作る。
 A4に8枚（2列×4行）。切り取り線つき。
+★2026-10-11: 「配布カード」を「ログインカード」に改めた（配布用紙と同じ）。予備のカード（M〜X）にも「予備」と書かない（松本の指示）
 """
 import os, csv, pathlib
 import pymupdf
@@ -14,7 +15,7 @@ from fontTools import subset
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTDIR = os.path.join(os.path.dirname(ROOT), "★UI研究")
 CSV = os.path.join(OUTDIR, "accounts.csv")
-OUT = os.path.join(OUTDIR, "配布カード.pdf")
+OUT = os.path.join(OUTDIR, "ログインカード.pdf")
 FONTDIR = pathlib.Path(os.environ['TEMP']) / 'jpfonts_cards2'
 FONTDIR.mkdir(parents=True, exist_ok=True)
 
@@ -49,7 +50,7 @@ def build_font(ttc_path, out_name, chars):
 with open(CSV, encoding="utf-8-sig", newline="") as f:
     rows = list(csv.DictReader(f))
 
-used = set("名前 ID パスワード 予備" + NOTE1 + NOTE2)
+used = set("名前 ID パスワード" + NOTE1 + NOTE2)
 used |= set(chr(c) for c in range(0x20, 0x7f))
 for r in rows:
     used |= set(r["名前"]) | set(r["ID"]) | set(r["パスワード"])
@@ -71,12 +72,6 @@ for i, r in enumerate(rows):
     # 枠（切り取り線）
     page.draw_rect(pymupdf.Rect(x, y, x + CW, y + CH),
                    color=(0.55, 0.55, 0.55), width=0.7, dashes="[3 3] 0")
-
-    yobi = (r.get("予備") or "").strip()
-
-    if yobi:
-        page.insert_text((x + CW - 46, y + 24), "予備", fontname="B", fontsize=10,
-                         color=(0.7, 0, 0))
 
     # 名前は空欄。参加者に手書きしてもらう
     page.insert_text((x + 16, y + 24), "名前", fontname="R", fontsize=9, color=(0.4, 0.4, 0.4))

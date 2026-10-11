@@ -116,7 +116,8 @@
   .lstat{flex:0 0 auto; font-size:11px; color:var(--muted); text-align:right;}
   .lstat.ok{color:#34d399;} .lstat.pend{color:#fbbf24;} .lstat.rec{color:#60a5fa;}
 
-  .center{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:16px; overflow-y:auto;}
+  .center{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:16px; overflow-y:auto;
+          scroll-padding-bottom:72px;}   /* ★uiStudy-0.9.7: 入力欄に触って画面が動くとき、下に固定した送信の行の裏に入れない */
 
   /* 停留所オートコンプリート */
   .stopwrap{width:100%; max-width:420px; display:flex; flex-direction:column; gap:10px; text-align:left;}
@@ -131,8 +132,14 @@
   .stoprow:active{background:var(--line);}
   .stoprow .dist{float:right; color:var(--muted); font-size:12px;}
   .stopsel{font-size:12px; color:#34d399; margin:4px 2px 0; min-height:15px;}
+  /* ★uiStudy-0.9.7: 何も出ていないときは行を取らない（数字キーの画面で入力欄が送信の下に隠れないように） */
+  .stopsel:empty{min-height:0; margin:0;}
   .stopsel .clr{color:#fca5a5; margin-left:8px; text-decoration:underline;}
   .stopsrc{font-size:10px; color:var(--muted); margin:2px 2px 0;}
+  /* ★uiStudy-0.9.7: 出典は候補の一覧のいちばん下に出す（バス停の名前が出る所に出典を付ける）。押しても何も起きない */
+  .stoplist .stopsrc{margin:0; padding:7px 12px 8px; line-height:1.4;}
+  /* 下に場所がない（画面の下・キーボード）ときは入力欄の上に開く */
+  .stoplist.up{top:auto; bottom:100%; margin-top:0; margin-bottom:4px;}
   .center h2{margin:0; font-size:18px; font-weight:700;}
   .center .hint{color:var(--muted); font-size:13px; margin:0;}
   /* 選んだクラス＋その目安人数（入力の制限ではない） */
@@ -177,8 +184,10 @@
   .unknownrow button.on{border-style:solid; border-color:#2563eb; color:var(--ink); background:rgba(37,99,235,.16);}
   .row{display:flex; gap:10px; width:100%; max-width:420px;}
   .row.actions{flex-direction:column;}   /* 通常は縦積み。縦の短い端末では横並びに切替（下部@media） */
-  /* 送信/スキップはスクロール領域の下端に固定。入力方式によって到達コストが変わると
-     「テンキーが遅い」のが入力ではなくスクロールのせいになってしまうため */
+  /* 送信はスクロール領域の下端に固定。入力方式によって到達コストが変わると
+     「テンキーが遅い」のが入力ではなくスクロールのせいになってしまうため。
+     ★uiStudy-0.9.7: 「スキップ」を消した（松本 2026-10-11。空欄のまま「送信」すれば同じ）。送信の行が1段になった分、
+     数字キーの画面でも「次に停まるバス停」の入力欄が送信の下に隠れないようにする */
   .row.actions{position:sticky; bottom:0; z-index:2; background:var(--bg); padding:8px 0 2px;}
   .btn{flex:1; border:none; border-radius:14px; padding:15px; font-size:15px; font-weight:700; font-family:inherit; color:#fff;}
   .btn.primary{background:#2563eb;} .btn.ghost{background:transparent; color:var(--muted); border:1px solid var(--line);}
@@ -274,7 +283,7 @@
   }
   /* ── さらに縦が短い画面（iPhone SE 1st 320x568 / 横向き） ── */
   @media (max-height:620px){
-    .center{gap:8px; padding:48px 12px 10px;}
+    .center{gap:6px; padding:44px 12px 8px;}   /* ★uiStudy-0.9.7: 8px → 6px、上 48px → 44px（戻るボタンの下端は 38px）。バス停の入力欄を送信の上に出すため */
     :root{--ctlh:46px;}
     .numwrap{gap:5px;}
     .numpad{gap:5px;}
@@ -284,8 +293,6 @@
     .afield{padding:9px 11px;}   /* font-size は16pxのまま＝iOSの自動ズーム回避 */
     .stoplist{max-height:132px;}
     .btn{padding:11px; font-size:14px;}
-    .row.actions{flex-direction:row;}
-    #sendBtn{flex:2;} #skipBtn{flex:1;}
   }
   /* 320px級ではナビ「データ一覧」が切れるので、優先度の低いログイン名を落として幅を譲る */
   @media (max-width:360px){ .sess{display:none;} }
@@ -343,7 +350,7 @@
    ========================================================== */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "uiStudy-0.9.6";
+const APP_VERSION = "uiStudy-0.9.7";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -834,7 +841,7 @@ const T = {
       {lbl:"立ち客", rng:"31〜45人"},{lbl:"混雑", rng:"46〜60人"},{lbl:"満員近い", rng:"61人〜"},
     ],
     // ★2026-10-07: 見出しだけにする。「数えられれば入力」は数えられないときの逃げ道を勧めてしまい、
-    //「わからない」ボタンの有無による差が見えなくなるため。空欄・スキップはこれまでどおりできる
+    //「わからない」ボタンの有無による差が見えなくなるため。空欄のまま送ることはこれまでどおりできる
     countTitle:"車内の人数", countHint:"",
     unknown:"わからない",
     back:"戻る", already_registered:"このIDは使われています。別のIDにしてください。",
@@ -843,7 +850,7 @@ const T = {
     stop_selected:"選択済み", stop_clear:"取消",
     stop_source:"バス停データ出典：国土数値情報 バス停留所データ（国土交通省・大阪府・令和4年度）",
     stop_pick_hint:"候補から選んでください", count_range:"目安",
-    send:"送信", skip:"スキップ", ppl:"人",
+    send:"送信", ppl:"人",
     saved:"送信しました", queued:"端末に保存しました（あとで自動で送ります）", finishing:"軌跡を記録中",
     saveNow:"今すぐ保存", recording:"記録中", pendingN:(n)=>`未送信 ${n}件`,
     st_ok:"送信済", st_pend:"未送信", st_rec:"記録中", log_head:"送信状況",
@@ -955,7 +962,7 @@ const T = {
     stop_selected:"Selected", stop_clear:"Clear",
     stop_source:"Bus-stop data: MLIT National Land Numerical Information (Osaka Pref., FY2022)",
     stop_pick_hint:"Choose one from the list", count_range:"guide",
-    send:"Submit", skip:"Skip", ppl:"",
+    send:"Submit", ppl:"",
     saved:"Sent", queued:"Saved on your device (will send later)", finishing:"Recording your path",
     saveNow:"Save now", recording:"Recording", pendingN:(n)=>`${n} unsent`,
     st_ok:"Sent", st_pend:"Not sent", st_rec:"Recording", log_head:"Status",
@@ -1370,11 +1377,29 @@ function wireStopField(inputId, listId, selId, field){
     inp.value=s.n; list.classList.remove("show");
     sel.innerHTML=`✓ ${T[lang].stop_selected}: ${s.n} <span class="clr">${T[lang].stop_clear}</span>`;
     const c=sel.querySelector(".clr"); if(c) c.onclick=clear; };
+  // ★uiStudy-0.9.7: 一覧は入力欄の下に開く。下に場所がない（画面の下・キーボード）ときは上に開き、高さも見える所に合わせる
+  const place=()=>{
+    if(!list.classList.contains("show")) return;
+    list.classList.remove("up"); list.style.maxHeight="";
+    const r=inp.getBoundingClientRect(), box=inp.closest(".center"), br=box?box.getBoundingClientRect():null;
+    const vv=window.visualViewport;
+    const vTop=vv?vv.offsetTop:0, vBot=vv?vv.offsetTop+vv.height:window.innerHeight;
+    const top=Math.max(vTop, br?br.top:vTop), bot=Math.min(vBot, br?br.bottom:vBot);
+    const below=bot-r.bottom-8, above=r.top-top-8;
+    const want=Math.min(list.scrollHeight, parseFloat(getComputedStyle(list).maxHeight)||220);
+    const up = below < want && above > below;
+    list.classList.toggle("up", up);
+    const room = up ? above : below;
+    if(room < want) list.style.maxHeight = Math.max(96, Math.floor(room)) + "px";
+  };
+  list._place = place;
   const render=(q)=>{
     const cs=stopCandidates(q);
     if(!cs.length){ list.classList.remove("show"); list.innerHTML=""; return; }
-    list.innerHTML=cs.map((s,i)=>`<div class="stoprow" data-i="${i}">${s.n}${s._d!=null?`<span class="dist">${fmtD(s._d)}</span>`:""}</div>`).join("");
+    list.innerHTML=cs.map((s,i)=>`<div class="stoprow" data-i="${i}">${s.n}${s._d!=null?`<span class="dist">${fmtD(s._d)}</span>`:""}</div>`).join("")
+      + `<div class="stopsrc">${T[lang].stop_source}</div>`;   // ★uiStudy-0.9.7: 出典は一覧のいちばん下
     list.classList.add("show");
+    place();
     logEvent("stop_candidates", { field:field, count:cs.length });
     // clickで確定（ドラッグ＝スクロール時はclickが発火しないので、スクロールと両立）
     list.querySelectorAll(".stoprow").forEach(row=>{
@@ -1389,7 +1414,9 @@ function wireStopField(inputId, listId, selId, field){
   inp.addEventListener("focus", ()=>{
     logEvent("stop_focus", { field:field });
     if(LOG) LOG.stop_focus_at = performance.now();
-    if(!inp.value) render(""); });
+    if(!inp.value) render("");
+    // ★uiStudy-0.9.7: 入力欄が送信の行の裏に隠れていたら、見える所まで動かす（.center の scroll-padding-bottom が効く）
+    setTimeout(()=>{ try{ inp.scrollIntoView({block:"nearest"}); }catch(e){} if(list._place) list._place(); }, 60); });
   // blurでの自動閉じはしない（一覧のスクロールを妨げるため）。一覧外タップで閉じる（下の共通ハンドラ）。
   if(pending && pending[field]){                       // 既存選択を復元
     inp.value=pending[field].name;
@@ -1403,6 +1430,10 @@ function wireStopField(inputId, listId, selId, field){
       document.querySelectorAll(".stoplist.show").forEach(l=>{ if(!fld || !fld.contains(l)) l.classList.remove("show"); });
     });
     window.__stopOutsideBound=true;
+    const replace=()=>document.querySelectorAll(".stoplist.show").forEach(l=>{ if(l._place) l._place(); });
+    if(window.visualViewport){ visualViewport.addEventListener("resize", replace); visualViewport.addEventListener("scroll", replace); }
+    window.addEventListener("resize", replace);
+    document.addEventListener("scroll", replace, true);   // 人数の画面の中のスクロールでも置き直す
   }
 }
 
@@ -1466,11 +1497,9 @@ function renderCount(){
           <div class="stoplist" id="nextList"></div>
           <div class="stopsel" id="nextSel"></div>
         </div>
-        <div class="stopsrc">${t.stop_source}</div>
       </div>
       <div class="row actions">
         <button class="btn primary" id="sendBtn">${t.send}</button>
-        <button class="btn ghost" id="skipBtn">${t.skip}</button>
       </div>
     </div>`;
   answering = true;             // 人数入力画面を表示中（背景の再描画から保護）
@@ -1551,9 +1580,6 @@ function renderCount(){
   $("sendBtn").onclick=()=>{ answering=false; pending.exact_count=n;
     logTap("send"); finishSession("submit", { count_touched: n!==null, exact_count:n,
                                               count_unknown: !!pending.n_unknown }); submit(); };
-  $("skipBtn").onclick=()=>{ answering=false; pending.exact_count=null;
-    logTap("skip"); finishSession("skip", { count_touched:false, exact_count:null,
-                                            count_unknown: !!pending.n_unknown }); submit(); };
   $("backPick").onclick=()=>{ logTap("back"); if(LOG) LOG.corrections++;
     finishSession("abandon", {}); cancelPick(); };
 }

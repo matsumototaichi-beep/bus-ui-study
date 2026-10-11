@@ -20,7 +20,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | 回答テーブル | `responses` | **`ui_responses`** |
 | 一覧ビュー | `report_feed` | **`ui_report_feed`** |
 | ローカル退避キー | `bus_outbox_v1` | **`uistudy_outbox_v1`** |
-| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.6`**（2026-10-10時点。乗降アプリは `counter-2.0.3`） |
+| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.7`**（2026-10-11時点。乗降アプリは `counter-2.0.3`） |
 
 > **2026-10-06 に Supabase を元アプリとは別のプロジェクト（`wwavbfdojschxohvvpzb`）に切り替えた**（前のプロジェクトは削除されていた）。
 > テーブルは `docs/テーブル作成.sql`（`ui_responses` / `ui_sessions` / `ui_report_feed`）で作る。
@@ -48,13 +48,13 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | `docs/old/` | 今は使わない古い文書（一覧は `docs/old/README.md`。バス会社の承諾条件は `docs/old/HANDOFF_hankyu.md` §1） |
 | `exports/` | 下見（2026-09-18）のデータ。個人に関わるので git に入れない（`.gitignore`） |
 | `../★乗降人数計算/` | 計数研究（1から数える vs 乗降で数える）の案内・配布用紙・QR・アンケート・アンケートURL.xlsx・ショートカット |
-| `../★UI研究/` | 参加者向け案内_Ui研究.docx（松本が直接編集）と .pdf・配布用紙（1回目・2回目）・QRポスター.pdf・配布カード.pdf・accounts.csv・アンケートURL.xlsx・人数アプリのショートカット |
+| `../★UI研究/` | 参加者向け案内_Ui研究.docx（松本が直接編集）と .pdf・配布用紙（1回目・2回目）・QRポスター.pdf・ログインカード.pdf・accounts.csv・アンケートURL.xlsx・人数アプリのショートカット |
 
 | `tools/` | 作るもの |
 |---|---|
 | `make_operation_docx.py` | `docs/実験の進め方.docx` |
 | `make_posters_pdf.py` | `../★UI研究/QRポスター.pdf` |
-| `make_cards_pdf.py` | `../★UI研究/配布カード.pdf` |
+| `make_cards_pdf.py` | `../★UI研究/ログインカード.pdf` |
 | `create_accounts.py` | 参加者アカウント・`../★UI研究/accounts.csv` |
 | `read_forms.py` | UI研究のアンケートの今の中身を読み（読むだけ）、控え `docs/questionnaire/フォームの中身_*.json`・`.md` と比べる・作り直す |
 | `make_questionnaire.py` | 紙の予備 `docs/questionnaire/アンケート_*.docx`（今の中身の控えから作る） |
