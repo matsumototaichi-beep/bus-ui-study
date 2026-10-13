@@ -60,6 +60,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | `make_questionnaire.py` | 紙の予備 `docs/questionnaire/アンケート_*.docx`（今の中身の控えから作る） |
 | `make_forms.py` | 作ったときの版（2026-10-09）の設問一覧.xlsx・GoogleForms生成.gs。今のフォームとは違う |
 | `join_survey_app.py` | アンケートの答えとアプリの記録をつないだ表と、問題の一覧（`docs/分析の準備.md`）。確かめは `test_join_survey_app.py` |
+| `fetch_weather.py` | 回答した時刻の天気（気象庁アメダス豊中の10分値・Open-Meteo）を、あとで取って回答に付ける。書き出しは `exports/`。確かめは `test_fetch_weather.py` |
 | `make_count_qr.py` | `../★乗降人数計算/QRポスター_計数研究.pdf`・`乗降アプリQR.png` |
 | `make_count_forms.py` | `../★乗降人数計算/計数研究アンケート生成.gs`・`計数研究アンケート.docx` |
 | `make_handouts.py` | 配布用紙（`../★UI研究/` に1回目・2回目、`../★乗降人数計算/` に計数研究）。UI研究の用紙には桃山台駅と南口のアンケートのQRが載る。アンケートURLは各フォルダの `アンケートURL.xlsx` から読む |
