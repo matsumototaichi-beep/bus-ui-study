@@ -406,6 +406,61 @@ def load_surveys(folder, qmap, issues, ids):
     return rows
 
 
+def apply_survey_fixes(rows, path, issues):
+    """アンケートの入れ間違いを、分析のときだけ直す（スプレッドシートは触らない）。
+
+    訂正の表（CSV・見出し行あり）
+        もとのフォーム,ID,何番目,直す先のフォーム,理由
+        2回目_桃山台,F,1,1回目_桃山台,1回目のつもりで2回目のフォームに答えたため
+
+    「何番目」は、そのフォームの中でその ID の行を答えた時刻の早い順に数えた番号（1から）。
+    区間（ゆき／かえり）が同じフォームどうしでしか付け替えない。設問がまったく同じで、
+    中身は正しく、入った箱だけが違うときのための仕組み。
+    直した行には必ず印を付けて、report にも残す。
+    """
+    if not path:
+        return
+    if not os.path.exists(path):
+        sys.exit("訂正の表が見つかりません: %s" % path)
+    df = read_csv_any(path)
+    need = ["もとのフォーム", "ID", "何番目", "直す先のフォーム"]
+    miss = [c for c in need if c not in df.columns]
+    if miss:
+        sys.exit("訂正の表に列がありません: %s（要る列: %s）" % ("／".join(miss), "／".join(need + ["理由"])))
+    for rule in df.to_dict("records"):
+        src = str(rule.get("もとのフォーム", "")).strip()
+        dst = str(rule.get("直す先のフォーム", "")).strip()
+        rid = nk(str(rule.get("ID", ""))).upper()
+        why = str(rule.get("理由", "")).strip()
+        try:
+            nth = int(str(rule.get("何番目", "")).strip())
+        except ValueError:
+            nth = 0
+        if src not in FORMS or dst not in FORMS:
+            sys.exit("訂正の表のフォーム名が違います: %s → %s（使える名前: %s）"
+                     % (src, dst, "／".join(FORMS)))
+        if FORMS[src][1] != FORMS[dst][1]:
+            sys.exit("訂正の表: %s → %s は区間が違うので付け替えません（設問が同じフォームどうしだけ）" % (src, dst))
+        hit = [r for r in rows if r["form"] == src and r["ID"] == rid]
+        hit.sort(key=lambda r: (r["ts"] is None, r["ts"]))
+        if nth < 1 or nth > len(hit):
+            issues.add("アンケートの訂正", "要確認",
+                       "%s の ID「%s」は %d 行しかないので、%d 番目を直せない" % (src, rid, len(hit), nth),
+                       where=src, how="訂正の表の「何番目」を直す")
+            continue
+        r = hit[nth - 1]
+        rnd, leg = FORMS[dst]
+        r["form"], r["form_round"], r["form_leg"] = dst, rnd, leg
+        r["fixed_from"] = src
+        r["flags"].append(("アンケートの訂正", "記録のみ",
+                           "%s から %s に付け替えた%s" % (src, dst, ("：" + why) if why else "")))
+        issues.add("アンケートの訂正", "記録のみ",
+                   "ID「%s」の %s %d番目（%s）を %s として扱った%s"
+                   % (rid, src, nth, (r["ts"].strftime("%m/%d %H:%M") if r["ts"] is not None else "時刻不明"),
+                      dst, ("：" + why) if why else ""),
+                   where=r["where"], how="元のスプレッドシートは直していない")
+
+
 def _similar(a, b):
     from difflib import SequenceMatcher
     return SequenceMatcher(None, nk(a), nk(b)).ratio()
@@ -1371,6 +1426,8 @@ def main(argv=None):
     ap.add_argument("--since", help="この日より前の行を読まない（例 2026-10-13）")
     ap.add_argument("--app-version", help="分析に使うアプリの版（, 区切り）。省くと index.html の APP_VERSION")
     ap.add_argument("--form-json", help="フォームの中身の控え（.json）")
+    ap.add_argument("--survey-fixes",
+                    help="アンケートの入れ間違いを直す表（CSV）。見出しは もとのフォーム,ID,何番目,直す先のフォーム,理由")
     a = ap.parse_args(argv)
 
     fj = a.form_json or latest_form_json()
@@ -1384,6 +1441,7 @@ def main(argv=None):
     versions = [v.strip() for v in a.app_version.split(",")] if a.app_version else default_versions()
     issues = Issues()
     surveys = load_surveys(a.forms, qmap, issues, ids)
+    apply_survey_fixes(surveys, a.survey_fixes, issues)   # 分析のときだけ付け替える（元の表は触らない）
     idmap = read_idmap(a.idmap)
     sess, resp, n_in = load_app(a.sessions, a.responses, idmap, issues)
     if a.since:

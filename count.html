@@ -332,12 +332,21 @@
     /* 巻けるようにする（中央寄せのままだと上にはみ出した分へ届かない）。
        ログイン画面は overflow の指定が無かったので、ここで足す */
     body.countstudy .login{justify-content:flex-start; overflow-y:auto; gap:10px; padding:12px;}
-    body.countstudy .center{justify-content:flex-start; gap:5px; padding:42px 12px 6px;}
+    /* ★countApp-1.0.2: 下の余白を広げて、数字キーの一番下の段（C 0 ⌫）が
+       画面下の帯（位置情報の状態を出す行）の裏に入らないようにする */
+    body.countstudy .center{justify-content:flex-start; gap:5px; padding:42px 12px 56px;}
     body.countstudy .numwrap{gap:4px;}
     body.countstudy .numpad{gap:4px;}
     body.countstudy .stopwrap{gap:5px;}
     body.countstudy .stoplist{max-height:126px;}
-    body.countstudy .row.actions{padding:6px 0 2px;}
+    /* ★countApp-1.0.1【重要】送信バーの貼り付きをやめる。
+       横画面では、貼り付いた不透明の送信バーの**真下に数字キーの下の段が入り**、
+       「7」を押したつもりが送信になって、数えた数と違う数が送られていた。
+       静的に戻すと、重なる所が一つも無くなる（巻けば必ず出てくる）。
+       縦画面は今までどおり貼り付く */
+    body.countstudy .row.actions{position:static; padding:6px 0 2px;}
+    /* 選んだバス停の確かめ行と入力欄も、送信の裏に入らないようにする */
+    body.countstudy .center{scroll-padding-bottom:0;}
   }
   /* 320px級ではナビ「データ一覧」が切れるので、優先度の低いログイン名を落として幅を譲る */
   @media (max-width:360px){ .sess{display:none;} }
@@ -437,9 +446,16 @@
      ここで足した処理はすべて計数研究の中だけで動く。UI研究（?round=1 / ?round=2）のふるまいは変えていない
    ---- 下の SUPABASE_URL / ANON_KEY に自分のプロジェクト値を入れる ----
    ========================================================== */
+/* ★countApp-1.0.1（2026-10-15）独立検証で出た直し
+   (1)【重要】横画面で、貼り付いた送信バーの真下に数字キーの下の段が入っていた。
+       「7」を押したつもりが送信になり、17人のつもりが 1人 で送られていた。
+       横画面では送信バーを貼り付けない（position:static）。縦画面は今までどおり
+   (2) 「ゆきに戻す」のあと、引っぱって更新・タブの復元でまたかえりになっていた。
+       新しく開いたとき（QR を読んだとき）だけ URL の leg=kaeri を効かせる
+   (3) ログイン画面の題名を「車内人数アプリ」にそろえた（配布用紙・アンケートと同じ呼び名） */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "countApp-1.0.0";
+const APP_VERSION = "countApp-1.0.2";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -527,11 +543,22 @@ function counterDir(){ return curLeg()==="kaeri" ? null : "out"; }
 // ★uiStudy-0.9.12: 一度きりにする。URL_LEG はページを閉じるまで "kaeri" のままなので、
 //   毎回の描画で立て直していると、「ゆきに戻す」で戻しても「報告」や「EN」を押した瞬間にかえりへ戻されていた
 let urlLegDone = false;
+// ★countApp-1.0.1: 読み込み直し・タブの復元・「戻る」で戻ってきたときは、URL の leg=kaeri を効かせない。
+//   そうしないと「ゆきに戻す」で戻したあと、引っぱって更新するだけでまたかえりになっていた。
+//   QR を読み直したとき（新しく開いたとき）は今までどおり効くので、桃山台駅での切り替えはできる
+function freshNavigation(){
+  try{
+    const e=(performance.getEntriesByType&&performance.getEntriesByType("navigation"))||[];
+    if(e.length && e[0].type) return e[0].type==="navigate";
+  }catch(err){}
+  return true;   // 分からない端末では今までどおり効かせる
+}
 function applyUrlLeg(){
   if(urlLegDone) return;
   if(URL_LEG!=="kaeri") return;
   if(studyMode()!=="count") return;
   urlLegDone = true;
+  if(!freshNavigation()) return;
   if(getDaily(LEG_KEY)==="kaeri") return;
   setLeg("kaeri", "switch");
 }
@@ -1135,7 +1162,7 @@ const logEntries = [];      // 画面表示用(新しい順)
 //   案内・配布用紙・実験の進め方・login_prep.md が引用している文言（ボタン名・画面の表示・エラー）は変えていない
 const T = {
   ja:{
-    auth_title:"バス混雑度 計測",
+    auth_title:"車内人数アプリ",
     // ★2026-10-08: アカウントは事前に作ってカードで渡す（docs/login_paths.md §5、配布用紙・案内も「カードの ID とパスワードでログイン」）。
     //   「好きなIDとパスワードを決めて登録」は自分で登録していたころの文で、「新規登録」を押させてしまうので乗降アプリと同じ文にした
     auth_intro:"バス車内の混み具合を答えていただく卒業研究です。<b>カードの ID とパスワード</b>でログインしてください。回答は混み具合と人数だけです。位置と時刻は自動で記録します。",
