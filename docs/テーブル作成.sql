@@ -27,7 +27,9 @@ create table if not exists public.ui_sessions (
                                                              --                 round と合わなければ、回はその日に覚えた値（別のQR・別のタブ）から来ている
                                                              --     leg_by    = いまの区間にした決め方。"pick"(区間を選ぶ画面で選んだ) / "switch"(かえりに切り替えた) / "back"(ゆきに戻した)
                                                              --     leg_at    = その時刻（UTC）。かえりに切り替え忘れた回答を、桃山台駅のアンケートの時刻と突き合わせて見つけるため
-                                                             --     （leg_by・leg_at は study="ui" の行だけに入る。0.9.5 までの行には、この4つは無い）
+                                                             --     （0.9.5 までの行には、この4つは無い）
+                                                             --     ★0.9.9 / counter-2.0.6 から、leg_by・leg_at は study="count" の行にも入る（人数アプリ・乗降アプリの両方）。
+                                                             --     値が入るのは「かえりに切り替えた」あとだけで、ゆきの行は null（区間を選ぶ操作そのものが無いため）
   context             jsonb,                                 -- congestion_class / exact_count / count_touched / count_unknown /
                                                              --   next_stop / gps_points / screen_w / screen_h / lang / app_version /
                                                              --   posture / practice / response_cid / device_id / reason

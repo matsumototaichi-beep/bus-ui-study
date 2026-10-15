@@ -20,7 +20,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | 回答テーブル | `responses` | **`ui_responses`** |
 | 一覧ビュー | `report_feed` | **`ui_report_feed`** |
 | ローカル退避キー | `bus_outbox_v1` | **`uistudy_outbox_v1`** |
-| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.7`**（2026-10-11時点。乗降アプリは `counter-2.0.3`） |
+| APP_VERSION | `phaseA-1.3` | **`uiStudy-0.9.7`**（UI研究。本実験のあいだ凍結）／**`countApp-1.0.0`**（計数研究）／**`counter-2.0.8`**（乗降アプリ） |
 
 > **2026-10-06 に Supabase を元アプリとは別のプロジェクト（`wwavbfdojschxohvvpzb`）に切り替えた**（前のプロジェクトは削除されていた）。
 > テーブルは `docs/テーブル作成.sql`（`ui_responses` / `ui_sessions` / `ui_report_feed`）で作る。
@@ -29,8 +29,9 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 ## どこに何があるか
 | 場所 | 中身 |
 |---|---|
-| `index.html` | 人数アプリ（UI研究・計数研究のゆき） |
-| `counter.html` | 乗降アプリ（計数研究のかえり） |
+| `index.html` | 人数アプリ（**UI研究専用**。`?round=1` / `?round=2`。本実験のあいだ触らない） |
+| `count.html` | 車内人数アプリ（**計数研究専用**。index.html から分けた写し。2026-10-15） |
+| `counter.html` | 乗降アプリ（計数研究） |
 | `stops.js` | バス停辞書736件・阪急バス（`window.HANKYU_STOPS`） |
 | `viewer.html` | 軌跡ビューア（元アプリから流用） |
 | `HANDOFF.md` | 引き継ぎ。§8 が決定の表、§9 が次にやること |
@@ -46,7 +47,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | `tools/` | 下の表 |
 | `docs/log/` | 日ごとの記録（`2026-09-12.md` は教授との打ち合わせ） |
 | `docs/old/` | 今は使わない古い文書（一覧は `docs/old/README.md`。バス会社の承諾条件は `docs/old/HANDOFF_hankyu.md` §1） |
-| `exports/` | 下見（2026-09-18）のデータ。個人に関わるので git に入れない（`.gitignore`） |
+| `★exports/` | 下見（2026-09-18）と本実験の書き出し（日付ごとのフォルダ）。個人に関わるので git に入れない（`.gitignore`。2026-10-14 に `exports/` から改名） |
 | `../★乗降人数計算/` | 計数研究（1から数える vs 乗降で数える）の案内・配布用紙・QR・アンケート・アンケートURL.xlsx・ショートカット |
 | `../★UI研究/` | 参加者向け案内_Ui研究.docx（松本が直接編集）と .pdf・配布用紙（1回目・2回目）・QRポスター.pdf・ログインカード.pdf・accounts.csv・アンケートURL.xlsx・人数アプリのショートカット |
 
@@ -60,7 +61,7 @@ NAIST共同研究用に開発した「バス混雑度 回答アプリ」を**土
 | `make_questionnaire.py` | 紙の予備 `docs/questionnaire/アンケート_*.docx`（今の中身の控えから作る） |
 | `make_forms.py` | 作ったときの版（2026-10-09）の設問一覧.xlsx・GoogleForms生成.gs。今のフォームとは違う |
 | `join_survey_app.py` | アンケートの答えとアプリの記録をつないだ表と、問題の一覧（`docs/分析の準備.md`）。確かめは `test_join_survey_app.py` |
-| `fetch_weather.py` | 回答した時刻の天気（気象庁アメダス豊中の10分値・Open-Meteo）を、あとで取って回答に付ける。書き出しは `exports/`。確かめは `test_fetch_weather.py` |
+| `fetch_weather.py` | 回答した時刻の天気（気象庁アメダス豊中の10分値・Open-Meteo）を、あとで取って回答に付ける。書き出しは `★exports/`（GitHub に上げない）。確かめは `test_fetch_weather.py` |
 | `make_count_qr.py` | `../★乗降人数計算/QRポスター_計数研究.pdf`・`乗降アプリQR.png` |
 | `make_count_forms.py` | `../★乗降人数計算/計数研究アンケート生成.gs`・`計数研究アンケート.docx` |
 | `make_handouts.py` | 配布用紙（`../★UI研究/` に1回目・2回目、`../★乗降人数計算/` に計数研究）。UI研究の用紙には桃山台駅と南口のアンケートのQRが載る。アンケートURLは各フォルダの `アンケートURL.xlsx` から読む |

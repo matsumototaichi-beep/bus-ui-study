@@ -2,6 +2,8 @@
 responses.json
 ui_logs*.json
 exports/
+★exports/
+*exports/
 
 # 生成物
 *.png

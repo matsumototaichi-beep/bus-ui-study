@@ -5,7 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>乗降アプリ</title>
 <!--
-  乗降アプリ（計数研究のかえり）  counter-2.0.2
+  乗降アプリ（計数研究）  counter-2.0.8
+
+  ★2026-10-15 (counter-2.0.8): 計数研究の人数アプリを index.html から count.html に分けた。
+    index.html は UI研究専用（本実験のあいだ uiStudy-0.9.7 のまま凍結）にするため。
+    「かえりに切り替える」の行き先を count.html?leg=kaeri に変えた
+
+  ★2026-10-15 (counter-2.0.7): 画面の言葉だけを直した。ふるまいは 2.0.6 と同じ
+    ・画面に出る「人数アプリ」を、すべて「車内人数アプリ」に変えた（renderMovedOn の見出しと説明、
+      「車内人数アプリを開く」ボタン、「かえりに切り替える」の確かめの文）。
+      アンケートの選択肢・配布用紙・人数アプリ自身の見出しと呼び名をそろえるため。「乗降アプリ」はそのまま
+    ・ゆき（?dir=out＝偶数組）のヘッダにある「かえりに切り替える」の確かめの文を、
+      「桃山台駅に着きましたか？」といまどこにいるかを聞く言い方にした。
+      これまでは移ってよいかだけを聞いていたので、桃山台駅に着く前に押すと、
+      その人のゆきの記録がそこで終わってしまった
+
+  ★2026-10-14 (counter-2.0.6): かえりの便を「計数研究ゆき」として記録してしまう穴を塞いだ
+    ・ログアウトしても、その日が計数研究（uistudy_round_v1 が "count"）なら、回目と区間の印
+      （uistudy_round_v1 / uistudy_leg_v1 / uistudy_leg_at_v1 / uistudy_leg_set_v1）を消さずに残す。
+      消すと「まだゆき」に戻ってしまい、ログインし直したあと、かえりの便をゆきとして記録してしまう。
+      確認用アカウント（組の表に無いID）のときは今までどおり全部消す
+    ・送る行の variant に leg_by / leg_at（区間をいつ・どう決めたか）を入れる。読み方は index.html の legSet と同じ。
+      あとから「かえりの便をゆきとして記録していないか」を見分けるため
+    ・ゆき（?dir=out）の古いタブで、もうかえりに進んでいるとき（uistudy_leg_v1="kaeri"）は ＋1 と「送信」を止め、
+      人数アプリへ移る案内を出す。画面を作るとき・送信を押したとき・ほかのタブで印が変わったときに見る
+
+  ★2026-10-14 (counter-2.0.5): かえり（?dir なし＝奇数組）で開いたら、ログインのあとに「かえりに入った」印
+    （uistudy_leg_v1="kaeri"）を立てる。これまでは誰も立てていなかったので、奇数組がこのアプリに移ったあと
+    ブラウザの戻るやQRで人数アプリに戻ると、かえりの便の回答が「計数研究ゆき」として記録されてしまった。
+    印が立っていれば人数アプリが案内の画面を出して止める。
+    「かえりに切り替える」で未送信が残るときの文言も、移ったあと人数アプリが続けて送ることを伝える言い方に直した
+
+  ★2026-10-14 (counter-2.0.4): 計数研究で、数え方と方向の組み合わせを組ごとに入れ替えた。偶数組（B D F H …）は
+    ゆきがこの乗降アプリ（?dir=out）で、桃山台駅でヘッダの「かえりに切り替える」から車内人数アプリ（count.html?leg=kaeri）へ移る。
+    奇数組（A C E G …）は今までどおり、ゆき＝人数アプリ・かえり＝この乗降アプリ（?dir なし）。
+    送る行に組（variant.group）と確認用アカウントかどうか（variant.test_account）も入れる
 
   ★2026-10-09 (counter-2.0.2): 位置情報の直し方の画面を短くした。手順は1つだけ大きく出し、ほかの確かめ方はたたむ。
     375×667 でスクロールせずにボタンまで見える。いつ出すか・ボタンを押したときのふるまいは 2.0.1 と同じ。index.html（uiStudy-0.9.5）と同じ文言
@@ -42,13 +76,19 @@
   /* 続けて速く押しても拡大されないように（ダブルタップ拡大を切る） */
   button{font-family:inherit; touch-action:manipulation;}
   header{flex:0 0 auto; padding:7px 12px; padding-top:calc(7px + env(safe-area-inset-top,0px));
-         display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--line); background:var(--panel);}
+         display:flex; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid var(--line); background:var(--panel);}
   .brand{flex:1 1 auto; min-width:0; font-size:14px; font-weight:800; display:flex; flex-direction:column; line-height:1.2;}
   .brand .staff{font-size:11px; font-weight:700; color:var(--muted); white-space:nowrap;}
-  .hactions{flex:0 0 auto; display:flex; align-items:center; gap:8px;}
+  .hactions{flex:0 0 auto; margin-left:auto; display:flex; align-items:center; gap:8px;}
   .sess{font-size:11px; color:var(--muted); white-space:nowrap;}
   .sess b{color:var(--ink); font-size:15px; font-weight:800; margin-left:3px;}
   .iconbtn{flex:0 0 auto; border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:10px; padding:7px 10px; font-size:13px; font-weight:600;}
+  /* ★counter-2.0.4: かえり（人数アプリ）へ移るボタン。見た目は index.html の .legsw と同じ。
+     ヘッダが3つのボタンで狭くなるので、入りきらないときは下の行に折り返す */
+  .legsw{flex:0 0 auto; border:1px solid #2563eb; background:rgba(37,99,235,.16); color:var(--ink); border-radius:10px;
+         padding:7px 10px; font-size:12.5px; font-weight:700; white-space:nowrap;}
+  .legsw:active{background:rgba(37,99,235,.35);}
+  .legsw:disabled{opacity:.5;}
 
   main{flex:1 1 auto; min-height:0; display:flex; flex-direction:column;}
   .scroll{flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:8px 12px 18px;}
@@ -98,6 +138,8 @@
   .btn{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; border:none; border-radius:14px;
        padding:15px; font-size:16px; font-weight:800; color:#fff;}
   .btn.primary{background:#16a34a;}
+  /* ★counter-2.0.6: 人数アプリへ移るボタン。送信（緑）と間違えないよう、ヘッダの「かえりに切り替える」と同じ青にする */
+  .btn.go{background:#2563eb;}
   .btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--line); font-weight:700; font-size:15px;}
   .btn .no{background:rgba(255,255,255,.25);}
   .btn:active{filter:brightness(.9);}
@@ -125,6 +167,8 @@
   .endbox .endt{font-size:20px; font-weight:800; line-height:1.5;}
   .endnote{margin-top:14px; font-size:15px; font-weight:800; line-height:1.5; color:#34d399;}
   .endnote.warn{background:#7c2d12; color:#fed7aa; border-radius:10px; padding:10px 12px; font-size:16px;}
+  /* ★counter-2.0.6: ゆき（?dir=out）の古い画面を開いたときの案内（もうかえりに進んでいる） */
+  .movelead{margin:12px 0 0; font-size:14.5px; line-height:1.6; color:var(--muted);}
 
   /* バス停の一覧（下から出す） */
   .sheet{position:fixed; inset:0; z-index:40; background:rgba(2,6,23,.72); display:flex; align-items:flex-end; justify-content:center;}
@@ -246,6 +290,8 @@
   <div class="brand">乗降アプリ<span class="staff" id="legTag"></span></div>
   <div class="hactions">
     <span class="sess" id="sess"></span>
+    <!-- ★counter-2.0.4: 偶数組のゆき（?dir=out）でログイン中のときだけ出す。押すと人数アプリのかえりへ移る -->
+    <button class="legsw" id="toIdxBtn" style="display:none">かえりに切り替える</button>
     <button class="iconbtn" id="outBtn" style="display:none">ログアウト</button>
   </div>
 </header>
@@ -260,7 +306,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
-const VERSION = "counter-2.0.3";
+const VERSION = "counter-2.0.8";
 // index.html と同じプロジェクト・同じ設定。同じサイトなのでログイン状態も共有される
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
@@ -273,7 +319,10 @@ const OUTBOUND = ["ＪＲ吹田駅（南口）","田中町","吹田市役所前�
   "佐竹台診療所前","阪急南千里駅","桃山台二丁目","桃山台駅"];
 const INBOUND = OUTBOUND.slice().reverse();
 
-// ★2026-10-07: 既定はかえり（桃山台駅 → ＪＲ吹田駅（南口））。?dir=out はテスト用のゆき方向
+/* ★counter-2.0.4: どちらの区間で使うかは組で決まる。QRは人数アプリの1枚だけで、ここへは人数アプリから移ってくる
+   ・奇数組（A C E G …）：ゆき＝人数アプリ → 桃山台駅で「かえりに切り替える」→ このアプリ（?dir なし＝かえり）
+   ・偶数組（B D F H …）：ゆき＝このアプリ（?dir=out） → 桃山台駅でヘッダの「かえりに切り替える」→ 人数アプリのかえり
+   既定はかえり（桃山台駅 → ＪＲ吹田駅（南口））、?dir=out はゆき（ＪＲ吹田駅（南口） → 桃山台駅） */
 const DIR   = (new URLSearchParams(location.search).get("dir")||"").toLowerCase()==="out" ? "out" : "in";
 const STOPS = DIR==="out" ? OUTBOUND : INBOUND;
 const LEG   = DIR==="out" ? "yuki" : "kaeri";
@@ -372,10 +421,58 @@ function setDaily(k,v){ lsSet(k, v ? v+"|"+todayStr() : null); }
 function isPractice(){ return getDaily(PRACTICE_KEY)==="1"; }
 // ★counter-2.0.3: ログインしているID（カードの文字。例 "A"）。送る行の variant.login_id に入れる（index.html の loginId と同じ）
 function loginId(){ return ((user && user.email) || "").split("@")[0].toUpperCase(); }
+// ★counter-2.0.4: 組はアカウントごとの表で決める（index.html の GROUP_OF と同じ文字割り）。送る行の variant.group に入れる
+const GROUP_OF = {};
+"ACEGIKMOQSUW".split("").forEach(c=>{ GROUP_OF[c]="odd"; });    // 奇数組：ゆき＝人数アプリ / かえり＝この乗降アプリ
+"BDFHJLNPRTVX".split("").forEach(c=>{ GROUP_OF[c]="even"; });   // 偶数組：ゆき＝この乗降アプリ / かえり＝人数アプリ
+// 表に無いID（admin など）は確認用アカウント。組は人数アプリの「確認用」ボタンで選んだものを使う（同じサイトなので端末の保存を共有できる）
+const TESTGROUP_KEY = "uistudy_testgroup_v1";
+function isTestAccount(){ return !GROUP_OF[loginId()]; }
+function idGroup(){ return GROUP_OF[loginId()] || (getDaily(TESTGROUP_KEY)==="even" ? "even" : "odd"); }
 // ★counter-2.0.3: 端末ごとのでたらめな番号（人数アプリと同じキー）。送る行の context.device_id に入れる。
 //   同じIDが2台から送っている・カードを取り違えた、を見つけるため。人を特定する情報は含まない。ログアウトしても消さない
 const DEVICE_KEY = "uistudy_device_v1";
 function deviceId(){ let v=lsGet(DEVICE_KEY); if(!v){ v=uuid(); lsSet(DEVICE_KEY, v); } return v; }
+
+/* ★counter-2.0.5: 「かえりに入った」印。計数研究では、その日どこまで進んだかを uistudy_leg_v1 で表す
+   （未設定＝まだゆき／"kaeri"＝もうかえり）。奇数組は桃山台駅で人数アプリからこのアプリ（?dir なし＝かえり）に
+   移るが、これまでは誰も印を立てていなかった。そのため、ブラウザの戻るやQRで人数アプリに戻ると、
+   かえりの便で答えても「計数研究ゆき」として記録されてしまう。印が立っていれば、人数アプリが案内の画面を出して止める。
+   キーの作りは index.html の setLeg と同じ（日付つき・"switch@時刻"） */
+const STUDY_KEY  = "uistudy_round_v1";     // その日に読んだQR（"r1" | "r2" | "count"）。人数アプリが入れる
+const LEG_KEY    = "uistudy_leg_v1";       // その日どこまで進んだか（未設定＝ゆき / "kaeri"）
+const LEGSET_KEY = "uistudy_leg_set_v1";   // 区間をいつ・どう決めたか（"switch@時刻"）
+// 人数アプリから移ってきたか。端末に保存できない設定だと uistudy_round_v1 が残らないので、そのときの備え。
+//   人数アプリが counter.html を開くのは計数研究のときだけ（index.html の legBar を参照）
+function fromIndexApp(){
+  const r=document.referrer; if(!r) return false;
+  try{
+    const u=new URL(r, location.href);
+    return u.origin===location.origin && (/\/index\.html$/i.test(u.pathname) || u.pathname.slice(-1)==="/");
+  }catch(e){ return false; }
+}
+// 印を立てるのは計数研究のときだけ。UI研究（r1・r2）のQRを読んでいるときは何もしない
+function isCountStudy(){ const r=getDaily(STUDY_KEY); return r ? r==="count" : fromIndexApp(); }
+function markKaeriLeg(){
+  if(DIR!=="in") return;                    // ゆき（?dir=out＝偶数組）では立てない
+  if(getDaily(LEG_KEY)==="kaeri") return;   // すでに立っていれば何もしない
+  if(!isCountStudy()) return;
+  setDaily(LEG_KEY, "kaeri");
+  setDaily(LEGSET_KEY, "switch@"+Date.now());
+}
+// ★counter-2.0.6: 区間をいつ・どう決めたか（"switch@時刻"）を読む。送る行の variant.leg_by / leg_at に入れる。
+//   読み方は index.html の legSet と同じ。まだ決めていなければ両方 null
+function legSet(){
+  const v=getDaily(LEGSET_KEY)||"", i=v.indexOf("@"), ms=parseInt(v.slice(i+1),10);
+  return (i>0 && ms) ? { by:v.slice(0,i), at:new Date(ms).toISOString() } : { by:null, at:null };
+}
+/* ★counter-2.0.6: ゆき（?dir=out＝偶数組）の画面なのに、その日はもうかえりに進んでいる。
+   偶数組は桃山台駅で人数アプリのかえりに移るが、古い ?dir=out のタブが残っていると、
+   そこから ＋1 や「送信」を押せてしまい、かえりの便が「計数研究ゆき」として記録されてしまう。
+   この形になっていたら入力と送信を止め、人数アプリへ移る案内（renderMovedOn）を出す */
+function legMovedOn(){
+  return DIR==="out" && getDaily(LEG_KEY)==="kaeri" && isCountStudy();
+}
 
 /* ---------------- 記録（1バス停＝1件） ---------------- */
 // ★2026-10-07: メモリに持たず毎回端末から読み直し、読む・変える・書くを updRecs の1か所で行う。
@@ -784,6 +881,8 @@ function finalizeAll(){ fins.slice().forEach(f=>finalize(f.sid, true)); }
 const SEND_AFTER_SHOW = 1000, SEND_AFTER_TAP = 700, PICK_AFTER_OPEN = 500;
 let shownAt=0, lastTapAt=0, sheetAt=0;
 function bump(k, delta){
+  // ★counter-2.0.6: ほかのタブでかえりに進んだら、この古いゆきの画面では数えさせない
+  if(legMovedOn()){ render(); return; }
   const d=run.draft;
   if(delta<0 && d[k]<=0) return;   // 0未満にしない
   firstOp();
@@ -820,6 +919,8 @@ function pickStop(i){
   saveRun(); renderStop(false);
 }
 function send(){
+  // ★counter-2.0.6: 押した瞬間にも見る。ほかのタブでかえりに進んだあと、この古いゆきの画面から送らせない
+  if(legMovedOn()){ render(); return; }
   const d=run.draft, now0=Date.now();
   if(now0-shownAt < SEND_AFTER_SHOW || now0-lastTapAt < SEND_AFTER_TAP) return;
   let zero=null;
@@ -831,13 +932,18 @@ function send(){
   ev("send", { board:d.board, alight:d.alight, zero_confirm:zero });
   const now=Date.now(), sec=Math.floor(now/1000), prac=isPractice();
   const resend=!!run.sent[d.cur];   // この往路で送ったバス停を選び直した（分析では同じ run・同じバス停の最後の記録を使う）
-  const sid=uuid(), traj=d.traj.slice();
+  const sid=uuid(), traj=d.traj.slice(), ls=legSet();
   const row = {
     session_id: sid,
     started_at: d.started_at,
     outcome: "submit",
-    variant: { study:"count", round:null, leg:LEG, group:null, label:LABEL, method:"flow", app:"counter", practice:prac,
-               login_id: loginId() || null },   // ★counter-2.0.3: 送信を押した時点でログインしていたID
+    // ★counter-2.0.4: 組（group）と確認用アカウントかどうか（test_account）も入れる。人数アプリの studyTag と同じ中身にそろえる
+    // ★counter-2.0.6: 区間をいつ・どう決めたか（leg_by / leg_at）も入れる。人数アプリの studyTag と同じで、
+    //   あとから「かえりの便をゆきとして記録していないか」を見分けるため。まだ決めていなければ null
+    variant: { study:"count", round:null, leg:LEG, group:idGroup(), test_account:isTestAccount(),
+               label:LABEL, method:"flow", app:"counter", practice:prac,
+               login_id: loginId() || null,   // ★counter-2.0.3: 送信を押した時点でログインしていたID
+               leg_by: ls.by, leg_at: ls.at },
     context: Object.assign({
       run_id: run.run_id, dir: DIR, stop: stopObj(d.cur), stop_suggested: stopObj(d.sug),
       stop_changed: d.cur!==d.sug, resend: resend, board: d.board, alight: d.alight,
@@ -873,6 +979,40 @@ function updateHeader(){
   $("legTag").textContent = "計数研究　" + (DIR==="out" ? "ゆき" : "かえり");
   $("sess").innerHTML = user ? `調査員<b>${esc(((user.email||"").split("@")[0]||"").toUpperCase())}</b>` : "";
   $("outBtn").style.display = user ? "" : "none";
+  // ★counter-2.0.4: かえり（人数アプリ）へ移るボタンは、ゆき（?dir=out）でログイン中のときだけ出す。
+  //   かえり（?dir なし＝奇数組）では出さない（この先は人数アプリに戻らないため）
+  // ★counter-2.0.6: もうかえりに進んでいるときも出さない（案内の画面に大きなボタンを出すため。
+  //   「かえりに切り替える」という名前も、切り替えたあとでは合わない）
+  $("toIdxBtn").style.display = (DIR==="out" && user && !legMovedOn()) ? "" : "none";
+}
+/* ★counter-2.0.4: 偶数組のかえりへ。ゆきをこのアプリで数え終えたら、桃山台駅で人数アプリに移る
+   （奇数組とは逆向き。index.html の toCounter と同じ作り・同じ文言）。
+   ★counter-2.0.5: 移る前に送れるだけ送るのは今までどおり。送りきれなかった分は、移ったあと人数アプリが
+   続けて送るので、そう伝える文言にした（以前は「この画面を開いたままにすると送れます」と、
+   移ったら送れないかのような言い方だった） */
+let moving = false;
+// ★counter-2.0.6: quiet を渡すと確認のダイアログを出さない（案内の画面の大きなボタンからはこれで来る。
+//   そこでは「人数アプリを開く」以外に進みようがなく、聞き直す意味がないため）。
+//   ヘッダの「かえりに切り替える」から来たときは、今までどおり確認してから移る
+async function toIndexKaeri(quiet){
+  if(moving) return;
+  // ★counter-2.0.5: 確かめる前に押せなくする。ダイアログを閉じたあとの二重押しで二度動かないように
+  moving=true;
+  const b=$("toIdxBtn"), b2=$("toIdxBig");
+  if(b) b.disabled=true;
+  if(b2) b2.disabled=true;
+  const back=()=>{ moving=false; if(b) b.disabled=false; if(b2) b2.disabled=false; setStatus(); };
+  /* ★counter-2.0.7: いまどこにいるかを聞く言い方にした。桃山台駅に着く前に押されると、
+     ゆきの記録がそこで終わってしまうため（以前は移ってよいかだけを聞いていた） */
+  if(!quiet && !confirm("桃山台駅に着きましたか？\nかえりは車内人数アプリで数えます。まだ着いていないときは「キャンセル」を押してください")){ back(); return; }
+  // ページを離れると送信が途中で切れることがあるので、記録中のものは先に「送る」印で端末に残してから送る
+  finalizeAll();
+  await Promise.race([flush(), new Promise(r=>setTimeout(r,3000))]);
+  const n=myRecs().filter(x=>x.state==="pend").length;
+  if(n && !confirm(`未送信が ${n}件あります。残りは車内人数アプリが続けて送ります。このまま車内人数アプリに移りますか？`)){
+    back(); return;
+  }
+  location.href="count.html?leg=kaeri";   // ★counter-2.0.8: 計数研究の人数アプリを count.html に分けた
 }
 // ★counter-2.0.1: 位置情報が拒否・大まかのときは帯を押せる（押すと直し方の画面）
 function setStatus(){
@@ -903,6 +1043,9 @@ function render(fresh){
   updateHeader();
   closeSheet();
   if(!user){ keepAwake(false); renderLogin(); return; }
+  markKaeriLeg();   // ★counter-2.0.5: かえりで開いたら、ログインのあとに「かえりに入った」印を立てる
+  // ★counter-2.0.6: ゆき（?dir=out）の古い画面で、その日はもうかえりに進んでいる。数えさせずに案内だけ出す
+  if(legMovedOn()){ keepAwake(false); renderMovedOn(); return; }
   ensureRun();
   if(run.next>=STOPS.length && !run.draft){ keepAwake(false); renderEnd(); return; }
   renderStop(fresh);
@@ -997,6 +1140,23 @@ function renderEnd(){
   renderLog(); setStatus();
   startSampling();
   geoAutoHelp();
+}
+/* ★counter-2.0.6: ゆき（?dir=out）の古い画面を開いたが、その日はもうかえりに進んでいるときの案内。
+   数える画面は出さず、人数アプリへ移るボタンだけを出す（index.html の renderCountToCounter と同じ考え方）。
+   勝手に移すと、押している最中のボタンが変わって事故るので、参加者がボタンを押したときだけ移る。
+   未送信が残っているときは、移る前に送れるだけ送る（ヘッダの「かえりに切り替える」と同じ扱い） */
+function renderMovedOn(){
+  main.innerHTML = `
+    <div class="scroll"><div class="inner">
+      <div class="endbox">
+        <div class="endt">いまは車内人数アプリで数えます</div>
+        <p class="movelead">かえりは、乗っている人数を1から数える車内人数アプリで記録します。下のボタンから開いてください</p>
+      </div>
+      <button class="btn go" id="toIdxBig">車内人数アプリを開く</button>
+      <div class="log" id="log"></div>
+    </div></div>`;
+  $("toIdxBig").onclick=()=>toIndexKaeri(true);
+  renderLog(); setStatus();
 }
 // 記録一覧（新しい順）。各バス停の乗/降だけを出す（合計は出さない）
 function renderLog(){
@@ -1095,14 +1255,25 @@ async function boot(){
   $("outBtn").onclick=async()=>{
     // 乗車中の誤タップ対策（index.html と同じ）
     if(!confirm("ログアウトします。次に使うときはIDとパスワードの入力が必要です。よろしいですか？")) return;
+    // ★counter-2.0.6: 何を消すかはサインアウトの前に決めておく（サインアウトすると user が消え、IDがわからなくなる）
+    const countDay = getDaily(STUDY_KEY)==="count", testAcct = isTestAccount();
     finalizeAll();
     await Promise.race([flush(), new Promise(r=>setTimeout(r,3000))]);   // 送れるものは先に送る（ログアウト後は送れない）
     if(sb){ try{ await sb.auth.signOut(); }catch(e){} }
     setDaily(POSTURE_KEY, null); setDaily(PRACTICE_KEY, null);
     // ★2026-10-07: ログインは人数アプリと共有しているので、人数アプリの着席/立席・練習・回目・区間も消す（index.html のログアウトと同じ）
-    ["uistudy_posture_v1","uistudy_practice_v1","uistudy_round_v1","uistudy_leg_v1","uistudy_leg_at_v1","uistudy_leg_set_v1","uistudy_testgroup_v1"].forEach(k=>lsSet(k, null));
+    // ★counter-2.0.6: ただし計数研究の日は、回目と区間の4つを残す。消すと「まだゆき」に戻ってしまい、
+    //   ログインし直したあと、かえりの便をゆきとして記録してしまうため。
+    //   確認用アカウント（組の表に無いID）のときは、今までどおり全部消す（回目や区間を変えながら確かめるため）
+    const keepLeg = countDay && !testAcct;
+    ["uistudy_posture_v1","uistudy_practice_v1","uistudy_testgroup_v1"]
+      .concat(keepLeg ? [] : ["uistudy_round_v1","uistudy_leg_v1","uistudy_leg_at_v1","uistudy_leg_set_v1"])
+      .forEach(k=>lsSet(k, null));
     user=null; run=null; render();
   };
+  // ★counter-2.0.4: かえり（人数アプリ）へ移るボタン。ゆき（?dir=out）のときだけ出る
+  // ★counter-2.0.6: 引数なしで呼ぶ（onclick にそのまま渡すと、クリックの情報が quiet として渡り、確認が出なくなる）
+  $("toIdxBtn").onclick=()=>toIndexKaeri();
   // ★counter-2.0.1: 位置情報が拒否・大まかなときは、帯を押すと直し方の画面を出す
   const stEl=$("status");
   stEl.addEventListener("click", ()=>{ if(stEl.classList.contains("act")) openGeoHelp(); });
@@ -1129,6 +1300,8 @@ async function boot(){
   // 画面を離れたら送信後の位置とりを打ち切って送る／戻ったら測位を再開して未送信を送り直す
   document.addEventListener("visibilitychange", ()=>{
     if(document.hidden){ finalizeAll(); stopSampling(); flush(); }
+    // ★counter-2.0.6: ブラウザの戻る（画面が残ったまま戻ってくる）でも見る。もうかえりに進んでいたら案内に切り替える
+    else if(user && legMovedOn()){ render(); flush(); }
     else if(user){ reloadRun(); geoResume(); flush(); if(run && run.next<STOPS.length) keepAwake(true); }   // ★2.0.1: 拒否のあとでも聞き直す
   });
   window.addEventListener("pagehide", ()=>finalizeAll());
@@ -1137,6 +1310,8 @@ async function boot(){
   window.addEventListener("storage", (e)=>{
     if(e.key===RUN_KEY) reloadRun();
     if(e.key===REC_KEY || e.key===IDX_OUTBOX || e.key===IDX_SESS){ renderLog(); setStatus(); }
+    // ★counter-2.0.6: ほかのタブでかえりに進んだら、このゆきの画面を案内に切り替える（古い画面から送らせない）
+    if(e.key===LEG_KEY && legMovedOn()) render();
   });
   // ★2026-10-07: 未送信があるあいだは20秒ごとにも送り直す（電波が戻っても online が来ない端末がある。終点の画面は開いたままにしてもらう）
   setInterval(()=>{ if(user && !document.hidden && (pendN() || myRecs().some(x=>x.state==="rec"))) flush(); }, 20000);

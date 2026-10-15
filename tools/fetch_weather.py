@@ -3,12 +3,12 @@
 
     python tools/fetch_weather.py --dates 2026-10-13
         その日の天気の表を作る（日付はカンマ区切り、または 2026-10-13..2026-10-20）
-    python tools/fetch_weather.py --responses exports/2026-10-20/ui_responses.csv
+    python tools/fetch_weather.py --responses ★exports/2026-10-20/ui_responses_rows.csv
         Supabase から書き出した ui_responses（CSV か JSON）の1回答ごとに、そのときの天気を付ける。日付は回答から決める
-    python tools/fetch_weather.py --sessions exports/2026-10-20/ui_sessions.csv
+    python tools/fetch_weather.py --sessions ★exports/2026-10-20/ui_sessions_rows.csv
         操作ログの1行ごとに付ける（乗降アプリは1バス停＝1行なので、計数研究のかえりはこちら）
 
-書き出すもの（--out。既定は exports/weather/。exports/ は .gitignore で GitHub に上げない）
+書き出すもの（--out。既定は ★exports/weather/（無ければ exports/weather/）。どちらも .gitignore で GitHub に上げない）
   天気_10分_豊中.csv   気象庁アメダス「豊中」の10分値（降水量・気温・風速・風向）。実際に測った値
   天気_1時間_吹田.csv  Open-Meteo の1時間値（天気・雲量・降水量・気温・湿度）。地点は路線の中ほど
   回答と天気.csv       --responses を渡したとき。1回答に1行
@@ -288,13 +288,15 @@ def main():
     ap.add_argument("--responses", help="Supabase から書き出した ui_responses（CSV か JSON）")
     ap.add_argument("--sessions", help="Supabase から書き出した ui_sessions（CSV か JSON）")
     ap.add_argument("--station", default="豊中", choices=sorted(STATIONS), help="気象庁の観測所（既定 豊中）")
-    ap.add_argument("--out", default=os.path.join(ROOT, "exports", "weather"), help="書き出すフォルダ")
+    # ★2026-10-14: 松本が exports/ を ★exports/ に名前を変えた。どちらでも書ける
+    exp = next((d for d in ("★exports", "exports") if os.path.isdir(os.path.join(ROOT, d))), "★exports")
+    ap.add_argument("--out", default=os.path.join(ROOT, exp, "weather"), help="書き出すフォルダ")
     a = ap.parse_args()
     if not (a.dates or a.responses or a.sessions):
         ap.error("--dates・--responses・--sessions のどれかを渡してください")
-    # 回答の行を書き出すので、public のリポジトリでは exports/（.gitignore）の中か、リポジトリの外にだけ書く
-    if inside(a.out, ROOT) and not inside(a.out, os.path.join(ROOT, "exports")):
-        sys.exit("--out はリポジトリの exports/ の中か、リポジトリの外にしてください（回答の行が入るため）")
+    # 回答の行を書き出すので、public のリポジトリでは ★exports/・exports/（.gitignore）の中か、リポジトリの外にだけ書く
+    if inside(a.out, ROOT) and not any(inside(a.out, os.path.join(ROOT, d)) for d in ("★exports", "exports")):
+        sys.exit("--out はリポジトリの ★exports/（または exports/）の中か、リポジトリの外にしてください（回答の行が入るため）")
 
     items = []          # (種類, 元の行, UTC の時刻)
     if a.responses:
