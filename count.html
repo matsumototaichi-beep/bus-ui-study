@@ -115,6 +115,12 @@
   .c4{background:var(--c4);} .c5{background:var(--c5);} .c6{background:var(--c6);}
 
   .log{flex:1 1 auto; min-height:0; overflow-y:auto; padding:0 10px 14px; background:var(--bg);}
+  /* ★countApp-1.1.0: 計数研究では、画面1枚目全体を巻けるようにする。
+     練習モードの帯や「未送信 N件」の案内が出ると、その分だけ下の記録の一覧が潰されて、
+     送ったデータが見られなくなっていた（一覧が伸び縮みする作りだったため）。
+     帯も一覧もまとめて巻けるようにする */
+  body.countstudy main{overflow-y:auto; -webkit-overflow-scrolling:touch;}
+  body.countstudy .log{flex:0 0 auto; overflow:visible;}
   .lhead{position:sticky; top:0; z-index:3; background:var(--bg); font-size:12px; color:var(--muted); padding:9px 12px; margin:0 -10px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line);}
   .empty{color:var(--muted); font-size:13px; text-align:center; padding:28px 10px;}
   .logrow{display:flex; align-items:center; gap:10px; padding:9px 6px; border-bottom:1px solid #1e2a3d;}
@@ -322,8 +328,6 @@
      縦画面にもこの指定は効かない（orientation:landscape） */
   @media (orientation:landscape) and (max-height:600px){
     body.countstudy{--ctlh:42px;}
-    body.countstudy main{overflow-y:auto; -webkit-overflow-scrolling:touch;}
-    body.countstudy .log{flex:0 0 auto; min-height:0; overflow:visible;}
     body.countstudy .picker{flex:0 0 auto; padding:4px 10px;}
     body.countstudy .grid{gap:5px;}
     body.countstudy .card{min-height:44px;}   /* 押せる高さの下限（44px）は割らない */
@@ -404,7 +408,7 @@
    - ★uiStudy-0.9.8: 計数研究（?study=count）の数え方の順番を組ごとに入れ替えた。
      奇数組は ゆき=人数アプリ／かえり=乗降アプリ（今までどおり）、偶数組は ゆき=乗降アプリ／かえり=人数アプリ。
      QR は1枚のまま。UI研究（?round=1 / ?round=2）のふるまいは変えていない
-   - ★uiStudy-0.9.9: 計数研究の区間を「その日どこまで進んだか」(uistudy_leg_v1) で表すように直した。
+   - ★uiStudy-0.9.9: 計数研究の区間を「その日どこまで進んだか」(countapp_leg_v1) で表すように直した。
      いまの区間を担当するアプリは組と区間で決まる（奇数組 ゆき=人数／かえり=乗降、偶数組 ゆき=乗降／かえり=人数）。
      担当でないときは回答画面を出さず、乗降アプリへの案内画面を出す。QR は表（ゆき）と裏（?leg=kaeri）の2つ。
      乗降アプリの未送信（counter_records_v2）を人数アプリからも送れるようにした。
@@ -455,7 +459,7 @@
    (3) ログイン画面の題名を「車内人数アプリ」にそろえた（配布用紙・アンケートと同じ呼び名） */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "countApp-1.0.2";
+const APP_VERSION = "countApp-1.1.0";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -500,11 +504,11 @@ const URL_STUDY = "count";
 // ★uiStudy-0.9.9: 配布用紙の裏のQR（index.html?study=count&leg=kaeri）と、乗降アプリの「かえりに切り替える」が
 //   これを付けて開く。裏のQRは奇数組も偶数組も同じものを読む（どちらのアプリで数えるかはアプリが組を見て決める）
 const URL_LEG = (URL_QS.get("leg")||"").toLowerCase()==="kaeri" ? "kaeri" : null;
-const STUDY_KEY = "uistudy_round_v1";    // "r1" | "r2" | "count"（日付つき）
-const LEG_KEY   = "uistudy_leg_v1";      // "yuki" | "kaeri"（日付つき）
-const LEGAT_KEY = "uistudy_leg_at_v1";   // ゆきを選んだ時刻(ms)。桃山台で切り替えの案内を出すため
+const STUDY_KEY = "countapp_round_v1";    // "r1" | "r2" | "count"（日付つき）
+const LEG_KEY   = "countapp_leg_v1";      // "yuki" | "kaeri"（日付つき）
+const LEGAT_KEY = "countapp_leg_at_v1";   // ゆきを選んだ時刻(ms)。桃山台で切り替えの案内を出すため
 // ★uiStudy-0.9.6: いまの区間にした決め方と時刻（"pick@ms" | "switch@ms" | "back@ms"。日付つき）。データに残すだけで、画面には使わない
-const LEGSET_KEY = "uistudy_leg_set_v1";
+const LEGSET_KEY = "countapp_leg_set_v1";
 // URL から消えても（再読込・ホーム画面から開き直し）その日のうちは保持する。
 // 別のQRを読んだら区間を選び直させる（同じ日に1回目と2回目をする人がいるため）
 function rememberUrlStudy(){
@@ -517,7 +521,7 @@ function studyMode(){ return "count"; }   // ★countApp-1.0.0: 計数研究専�
 function roundNo(){ const m=studyMode(); return m==="r1" ? 1 : m==="r2" ? 2 : null; }
 function curLeg(){
   // ★uiStudy-0.9.9: 計数研究の区間は「その日どこまで進んだか」で決める（組では決めない）。
-  //   uistudy_leg_v1 が未設定ならまだ「ゆき」、"kaeri" が入っていればもう「かえり」。
+  //   countapp_leg_v1 が未設定ならまだ「ゆき」、"kaeri" が入っていればもう「かえり」。
   //   どちらのアプリで数えるかは、この区間と組の組み合わせで決まる（countIsMine を参照）
   if(studyMode()==="count") return getDaily(LEG_KEY)==="kaeri" ? "kaeri" : "yuki";
   if(!roundNo()) return null;
@@ -583,7 +587,7 @@ function legElapsedMin(){ const a=parseInt(getDaily(LEGAT_KEY)||"",10); return a
 const GROUP_OF = {};
 "ACEGIKMOQSUW".split("").forEach(c=>{ GROUP_OF[c]="odd"; });    // 1回目なし → 2回目あり
 "BDFHJLNPRTVX".split("").forEach(c=>{ GROUP_OF[c]="even"; });   // 1回目あり → 2回目なし
-const TESTGROUP_KEY = "uistudy_testgroup_v1";   // 確認用アカウントで見ている組（日付つき）
+const TESTGROUP_KEY = "countapp_testgroup_v1";   // 確認用アカウントで見ている組（日付つき）
 function loginId(){ return ((user && user.email) || "").split("@")[0].toUpperCase(); }
 function isTestAccount(){ return !GROUP_OF[loginId()]; }
 function idGroup(){
@@ -633,9 +637,9 @@ function activeConds(){
   return c.length ? c : UI_CONDS;   // 該当が0件（あり得ないURL指定）なら全条件にフォールバック
 }
 const UISTUDY_KEY  = "uistudy_sessions_v1";        // 未送信セッションの退避
-const UISTUDY_SEQ  = "uistudy_seq_v1";             // 条件割当の通し番号（本番）
-const UISTUDY_PSEQ = "uistudy_pseq_v1";            // 同（練習用）。本番の順番を練習で進めないため
-const UISTUDY_OFF  = "uistudy_offset_v1";          // 端末ごとの開始位置（順序効果の相殺）
+const UISTUDY_SEQ  = "countapp_seq_v1";             // 条件割当の通し番号（本番）
+const UISTUDY_PSEQ = "countapp_pseq_v1";            // 同（練習用）。本番の順番を練習で進めないため
+const UISTUDY_OFF  = "countapp_offset_v1";          // 端末ごとの開始位置（順序効果の相殺）
 
 // 端末ごとに違う位置から回し始める。全員が同じ順なら順序効果と条件が区別できないため。
 // mod: そのとき実際にローテーションする条件数（activeConds().length）
@@ -693,10 +697,10 @@ let pickerShownAt = 0;
 // ログアウト時にも明示的にクリアする（uiStudy-0.7.5、outBtnハンドラ参照）。
 // 2026-09-18: 実験コード・参加者番号は廃止（識別はログインアカウント、条件はURLで決めるため。
 // docs/old/HANDOFF_hankyu.md 参照）
-const POSTURE_KEY  = "uistudy_posture_v1";
+const POSTURE_KEY  = "countapp_posture_v1";
 // ★UI研究: 練習モード。オンの間の回答は practice:true で記録し、分析から外す。
 // 日付で失効させるのは他と同じ（前日オンのまま本番が始まるのを防ぐ）
-const PRACTICE_KEY = "uistudy_practice_v1";
+const PRACTICE_KEY = "countapp_practice_v1";
 function isPractice(){ return getDaily(PRACTICE_KEY) === "1"; }
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
 // ★2026-10-07: 端末に保存できない（Cookie 全ブロック等で localStorage が例外を出す）ときはメモリに持つ。
@@ -899,7 +903,7 @@ function renderCountToCounter(){
   const b=$("toCounterBig");
   if(b) b.onclick=()=>{
     // ★uiStudy-0.9.9: タブを開きっぱなしにしていると、別のタブで先に進んだあとも古い案内が残る。
-    //   押した瞬間に uistudy_leg_v1 を読み直し、もう人数アプリの区間になっていたら移らずに画面を作り直す
+    //   押した瞬間に countapp_leg_v1 を読み直し、もう人数アプリの区間になっていたら移らずに画面を作り直す
     if(!needCounter()){ renderMain(); return; }
     toCounter(counterDir(), true);
   };
@@ -1690,7 +1694,7 @@ function pickClass(cls){
   // ★uiStudy-0.9.10: いまの区間が乗降アプリの担当なら、ここで答えさせない。
   //   乗降アプリから「戻る」で帰ってくると、ブラウザが古い画面（人数のクラス選択）をそのまま戻すことがある。
   //   そのまま押せてしまうと、かえりの便を「計数研究のゆき」として記録してしまう。
-  //   押した瞬間に uistudy_leg_v1 を読み直して、担当でなければ案内画面に作り直す（計数研究でしか効かない）
+  //   押した瞬間に countapp_leg_v1 を読み直して、担当でなければ案内画面に作り直す（計数研究でしか効かない）
   if(needCounter()){ renderMain(); return; }
   // 直前の回答が確定待ちなら即確定（★未コミットならここで確実にコマを消費させる）
   if(pending){ commitVariant(pending.variant); finalizeNow(true); }
@@ -2518,7 +2522,7 @@ async function boot(){
      UI研究（?round=1 / ?round=2）では studyMode() が "count" にならないので、今までどおり何も起きない */
 
   // 乗降アプリから「戻る」で帰ってくると、ブラウザが古い画面をそのまま戻すことがある（bfcache）。
-  // 戻ってきた時点の uistudy_leg_v1 で画面を作り直し、担当でない区間の画面が残らないようにする
+  // 戻ってきた時点の countapp_leg_v1 で画面を作り直し、担当でない区間の画面が残らないようにする
   window.addEventListener("pageshow", ()=>{
     if(studyMode()!=="count") return;
     if(answering) return;   // 人数を入れている途中は作り直さない（入力中の値が消えるため）

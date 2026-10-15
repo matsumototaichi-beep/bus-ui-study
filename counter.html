@@ -21,17 +21,17 @@
       その人のゆきの記録がそこで終わってしまった
 
   ★2026-10-14 (counter-2.0.6): かえりの便を「計数研究ゆき」として記録してしまう穴を塞いだ
-    ・ログアウトしても、その日が計数研究（uistudy_round_v1 が "count"）なら、回目と区間の印
-      （uistudy_round_v1 / uistudy_leg_v1 / uistudy_leg_at_v1 / uistudy_leg_set_v1）を消さずに残す。
+    ・ログアウトしても、その日が計数研究（countapp_round_v1 が "count"）なら、回目と区間の印
+      （countapp_round_v1 / countapp_leg_v1 / countapp_leg_at_v1 / countapp_leg_set_v1）を消さずに残す。
       消すと「まだゆき」に戻ってしまい、ログインし直したあと、かえりの便をゆきとして記録してしまう。
       確認用アカウント（組の表に無いID）のときは今までどおり全部消す
     ・送る行の variant に leg_by / leg_at（区間をいつ・どう決めたか）を入れる。読み方は index.html の legSet と同じ。
       あとから「かえりの便をゆきとして記録していないか」を見分けるため
-    ・ゆき（?dir=out）の古いタブで、もうかえりに進んでいるとき（uistudy_leg_v1="kaeri"）は ＋1 と「送信」を止め、
+    ・ゆき（?dir=out）の古いタブで、もうかえりに進んでいるとき（countapp_leg_v1="kaeri"）は ＋1 と「送信」を止め、
       人数アプリへ移る案内を出す。画面を作るとき・送信を押したとき・ほかのタブで印が変わったときに見る
 
   ★2026-10-14 (counter-2.0.5): かえり（?dir なし＝奇数組）で開いたら、ログインのあとに「かえりに入った」印
-    （uistudy_leg_v1="kaeri"）を立てる。これまでは誰も立てていなかったので、奇数組がこのアプリに移ったあと
+    （countapp_leg_v1="kaeri"）を立てる。これまでは誰も立てていなかったので、奇数組がこのアプリに移ったあと
     ブラウザの戻るやQRで人数アプリに戻ると、かえりの便の回答が「計数研究ゆき」として記録されてしまった。
     印が立っていれば人数アプリが案内の画面を出して止める。
     「かえりに切り替える」で未送信が残るときの文言も、移ったあと人数アプリが続けて送ることを伝える言い方に直した
@@ -426,7 +426,7 @@ const GROUP_OF = {};
 "ACEGIKMOQSUW".split("").forEach(c=>{ GROUP_OF[c]="odd"; });    // 奇数組：ゆき＝人数アプリ / かえり＝この乗降アプリ
 "BDFHJLNPRTVX".split("").forEach(c=>{ GROUP_OF[c]="even"; });   // 偶数組：ゆき＝この乗降アプリ / かえり＝人数アプリ
 // 表に無いID（admin など）は確認用アカウント。組は人数アプリの「確認用」ボタンで選んだものを使う（同じサイトなので端末の保存を共有できる）
-const TESTGROUP_KEY = "uistudy_testgroup_v1";
+const TESTGROUP_KEY = "countapp_testgroup_v1";
 function isTestAccount(){ return !GROUP_OF[loginId()]; }
 function idGroup(){ return GROUP_OF[loginId()] || (getDaily(TESTGROUP_KEY)==="even" ? "even" : "odd"); }
 // ★counter-2.0.3: 端末ごとのでたらめな番号（人数アプリと同じキー）。送る行の context.device_id に入れる。
@@ -434,15 +434,15 @@ function idGroup(){ return GROUP_OF[loginId()] || (getDaily(TESTGROUP_KEY)==="ev
 const DEVICE_KEY = "uistudy_device_v1";
 function deviceId(){ let v=lsGet(DEVICE_KEY); if(!v){ v=uuid(); lsSet(DEVICE_KEY, v); } return v; }
 
-/* ★counter-2.0.5: 「かえりに入った」印。計数研究では、その日どこまで進んだかを uistudy_leg_v1 で表す
+/* ★counter-2.0.5: 「かえりに入った」印。計数研究では、その日どこまで進んだかを countapp_leg_v1 で表す
    （未設定＝まだゆき／"kaeri"＝もうかえり）。奇数組は桃山台駅で人数アプリからこのアプリ（?dir なし＝かえり）に
    移るが、これまでは誰も印を立てていなかった。そのため、ブラウザの戻るやQRで人数アプリに戻ると、
    かえりの便で答えても「計数研究ゆき」として記録されてしまう。印が立っていれば、人数アプリが案内の画面を出して止める。
    キーの作りは index.html の setLeg と同じ（日付つき・"switch@時刻"） */
-const STUDY_KEY  = "uistudy_round_v1";     // その日に読んだQR（"r1" | "r2" | "count"）。人数アプリが入れる
-const LEG_KEY    = "uistudy_leg_v1";       // その日どこまで進んだか（未設定＝ゆき / "kaeri"）
-const LEGSET_KEY = "uistudy_leg_set_v1";   // 区間をいつ・どう決めたか（"switch@時刻"）
-// 人数アプリから移ってきたか。端末に保存できない設定だと uistudy_round_v1 が残らないので、そのときの備え。
+const STUDY_KEY  = "countapp_round_v1";     // その日に読んだQR（"r1" | "r2" | "count"）。人数アプリが入れる
+const LEG_KEY    = "countapp_leg_v1";       // その日どこまで進んだか（未設定＝ゆき / "kaeri"）
+const LEGSET_KEY = "countapp_leg_set_v1";   // 区間をいつ・どう決めたか（"switch@時刻"）
+// 人数アプリから移ってきたか。端末に保存できない設定だと countapp_round_v1 が残らないので、そのときの備え。
 //   人数アプリが counter.html を開くのは計数研究のときだけ（index.html の legBar を参照）
 function fromIndexApp(){
   const r=document.referrer; if(!r) return false;
@@ -1266,8 +1266,8 @@ async function boot(){
     //   ログインし直したあと、かえりの便をゆきとして記録してしまうため。
     //   確認用アカウント（組の表に無いID）のときは、今までどおり全部消す（回目や区間を変えながら確かめるため）
     const keepLeg = countDay && !testAcct;
-    ["uistudy_posture_v1","uistudy_practice_v1","uistudy_testgroup_v1"]
-      .concat(keepLeg ? [] : ["uistudy_round_v1","uistudy_leg_v1","uistudy_leg_at_v1","uistudy_leg_set_v1"])
+    ["countapp_posture_v1","countapp_practice_v1","countapp_testgroup_v1"]
+      .concat(keepLeg ? [] : ["countapp_round_v1","countapp_leg_v1","countapp_leg_at_v1","countapp_leg_set_v1"])
       .forEach(k=>lsSet(k, null));
     user=null; run=null; render();
   };
