@@ -5,7 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>乗降アプリ</title>
 <!--
-  乗降アプリ（計数研究）  counter-2.1.1
+  乗降アプリ（計数研究）  counter-2.2.0
+
+  ★2026-10-16 (counter-2.2.0): 松本が実機を見たうえでの指示どおりに、数える枠のボタンを並べ直した
+    ・数える枠を1行にした。並びは「数 ／ ＋1 ／ −1 ／ わからない」。
+      ＋1・−1・わからない は同じ大きさ（列の幅は三等分、高さは --plush）にして、
+      これまで ＋1 だけが使っていた幅に3つを収めた。2行目（わからない）は無くした。
+      −1 が小さくて押しづらい、という指摘への直し。＋1 と −1 が隣り合うので、
+      誤って押さないよう列のすき間は 18px（2.1.1 の ＋1−−1 間と同じ）を取る。
+      狭い画面と横画面だけ 16px に詰める
+    ・丸番号（①②③④）を消した。わかりづらい、という指摘への直し。
+      見出しの文字（バス停・乗ってきた人・降りた人・送信）はそのまま残してある
+    ・横画面で「送信」がはみ出していたのを直した（667×375 のふつうの状態で 21.6px、
+      練習モードでは 44.5px はみ出し、見えている所を押すと位置情報の帯が反応して送れなかった）。
+      1行にしたぶん（横画面で51px）に加えて、横画面だけ 見出し・枠の余白・送信の上の余白 を詰めた。
+      ＋1 の高さ（--plush）と、押せる高さ 44px はどこも下げていない
 
   ★2026-10-16 (counter-2.1.1): 2.1.0 の独立検証で出た、画面からはみ出す・読めない・押し間違える を直した
     ・【最優先】「送信」が画面からはみ出していた。原因は2つで、かえりにもヘッダのボタンが出て
@@ -145,11 +159,11 @@
   .pbanner{display:block; width:100%; border:none; border-radius:10px; background:#f59e0b; color:#1f2937;
            padding:8px 10px; font-size:12.5px; font-weight:800; line-height:1.35; text-align:center;}
 
-  /* 1バス停ぶんの画面。番号は参加者向け案内「人数の答え方」の 1〜4 */
+  /* 1バス停ぶんの画面。
+     ★counter-2.2.0: 見出しの丸番号（①②③④）は消した（松本の指示。わかりづらいため）。
+     見出しの文字だけを残したので、.lbl の中の gap と .no の指定も要らなくなった */
   .blk{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:8px 10px 10px;}
-  .lbl{display:flex; align-items:center; gap:7px; font-size:13px; font-weight:700; color:var(--muted); margin-bottom:6px;}
-  .no{flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:var(--line); color:var(--ink);
-      font-size:12px; font-weight:800; display:inline-flex; align-items:center; justify-content:center;}
+  .lbl{display:flex; align-items:center; font-size:13px; font-weight:700; color:var(--muted); margin-bottom:6px;}
   .stoprow{display:flex; align-items:center; gap:8px;}
   .stopname{flex:1 1 auto; min-width:0; font-size:20px; font-weight:800; line-height:1.25; overflow-wrap:anywhere;}
   .stopname small{display:block; font-size:11px; font-weight:600; color:var(--muted);}
@@ -162,26 +176,36 @@
   .blk.fresh{animation:fresh .7s ease;}
   @keyframes fresh{0%{border-color:#60a5fa; background:#1e3a5f;}100%{border-color:var(--line); background:var(--panel);}}
 
-  /* ★counter-2.1.0: 並びを「数 ／ ＋1 ／ −1」にした（−1 は ＋1 の右）。2行目の左に「わからない」を置く。
-       1行目  数（左）  ＋1（まん中・大きいまま）  −1（右・小さめ）
-       2行目  わからない（左。右側は空ける）
-     ＋1 を続けて押す指がずれて当たらないよう、−1 と「わからない」は ＋1 と辺を接しない置き方にする。
-     ＋1 との間は、−1 が 18px（margin-left）、「わからない」は斜め（右に 16px・下に 12px）離れている */
-  .ctr{display:grid; grid-template-columns:86px 1fr 78px; grid-template-rows:auto auto; gap:6px; align-items:stretch;}
-  .ctr button{border-radius:12px; font-weight:800; font-variant-numeric:tabular-nums;}
+  /* ★counter-2.2.0: 1行に「数 ／ ＋1 ／ −1 ／ わからない」を並べる（松本の指示）。
+       数（左・幅は固定）  ＋1   −1   わからない
+     ＋1・−1・わからない は同じ大きさにする。列の幅は3つとも同じ（残りの幅を三等分）、
+     高さは行ごと（align-items:stretch）なので、幅も高さも必ずそろう。高さは ＋1 の --plush のまま。
+     これまで ＋1 だけが使っていた幅に3つを収めるため、数の枠は 86px → 76px に細くした。
+     ＋1 と −1 が隣り合うので、誤って押さないよう列のすき間は 18px
+     （2.1.1 の ＋1 と −1 のあいだと同じ）を取る。狭い画面と横画面だけ 16px に詰める。
+     列は 1fr ではなく minmax(0,1fr) にする。1fr のままだと、中の文字が入りきらない列だけが
+     勝手に広がって3つの幅がそろわなくなる（320px 幅で実際にそうなった）。
+     そのかわり、文字が必ず収まるよう ＋1 の字の大きさは画面の幅に合わせて小さくする */
+  .ctr{display:grid; grid-template-columns:76px repeat(3, minmax(0,1fr)); column-gap:18px; align-items:stretch;}
+  /* 3つのボタンは高さも --plush でそろえる。--plush は 72 / 56 / 46 / 44px のどれかで、44px を下回らない */
+  .ctr button{border-radius:12px; font-weight:800; font-variant-numeric:tabular-nums; min-height:var(--plush); padding:0 2px;}
   .ctr .val{grid-column:1; grid-row:1; min-height:var(--plush);
             display:flex; align-items:center; justify-content:center; border-radius:12px; border:2px solid var(--line); background:var(--bg);}
   .ctr .vin{display:flex; align-items:baseline; gap:2px;}
   .ctr .val b{font-size:32px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; color:var(--ink);}
   .ctr .vin > span{font-size:12px; color:var(--muted);}
-  .ctr .plus{grid-column:2; grid-row:1; height:var(--plush); margin-left:10px; border:none; color:#fff; font-size:30px;}
+  /* 「＋1」は途中で折り返させない（折り返すと2行になってボタンの高さが倍になる）。
+     そのぶん字の大きさは、いちばん狭い列でも収まる 28px にした（狭い画面と横画面ではさらに小さくする） */
+  .ctr .plus{grid-column:2; grid-row:1; border:none; color:#fff; font-size:28px; white-space:nowrap;}
   .ctr .plus:active{filter:brightness(1.25);}
   /* ★counter-2.1.1: 押せないあいだも文字は読める濃さのままにする（薄さは背景の色で表す）。
      opacity で薄くすると、白い「＋1」まで背景に溶けて読めなくなっていた（＋1 が押せないのは「わからない」が入のとき） */
   .ctr .plus:disabled{background:#3f4c61; color:#e8edf5; opacity:1;}
-  /* −1 は小さめ・控えめ。margin-left で ＋1 とのあいだにすき間（18px）を作り、誤って押しにくくする。
-     何をするボタンかが見てわかるよう、数字の下に「1つ戻す」と添える */
-  .ctr .minus{grid-column:3; grid-row:1; align-self:start; margin-left:12px; height:44px;
+  /* ★counter-2.2.0: −1 は ＋1 と同じ大きさにした（小さくて押しづらい、という松本の指摘への直し）。
+     ＋1 とのあいだのすき間（18px）は列のすき間（column-gap）で作り、誤って押しにくくする。
+     何をするボタンかが見てわかるよう、数字の下に「1つ戻す」と添える（幅が足りない横画面では隠す。
+     そのときも aria-label の「−1 1つ戻す」は残る） */
+  .ctr .minus{grid-column:3; grid-row:1;
               display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
               border:1px solid var(--line); background:var(--bg); color:#fca5a5;}
   .ctr .minus .mn{font-size:15px; line-height:1;}
@@ -192,8 +216,11 @@
      薄さは枠と背景で表し、文字は読める濃さ（var(--muted) で 6.9対1）を保つ */
   .ctr .minus:disabled{color:var(--muted); border-color:#2b3a52; background:#141d33;}
   .ctr .minus:disabled .mh{color:var(--muted);}
-  /* ★counter-2.1.0: 「わからない」は数の枠の下（2行目の左）。入のあいだは練習ボタンと同じ山吹色にする */
-  .ctr .unk{grid-column:1; grid-row:2; margin-top:6px; min-height:44px; white-space:nowrap;
+  /* ★counter-2.2.0: 「わからない」は1行目のいちばん右（2.1.1 で −1 があった場所）。
+     大きさは ＋1・−1 とそろう（列の幅は三等分、高さは行の高さ）。入のあいだは練習ボタンと同じ山吹色にする。
+     折り返しは止めない。端末の書体しだいで列から1〜2px あふれることがあり、
+     止めると文字が切れてしまう。折り返せば2行になるだけで、ボタンの高さ（44px 以上）には収まる */
+  .ctr .unk{grid-column:4; grid-row:1; line-height:1.2; padding:0;
             border:1px solid var(--line); background:var(--bg); color:var(--muted); font-size:12px; font-weight:700;}
   .ctr .unk.on{background:#f59e0b; border-color:#f59e0b; color:#1f2937; font-weight:800;}
   /* 「わからない」が入のあいだは、その枠の数を数えない（数は「？」にする）。
@@ -215,14 +242,15 @@
   /* ★counter-2.0.6: 人数アプリへ移るボタン。送信（緑）と間違えないよう、ヘッダの「かえりに切り替える」と同じ青にする */
   .btn.go{background:#2563eb;}
   .btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--line); font-weight:700; font-size:15px;}
-  .btn .no{background:rgba(255,255,255,.25);}
   .btn:active{filter:brightness(.9);}
   .btn:disabled{opacity:.5;}
   /* ★2026-10-07: 降りた人の＋1 から離す（揺れる車内で＋1を続けて押す指がずれて送信しないように）
      ★counter-2.1.1: 「わからない」が降りた人の枠の下に来たので、ここを 26px → 42px に広げた。
      送信までのすき間は 40.8px → 約60px になる。＋1 のあとに効く700ミリ秒の歯止めは
      「わからない」を押したときには働かないので、すべった指がそのまま送信に当たっていた。
-     画面を詰める @media でも、ここだけは詰めない */
+     ★counter-2.2.0: 1行になっても、枠のいちばん下は「わからない」と＋1・−1 の行で変わらないので、
+     ここはそのまま。縦画面のすき間は今までどおり約60px になる。
+     縦画面を詰める @media でも、ここだけは詰めない（横画面は下の landscape で詰める） */
   #sendBtn{margin-top:42px;}
   /* ★counter-2.1.1: かえり（?dir なし）で車内人数アプリへ戻るボタン。数えている最中に押すものではないので、
      ヘッダではなく記録の一覧の下に置く。送信（緑）と見分けがつくよう、ヘッダのボタンと同じ青の控えめな見た目にする */
@@ -350,10 +378,7 @@
     .inner{gap:4px;}
     .blk{padding:5px 9px 6px;}
     .lbl{margin-bottom:3px;}
-    .no{width:18px; height:18px; font-size:11px;}
     :root{--plush:56px;}
-    .ctr{row-gap:4px;}
-    .ctr .unk{margin-top:4px;}
     .pbanner{padding:6px 9px; font-size:12px;}
     .renote{margin-top:3px; font-size:12.5px;}
     .btn{padding:11px;}
@@ -368,11 +393,8 @@
     :root{--plush:46px;}
     .stopname{font-size:18px;}
     .ctr .val b{font-size:28px;}
-    .ctr{row-gap:3px;}
-    .ctr .unk{margin-top:3px;}
     .blk{padding:3px 8px 4px;}
     .lbl{margin-bottom:2px;}
-    .no{width:16px; height:16px; font-size:10.5px;}
     .inner{gap:2px;}
     .pbanner{padding:5px 7px; font-size:11px; line-height:1.3;}
     .btn{padding:9px;}
@@ -388,7 +410,6 @@
     :root{--plush:44px;}
     .chg{min-height:44px;}   /* ★counter-2.1.1: 38px だと押せる高さが足りないので 44px に戻した */
     .stopname{font-size:17px;}
-    .ctr{row-gap:4px;}
     .ctr .val b{font-size:26px;}
     .expbar .pz,.expbar .prac{padding-top:5px; padding-bottom:5px;}
     .pbanner{padding:4px 8px; font-size:11.5px;}
@@ -403,17 +424,42 @@
     .inner{max-width:640px;}
     .pair{flex-direction:row; gap:8px;}
     .pair > .blk{flex:1 1 0; min-width:0;}
-    /* 枠が半分の幅になるので、左右の枠を細くして＋1 の幅を残す */
-    .ctr{grid-template-columns:72px 1fr 70px;}
+    /* 枠が半分の幅になるので、数の枠をさらに細くし、列のすき間も 16px にして3つのボタンの幅を残す */
+    .ctr{grid-template-columns:58px repeat(3, minmax(0,1fr)); column-gap:16px;}
+    .ctr .plus{font-size:26px;}
+    /* 幅が足りないので「1つ戻す」は隠す。aria-label の「−1 1つ戻す」は残るので、読み上げでは今までどおり */
+    .ctr .minus .mh{display:none;}
+    /* 「わからない」は5文字ぶん（5em）の幅が要る。横画面は列が 64px しかないので字を 11px にする
+       （文字の幅 55px ／ 入る幅 62.1px） */
+    .ctr .unk{font-size:11px;}
+    /* ★counter-2.2.0: 横画面で「送信」が画面からはみ出していたので、ここだけさらに詰める。
+       1行にしたぶん（51px）では練習モードに足りなかった。
+       詰めるのは 見出し・枠の余白・送信の上の余白 だけで、＋1 の高さ（--plush＝44px）と
+       押せる高さ 44px はどこも下げていない */
+    .lbl{font-size:12px; margin-bottom:1px;}
+    .blk{padding:3px 8px 3px;}
+    .expbar .pz,.expbar .prac{padding-top:4px; padding-bottom:4px;}
+    .pbanner{padding:3px 8px; font-size:11px;}
+    .statusbar{padding-top:4px; padding-bottom:calc(4px + env(safe-area-inset-bottom,0px));}
+    /* 縦画面の約60px は保てないが、26px あれば ＋1 からすべった指は届かない
+       （＋1 のあとに効く700ミリ秒の歯止めも、横画面では今までどおり働く） */
+    #sendBtn{margin-top:26px;}
   }
   @media (max-width:360px){
     header{gap:7px; padding-left:9px; padding-right:9px;}
     .scroll{padding-left:10px; padding-right:10px;}
     .iconbtn{padding:6px 8px; font-size:12px;}
     .pz{padding:7px 10px;}
-    /* ★counter-2.1.0: 狭い画面では左右の枠を細くして、＋1 の幅を残す */
-    .ctr{grid-template-columns:80px 1fr 72px;}
-    .ctr .minus{margin-left:10px;}
+    /* ★counter-2.2.0: 狭い画面では数の枠を細くし、列のすき間も 16px にして3つのボタンの幅を残す */
+    .ctr{grid-template-columns:68px repeat(3, minmax(0,1fr)); column-gap:16px;}
+    .ctr .unk{font-size:11.5px;}
+  }
+  /* ★counter-2.2.0: 320×568 など、いちばん狭い端末。ここまで狭いと ＋1 の字が列に入りきらず、
+     2行に折り返してボタンの高さが倍（88px）になっていた。字の大きさと列のすき間でそろえ直す */
+  @media (max-width:340px){
+    .ctr{grid-template-columns:56px repeat(3, minmax(0,1fr)); column-gap:14px;}
+    .ctr .plus{font-size:24px;}
+    .ctr .unk{font-size:11px;}
   }
 </style>
 </head>
@@ -445,7 +491,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
-const VERSION = "counter-2.1.1";
+const VERSION = "counter-2.2.1";
 // index.html と同じプロジェクト・同じ設定。同じサイトなのでログイン状態も共有される
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
@@ -1025,6 +1071,21 @@ function finalizeAll(){ fins.slice().forEach(f=>finalize(f.sid, true)); }
 //   （「送信」の2回押しで次のバス停を0人で送る、「変える」の2回押しで一覧の上のバス停を選ぶ、＋1の連打の指がずれて送る）
 const SEND_AFTER_SHOW = 1000, SEND_AFTER_TAP = 700, PICK_AFTER_OPEN = 500;
 let shownAt=0, lastTapAt=0, sheetAt=0;
+/* ★counter-2.2.1: 送信の歯止めを画面に出す。
+   これまでは歯止めに当たると何も知らせずに捨てていたので、参加者からは「押したのに無反応」に見え、
+   1回押して目を離すとそのバス停の記録が残らなかった */
+function sendBlockMs(){
+  const n=Date.now();
+  return Math.max(0, SEND_AFTER_SHOW-(n-shownAt), SEND_AFTER_TAP-(n-lastTapAt));
+}
+let sendLockTimer=null;
+function refreshSendLock(){
+  const b=$("sendBtn"); if(!b) return;
+  const ms=sendBlockMs();
+  b.disabled = ms>0;
+  if(sendLockTimer){ clearTimeout(sendLockTimer); sendLockTimer=null; }
+  if(ms>0) sendLockTimer=setTimeout(refreshSendLock, ms+30);
+}
 // ★counter-2.1.0: その枠が「わからない」かどうか
 function isUnk(k){ return !!(run && run.draft && run.draft[k+"_unknown"]); }
 function bump(k, delta){
@@ -1038,15 +1099,16 @@ function bump(k, delta){
   d.cnt[k+(delta>0?"_plus":"_minus")]++;
   ev(k+(delta>0?"+1":"-1"), { value:d[k] });
   saveRun(); showVals();
-  lastTapAt=Date.now();
+  lastTapAt=Date.now(); refreshSendLock();
   if(delta>0 && navigator.vibrate) navigator.vibrate(8);
 }
 /* ★counter-2.1.0: 「わからない」の入／切。車内人数アプリ（count.html）には「わからない」があるので、
    こちらにも足して数え方をそろえる。乗ってきた人・降りた人のそれぞれに1つずつ置き、
    どちらが数えにくかったかを分けて見られるようにする。
    入のあいだは数を「？」にして ＋1・−1 を止めるが、それまでの数は消さずに持っておき、切に戻すとそのまま戻る。
-   送信は止めない（片方だけでも、両方でも送れる）。lastTapAt は動かさない
-   （「わからない」は ＋1 から離れていて指がずれて当たらず、押した直後に送信が効かないほうが困るため） */
+   送信そのものは止めない（片方だけでも、両方でも送れる）。
+   ★counter-2.2.1: ただし lastTapAt を動かす。2.2.0 で横画面の「わからない」と「送信」が
+   31.8px まで近づき、指がすべってそのまま送られるおそれが出たため */
 function setUnknown(k, on){
   if(legMovedOn()){ render(); return; }
   const d=run.draft;
@@ -1056,6 +1118,7 @@ function setUnknown(k, on){
   d[k+"_unknown"]=on; d.taps++;
   d.cnt[k+"_unknown_taps"]=(d.cnt[k+"_unknown_taps"]||0)+1;
   ev("unknown", { field:k, on:on, value_before:before });
+  lastTapAt=Date.now(); refreshSendLock();
   saveRun(); showVals();
   if(navigator.vibrate) navigator.vibrate(8);
 }
@@ -1088,7 +1151,8 @@ function send(){
   // ★counter-2.0.6: 押した瞬間にも見る。ほかのタブでかえりに進んだあと、この古いゆきの画面から送らせない
   if(legMovedOn()){ render(); return; }
   const d=run.draft, now0=Date.now();
-  if(now0-shownAt < SEND_AFTER_SHOW || now0-lastTapAt < SEND_AFTER_TAP) return;
+  // ★counter-2.2.1: 歯止めに当たったときは、黙って捨てずに知らせる
+  if(sendBlockMs()>0){ refreshSendLock(); toast("少し待ってから「送信」を押してください","#f59e0b"); return; }
   /* ★counter-2.1.0: 「わからない」の枠は数を送らず null にする。0 は「誰もいなかった」なので分けて残す。
      どちらの枠がわからなかったかは board_unknown / alight_unknown でわかる。
      「0人で送りますか？」の確かめは、両方とも数えられて0人のときだけ出す（わからないは0人ではない） */
@@ -1290,8 +1354,8 @@ function renderExpBar(){
   renderPracBanner();
 }
 /* ★counter-2.1.0: 乗ってきた人・降りた人で同じ作りなので1か所にまとめた（p は "b"＝乗 / "a"＝降）。
-   並びは「数 ／ ＋1 ／ −1」。「わからない」は数の枠の下に置き、＋1 とは隣り合わせない。
-   画面での位置は CSS（.ctr）で決めているので、ここは読みやすい順（数 → ＋1 → −1 → わからない）に並べる */
+   ★counter-2.2.0: 並びは1行で「数 ／ ＋1 ／ −1 ／ わからない」。
+   画面での位置と大きさは CSS（.ctr）で決めているので、ここは読む順にそのまま並べる */
 function ctrHtml(p){
   return `<div class="ctr" id="${p}Ctr">
       <div class="val"><span class="vin"><b id="${p}Val">0</b><span id="${p}Unit">人</span></span></div>
@@ -1307,7 +1371,7 @@ function renderStop(fresh){
       <div id="pracwrap"></div>
       <div class="expbar" id="expbar"></div>
       <section class="blk${fresh?" fresh":""}">
-        <div class="lbl"><span class="no">1</span>バス停</div>
+        <div class="lbl">バス停</div>
         <div class="stoprow"><div class="stopname" id="stopName"></div><button class="chg" id="chgBtn">変える</button></div>
         <div class="renote" id="reNote" hidden></div>
       </section>
@@ -1315,15 +1379,15 @@ function renderStop(fresh){
            横画面のときだけ左右に並ぶ（CSS の @media (orientation:landscape)） -->
       <div class="pair">
         <section class="blk board">
-          <div class="lbl"><span class="no">2</span>乗ってきた人</div>
+          <div class="lbl">乗ってきた人</div>
           ${ctrHtml("b")}
         </section>
         <section class="blk alight">
-          <div class="lbl"><span class="no">3</span>降りた人</div>
+          <div class="lbl">降りた人</div>
           ${ctrHtml("a")}
         </section>
       </div>
-      <button class="btn primary" id="sendBtn"><span class="no">4</span>送信</button>
+      <button class="btn primary" id="sendBtn">送信</button>
       ${run.sent[STOPS.length-1] ? `<button class="btn ghost" id="toEndBtn">終点の画面に戻る</button>` : ""}
       <div class="log" id="log"></div>
       ${botHtml()}
@@ -1332,6 +1396,7 @@ function renderStop(fresh){
   renderExpBar();
   showStop(); showVals();
   shownAt=Date.now();
+  refreshSendLock();   // ★counter-2.2.1: 画面が出た直後の1秒も、「送信」を見た目で押せなくする
   $("chgBtn").onclick=openSheet;
   $("bPlus").onclick=()=>bump("board", 1);   $("bMinus").onclick=()=>bump("board", -1);
   $("aPlus").onclick=()=>bump("alight", 1);  $("aMinus").onclick=()=>bump("alight", -1);
