@@ -5,7 +5,45 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>乗降アプリ</title>
 <!--
-  乗降アプリ（計数研究）  counter-2.0.8
+  乗降アプリ（計数研究）  counter-2.1.1
+
+  ★2026-10-16 (counter-2.1.1): 2.1.0 の独立検証で出た、画面からはみ出す・読めない・押し間違える を直した
+    ・【最優先】「送信」が画面からはみ出していた。原因は2つで、かえりにもヘッダのボタンが出て
+      ヘッダが 45.6px → 85.6px に増えたこと、「わからない」で枠ごとに1行（2枠で約112px）増えたのに、
+      詰める指定が @media (max-height:520px) の中にしかなく 664・667 の端末に当たっていなかったこと。
+      かえり（?dir なし）の「車内人数アプリへ」をヘッダから記録の一覧の下へ移し、
+      高さ 700px 以下の指定を作り直した。詰めたのは すき間・余白・ヘッダの高さ だけで、
+      押せる高さは 44px を下回らない（＋1 は 56px、−1・わからない・変える は 44px）
+    ・横画面（667×375 など）では、乗ってきた人・降りた人の枠を左右に並べる。
+      縦に積んだままだと、降りた人の＋1 がスクロールしないと押せなかった。
+      枠の中の並び（数／＋1／−1、その下にわからない）は縦画面と同じまま変えていない
+    ・押せない（disabled）あいだの「−1」「1つ戻す」が読めなかった（明暗の比 1.72対1）。
+      バス停の画面は毎回 0 から始まるので、初めて見る瞬間がいちばん読めない状態だった。
+      薄さは枠と背景で表し、文字は読める濃さ（6.9対1）に戻した。＋1 も押せないあいだは
+      色を変えるだけにして、文字が薄くならないようにした
+    ・降りた人の「わからない」と「送信」のあいだを 40.8px → 約60px に広げた。
+      ＋1 のあとに効く700ミリ秒の歯止めは「わからない」では働かないので、すべった指がそのまま送信に当たっていた
+    ・確認用アカウントの向き切り替えが説明と違っていた。かえりへ移ると区間の印が kaeri になり、
+      そのあと「ゆきへ」を押しても案内の画面に変わって戻れなかった（ログアウトが要った）。
+      確認用アカウントのときはゆきへ戻るときに印も一緒に戻し、本当に行き来できるようにした
+
+  ★2026-10-15 (counter-2.1.0): 車内人数アプリ（count.html）と数え方をそろえ、ボタンの並びと行き来を直した
+    ・「乗ってきた人」「降りた人」のそれぞれに「わからない」を足した。車内人数アプリには「わからない」があり、
+      こちらに無いままだと、数え方のちがいに「わからないと言えるかどうか」のちがいが混ざってしまう。
+      わからないのあいだは数を「？」にして ＋1・−1 を止め、送る行の context.board / context.alight は null にする
+      （0 は「誰もいなかった」なので分けて残す）。どちらの枠がわからないかは context.board_unknown /
+      context.alight_unknown に入れる。乗と降で別々にしたのは、降りる人のほうが数えにくいかを見るため。
+      押した瞬間は操作ログに events の "unknown"（field / on / value_before）で、押した回数は
+      summary の board_unknown_taps / alight_unknown_taps で残る。表の列は増やしていない
+    ・並びを「数 ／ ＋1 ／ −1」に変えた（−1 を ＋1 の右に置く）。−1 には「1つ戻す」と添えて、
+      何をするボタンかを見てわかるようにした。＋1 とのあいだに 18px のすき間を取り、誤って押しにくくしている。
+      「わからない」は数の枠の下（2行目の左）に置き、＋1 とは隣り合わせない。
+      ＋1 は2行ぶんの高さにして、いちばん押しやすいままにした
+    ・かえり（?dir なし）でも、ヘッダから車内人数アプリへ移れるようにした（「車内人数アプリへ」→ count.html。
+      leg は付けないので区間の印は変わらない）。これまではゆき（?dir=out）にしかボタンが無く、
+      かえりで開くと車内人数アプリへ戻る手段が画面に一つも無かった
+    ・確認用アカウント（組の表に無いID）のときだけ、ヘッダに向きを変えるボタンを出す
+      （ゆきでは「かえりへ」、かえりでは「ゆきへ」）。本番前の確認で向きを変えられるように
 
   ★2026-10-15 (counter-2.0.8): 計数研究の人数アプリを index.html から count.html に分けた。
     index.html は UI研究専用（本実験のあいだ uiStudy-0.9.7 のまま凍結）にするため。
@@ -79,7 +117,9 @@
          display:flex; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid var(--line); background:var(--panel);}
   .brand{flex:1 1 auto; min-width:0; font-size:14px; font-weight:800; display:flex; flex-direction:column; line-height:1.2;}
   .brand .staff{font-size:11px; font-weight:700; color:var(--muted); white-space:nowrap;}
-  .hactions{flex:0 0 auto; margin-left:auto; display:flex; align-items:center; gap:8px;}
+  /* ★counter-2.1.0: ボタンが増えたので、入りきらないときは中でも折り返す。
+     縮められる（flex:1 1 auto・min-width:0）ようにしておかないと、折り返さずに画面の外へはみ出す */
+  .hactions{flex:1 1 auto; min-width:0; margin-left:auto; display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px;}
   .sess{font-size:11px; color:var(--muted); white-space:nowrap;}
   .sess b{color:var(--ink); font-size:15px; font-weight:800; margin-left:3px;}
   .iconbtn{flex:0 0 auto; border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:10px; padding:7px 10px; font-size:13px; font-weight:600;}
@@ -122,20 +162,54 @@
   .blk.fresh{animation:fresh .7s ease;}
   @keyframes fresh{0%{border-color:#60a5fa; background:#1e3a5f;}100%{border-color:var(--line); background:var(--panel);}}
 
-  .ctr{display:grid; grid-template-columns:54px 64px 1fr; gap:6px; align-items:stretch;}
+  /* ★counter-2.1.0: 並びを「数 ／ ＋1 ／ −1」にした（−1 は ＋1 の右）。2行目の左に「わからない」を置く。
+       1行目  数（左）  ＋1（まん中・大きいまま）  −1（右・小さめ）
+       2行目  わからない（左。右側は空ける）
+     ＋1 を続けて押す指がずれて当たらないよう、−1 と「わからない」は ＋1 と辺を接しない置き方にする。
+     ＋1 との間は、−1 が 18px（margin-left）、「わからない」は斜め（右に 16px・下に 12px）離れている */
+  .ctr{display:grid; grid-template-columns:86px 1fr 78px; grid-template-rows:auto auto; gap:6px; align-items:stretch;}
   .ctr button{border-radius:12px; font-weight:800; font-variant-numeric:tabular-nums;}
-  .ctr .minus{height:var(--plush); border:1px solid var(--line); background:var(--bg); color:#fca5a5; font-size:15px;}
-  .ctr .minus:disabled{color:var(--line);}
-  .ctr .val{display:flex; align-items:center; justify-content:center; border-radius:12px; border:2px solid var(--line); background:var(--bg);}
+  .ctr .val{grid-column:1; grid-row:1; min-height:var(--plush);
+            display:flex; align-items:center; justify-content:center; border-radius:12px; border:2px solid var(--line); background:var(--bg);}
   .ctr .vin{display:flex; align-items:baseline; gap:2px;}
   .ctr .val b{font-size:32px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; color:var(--ink);}
   .ctr .vin > span{font-size:12px; color:var(--muted);}
-  .ctr .plus{height:var(--plush); border:none; color:#fff; font-size:30px;}
+  .ctr .plus{grid-column:2; grid-row:1; height:var(--plush); margin-left:10px; border:none; color:#fff; font-size:30px;}
   .ctr .plus:active{filter:brightness(1.25);}
+  /* ★counter-2.1.1: 押せないあいだも文字は読める濃さのままにする（薄さは背景の色で表す）。
+     opacity で薄くすると、白い「＋1」まで背景に溶けて読めなくなっていた（＋1 が押せないのは「わからない」が入のとき） */
+  .ctr .plus:disabled{background:#3f4c61; color:#e8edf5; opacity:1;}
+  /* −1 は小さめ・控えめ。margin-left で ＋1 とのあいだにすき間（18px）を作り、誤って押しにくくする。
+     何をするボタンかが見てわかるよう、数字の下に「1つ戻す」と添える */
+  .ctr .minus{grid-column:3; grid-row:1; align-self:start; margin-left:12px; height:44px;
+              display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+              border:1px solid var(--line); background:var(--bg); color:#fca5a5;}
+  .ctr .minus .mn{font-size:15px; line-height:1;}
+  .ctr .minus .mh{font-size:10px; font-weight:700; line-height:1; color:var(--muted);}
+  /* ★counter-2.1.1: バス停の画面は毎回 0 から始まり、そのとき −1 は押せない。
+     これまでは文字も枠と同じ色（var(--line)）にしていたので、明暗の比が 1.72対1 しかなく、
+     「−1」も「1つ戻す」も初めて見る瞬間に読めなかった。
+     薄さは枠と背景で表し、文字は読める濃さ（var(--muted) で 6.9対1）を保つ */
+  .ctr .minus:disabled{color:var(--muted); border-color:#2b3a52; background:#141d33;}
+  .ctr .minus:disabled .mh{color:var(--muted);}
+  /* ★counter-2.1.0: 「わからない」は数の枠の下（2行目の左）。入のあいだは練習ボタンと同じ山吹色にする */
+  .ctr .unk{grid-column:1; grid-row:2; margin-top:6px; min-height:44px; white-space:nowrap;
+            border:1px solid var(--line); background:var(--bg); color:var(--muted); font-size:12px; font-weight:700;}
+  .ctr .unk.on{background:#f59e0b; border-color:#f59e0b; color:#1f2937; font-weight:800;}
+  /* 「わからない」が入のあいだは、その枠の数を数えない（数は「？」にする）。
+     ★counter-2.1.1: 薄くするのは枠と背景だけにした。＋1・−1 は押せない状態の色（上の :disabled）になるので、
+     opacity を重ねがけすると文字が読めなくなる */
+  .ctr.unkon .val{border-color:var(--line); background:#141d33;}
+  .ctr.unkon .val b{color:var(--muted);}
   .board .plus{background:var(--board);}  .board .val{border-color:var(--board);}
   .alight .plus{background:var(--alight);} .alight .val{border-color:var(--alight);}
+  /* ★counter-2.1.1: 乗ってきた人・降りた人の2枠をまとめた入れもの。
+     縦画面では今までどおり縦に並ぶ（すき間は .inner と同じ）。横画面だけ左右に並べる（下の @media） */
+  .pair{display:flex; flex-direction:column; gap:inherit;}
 
-  .btn{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; border:none; border-radius:14px;
+  /* ★counter-2.1.1: min-height を足した。画面を詰める @media で padding を減らしても、
+     押せる高さが 44px を下回らないようにするため */
+  .btn{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:44px; border:none; border-radius:14px;
        padding:15px; font-size:16px; font-weight:800; color:#fff;}
   .btn.primary{background:#16a34a;}
   /* ★counter-2.0.6: 人数アプリへ移るボタン。送信（緑）と間違えないよう、ヘッダの「かえりに切り替える」と同じ青にする */
@@ -144,8 +218,23 @@
   .btn .no{background:rgba(255,255,255,.25);}
   .btn:active{filter:brightness(.9);}
   .btn:disabled{opacity:.5;}
-  /* ★2026-10-07: 降りた人の＋1 から離す（揺れる車内で＋1を続けて押す指がずれて送信しないように） */
-  #sendBtn{margin-top:26px;}
+  /* ★2026-10-07: 降りた人の＋1 から離す（揺れる車内で＋1を続けて押す指がずれて送信しないように）
+     ★counter-2.1.1: 「わからない」が降りた人の枠の下に来たので、ここを 26px → 42px に広げた。
+     送信までのすき間は 40.8px → 約60px になる。＋1 のあとに効く700ミリ秒の歯止めは
+     「わからない」を押したときには働かないので、すべった指がそのまま送信に当たっていた。
+     画面を詰める @media でも、ここだけは詰めない */
+  #sendBtn{margin-top:42px;}
+  /* ★counter-2.1.1: かえり（?dir なし）で車内人数アプリへ戻るボタン。数えている最中に押すものではないので、
+     ヘッダではなく記録の一覧の下に置く。送信（緑）と見分けがつくよう、ヘッダのボタンと同じ青の控えめな見た目にする */
+  .gobtm{display:block; width:100%; min-height:44px; margin:14px 0 0; padding:11px;
+         border:1px solid #2563eb; border-radius:12px; background:rgba(37,99,235,.14);
+         color:var(--ink); font-size:14px; font-weight:700;}
+  .gobtm:active{background:rgba(37,99,235,.3);}
+  .gobtm:disabled{opacity:.5;}
+  /* ★counter-2.1.1: 確認用アカウントだけに出す、ゆき／かえりの切り替え。
+     参加者のボタンと見分けがつくよう、枠線を点線にして控えめにする */
+  .gobtm.quiet{border:1px dashed var(--line); background:transparent; color:var(--muted); font-size:13px;}
+  .gobtm.quiet:active{background:var(--line);}
 
   /* 記録一覧 */
   .log{margin-top:6px; border-top:1px solid var(--line);}
@@ -240,47 +329,91 @@
   .authform .btn{background:#2563eb;}
   #authNote{color:#fca5a5; font-size:12px; min-height:16px; margin:0;}
 
-  /* ── 小さい画面（iPhone SE 375x667 / 320x568 など） ── */
+  /* ── 小さい画面（iPhone 390x664 / iPhone SE 375x667 / 360x640 / 320x568 など） ──
+     ★counter-2.1.1: 「わからない」で枠ごとに1行（2枠で約112px）増えたのに、詰める指定が
+     @media (max-height:520px) の中にしかなく、664・667 の端末には当たっていなかった。
+     練習モード・送り直し・位置情報オフが出ていても「送信」まで見えるよう、ここで詰める。
+     詰めるのは すき間・余白・ヘッダの高さ だけで、押せる高さは 44px を下回らない
+     （＋1 は 56px、−1・わからない・変える は 44px のまま）。
+     降りた人の「わからない」と「送信」のあいだ（#sendBtn の margin-top）は逆に広げてある */
   @media (max-height:700px){
-    header{padding-top:calc(5px + env(safe-area-inset-top,0px)); padding-bottom:5px;}
-    .scroll{padding-top:6px;}
-    .inner{gap:6px;}
-    .blk{padding:6px 9px 8px;}
-    .lbl{margin-bottom:4px;}
-    :root{--plush:64px;}
-    .btn{padding:13px;}
+    header{padding-top:calc(4px + env(safe-area-inset-top,0px)); padding-bottom:4px; gap:8px;}
+    .hactions{gap:6px;}
+    .brand .staff{font-size:10.5px;}
+    /* 長いIDでもヘッダが2行に増えないよう、念のため幅を止める（参加者のIDは1文字なので収まる） */
+    .sess{max-width:110px; overflow:hidden; text-overflow:ellipsis;}
+    /* 横の余白と文字だけ小さくする（押せる高さは 31.6px → 32.4px で、小さくしていない）。
+       ヘッダが1行で収まれば 40px ぶん短くなる */
+    .legsw{padding:8px; font-size:12px;}
+    .iconbtn{padding:8px; font-size:12px;}
+    .scroll{padding-top:5px;}
+    .inner{gap:4px;}
+    .blk{padding:5px 9px 6px;}
+    .lbl{margin-bottom:3px;}
+    .no{width:18px; height:18px; font-size:11px;}
+    :root{--plush:56px;}
+    .ctr{row-gap:4px;}
+    .ctr .unk{margin-top:4px;}
+    .pbanner{padding:6px 9px; font-size:12px;}
+    .renote{margin-top:3px; font-size:12.5px;}
+    .btn{padding:11px;}
+    #sendBtn{margin-top:50px;}   /* 詰めたぶん、ここは広げたままにする（すき間は約60px） */
+    .statusbar{padding-top:5px;}
     .login{gap:14px; padding:16px;}
     .afield{padding:11px;}
   }
+  /* iPhone の Safari は上下のバーが出ていると、375×667 の端末でも見えている高さが 560 前後まで下がる。
+     320×568 の端末もここに入る。＋1 は 46px まで、ほかの押せるものは 44px のまま */
   @media (max-height:620px){
-    :root{--plush:58px;}
+    :root{--plush:46px;}
     .stopname{font-size:18px;}
     .ctr .val b{font-size:28px;}
-    .btn{padding:12px;}
+    .ctr{row-gap:3px;}
+    .ctr .unk{margin-top:3px;}
+    .blk{padding:3px 8px 4px;}
+    .lbl{margin-bottom:2px;}
+    .no{width:16px; height:16px; font-size:10.5px;}
+    .inner{gap:2px;}
+    .pbanner{padding:5px 7px; font-size:11px; line-height:1.3;}
+    .btn{padding:9px;}
+    #sendBtn{margin-top:46px;}
   }
   /* ★2026-10-07: 320x460 など（Safari の上下のバーが出ている小さい端末）でも、練習中を含めて送信がスクロールなしで見えるように */
   @media (max-height:520px){
-    header{padding-top:calc(4px + env(safe-area-inset-top,0px)); padding-bottom:4px;}
-    .scroll{padding-top:5px;}
-    .inner{gap:4px;}
-    .blk{padding:4px 8px 6px;}
-    .lbl{margin-bottom:3px;}
-    .no{width:18px; height:18px; font-size:11px;}
+    header{padding-top:calc(3px + env(safe-area-inset-top,0px)); padding-bottom:3px;}
+    .scroll{padding-top:4px;}
+    .inner{gap:2px;}
+    .blk{padding:3px 8px 4px;}
+    .lbl{margin-bottom:2px;}
     :root{--plush:44px;}
-    .chg{min-height:38px;}
+    .chg{min-height:44px;}   /* ★counter-2.1.1: 38px だと押せる高さが足りないので 44px に戻した */
     .stopname{font-size:17px;}
+    .ctr{row-gap:4px;}
     .ctr .val b{font-size:26px;}
-    .expbar .pz,.expbar .prac{padding-top:4px; padding-bottom:4px;}
+    .expbar .pz,.expbar .prac{padding-top:5px; padding-bottom:5px;}
     .pbanner{padding:4px 8px; font-size:11.5px;}
     .btn{padding:9px;}
-    #sendBtn{margin-top:22px;}
+    #sendBtn{margin-top:44px;}
     .statusbar{padding-top:5px;}
+  }
+  /* ★counter-2.1.1: 横画面（667×375 など）は縦が足りないので、乗ってきた人・降りた人の枠を左右に並べる。
+     縦に積んだままだと、降りた人の＋1 がスクロールしないと押せなかった。
+     枠の中の並び（数／＋1／−1、その下にわからない）は縦画面と同じまま変えない */
+  @media (orientation:landscape) and (max-height:520px){
+    .inner{max-width:640px;}
+    .pair{flex-direction:row; gap:8px;}
+    .pair > .blk{flex:1 1 0; min-width:0;}
+    /* 枠が半分の幅になるので、左右の枠を細くして＋1 の幅を残す */
+    .ctr{grid-template-columns:72px 1fr 70px;}
   }
   @media (max-width:360px){
     header{gap:7px; padding-left:9px; padding-right:9px;}
     .scroll{padding-left:10px; padding-right:10px;}
     .iconbtn{padding:6px 8px; font-size:12px;}
     .pz{padding:7px 10px;}
+    /* ★counter-2.1.0: 狭い画面では左右の枠を細くして、＋1 の幅を残す */
+    .ctr{grid-template-columns:80px 1fr 72px;}
+    .ctr .minus{margin-left:10px;}
   }
 </style>
 </head>
@@ -290,8 +423,14 @@
   <div class="brand">乗降アプリ<span class="staff" id="legTag"></span></div>
   <div class="hactions">
     <span class="sess" id="sess"></span>
-    <!-- ★counter-2.0.4: 偶数組のゆき（?dir=out）でログイン中のときだけ出す。押すと人数アプリのかえりへ移る -->
+    <!-- ★counter-2.1.1: ヘッダに出すのは、ゆき（?dir=out）の「かえりに切り替える」だけにした。
+         これは桃山台駅で必ず押すボタンなので、数えている画面から見えるところに要る。
+         かえり（?dir なし）の「車内人数アプリへ」は、行き止まりを避けるための逃げ道なので、
+         ヘッダを増やさないよう画面のいちばん下（記録の一覧の下）に移した（.gobtm / botHtml） -->
     <button class="legsw" id="toIdxBtn" style="display:none">かえりに切り替える</button>
+    <!-- ★counter-2.1.1: 確認用アカウントのゆき／かえりの切り替えもヘッダから外した。
+         ヘッダが3行になり、390×664 のふつうの画面でも「送信」が 53.2px はみ出していた。
+         本番前の確認にしか使わないボタンなので、画面のいちばん下に移した（botHtml） -->
     <button class="iconbtn" id="outBtn" style="display:none">ログアウト</button>
   </div>
 </header>
@@ -306,7 +445,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
-const VERSION = "counter-2.0.8";
+const VERSION = "counter-2.1.1";
 // index.html と同じプロジェクト・同じ設定。同じサイトなのでログイン状態も共有される
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
@@ -527,12 +666,18 @@ function ensureDraft(){
   return run.draft;
 }
 // prev があれば送り直し：前回の値から始める（数え漏れた人だけ＋1すればよい）
+// ★counter-2.1.0: 前回が「わからない」だったバス停（board / alight が null）は、「わからない」が入った状態から始める
 function newDraft(i, prev){
   const now=Date.now(), sug=Math.min(run.next, STOPS.length-1);   // 終点のあとの送り直しは終点が「出したバス停」
   run.draft = { shown_at:now, started_at:new Date(now).toISOString(), sug:sug, cur:i,
-                board:prev ? prev.board : 0, alight:prev ? prev.alight : 0, resend:!!prev,
+                board:(prev && prev.board!=null) ? prev.board : 0,
+                alight:(prev && prev.alight!=null) ? prev.alight : 0,
+                board_unknown:!!(prev && prev.board==null),
+                alight_unknown:!!(prev && prev.alight==null),
+                resend:!!prev,
                 prev:prev ? { board:prev.board, alight:prev.alight } : null,
-                taps:0, cnt:{ board_plus:0, board_minus:0, alight_plus:0, alight_minus:0 },
+                taps:0, cnt:{ board_plus:0, board_minus:0, alight_plus:0, alight_minus:0,
+                              board_unknown_taps:0, alight_unknown_taps:0 },
                 first_at:null, traj:[], events:[] };
   ev("screen_view", Object.assign({ stop:stopObj(i), screen_w:innerWidth, screen_h:innerHeight }, prev ? { resend:true, prev:run.draft.prev } : {}));
   saveRun();
@@ -880,10 +1025,13 @@ function finalizeAll(){ fins.slice().forEach(f=>finalize(f.sid, true)); }
 //   （「送信」の2回押しで次のバス停を0人で送る、「変える」の2回押しで一覧の上のバス停を選ぶ、＋1の連打の指がずれて送る）
 const SEND_AFTER_SHOW = 1000, SEND_AFTER_TAP = 700, PICK_AFTER_OPEN = 500;
 let shownAt=0, lastTapAt=0, sheetAt=0;
+// ★counter-2.1.0: その枠が「わからない」かどうか
+function isUnk(k){ return !!(run && run.draft && run.draft[k+"_unknown"]); }
 function bump(k, delta){
   // ★counter-2.0.6: ほかのタブでかえりに進んだら、この古いゆきの画面では数えさせない
   if(legMovedOn()){ render(); return; }
   const d=run.draft;
+  if(isUnk(k)) return;             // ★counter-2.1.0: 「わからない」のあいだは数えない（ボタンも止めてある）
   if(delta<0 && d[k]<=0) return;   // 0未満にしない
   firstOp();
   d[k]+=delta; d.taps++;
@@ -892,6 +1040,24 @@ function bump(k, delta){
   saveRun(); showVals();
   lastTapAt=Date.now();
   if(delta>0 && navigator.vibrate) navigator.vibrate(8);
+}
+/* ★counter-2.1.0: 「わからない」の入／切。車内人数アプリ（count.html）には「わからない」があるので、
+   こちらにも足して数え方をそろえる。乗ってきた人・降りた人のそれぞれに1つずつ置き、
+   どちらが数えにくかったかを分けて見られるようにする。
+   入のあいだは数を「？」にして ＋1・−1 を止めるが、それまでの数は消さずに持っておき、切に戻すとそのまま戻る。
+   送信は止めない（片方だけでも、両方でも送れる）。lastTapAt は動かさない
+   （「わからない」は ＋1 から離れていて指がずれて当たらず、押した直後に送信が効かないほうが困るため） */
+function setUnknown(k, on){
+  if(legMovedOn()){ render(); return; }
+  const d=run.draft;
+  if(!!d[k+"_unknown"]===on) return;
+  firstOp();
+  const before=d[k];
+  d[k+"_unknown"]=on; d.taps++;
+  d.cnt[k+"_unknown_taps"]=(d.cnt[k+"_unknown_taps"]||0)+1;
+  ev("unknown", { field:k, on:on, value_before:before });
+  saveRun(); showVals();
+  if(navigator.vibrate) navigator.vibrate(8);
 }
 function pickStop(i){
   if(Date.now()-sheetAt < PICK_AFTER_OPEN) return;
@@ -923,13 +1089,18 @@ function send(){
   if(legMovedOn()){ render(); return; }
   const d=run.draft, now0=Date.now();
   if(now0-shownAt < SEND_AFTER_SHOW || now0-lastTapAt < SEND_AFTER_TAP) return;
+  /* ★counter-2.1.0: 「わからない」の枠は数を送らず null にする。0 は「誰もいなかった」なので分けて残す。
+     どちらの枠がわからなかったかは board_unknown / alight_unknown でわかる。
+     「0人で送りますか？」の確かめは、両方とも数えられて0人のときだけ出す（わからないは0人ではない） */
+  const bUnk=!!d.board_unknown, aUnk=!!d.alight_unknown;
+  const bv=bUnk ? null : d.board, av=aUnk ? null : d.alight;
   let zero=null;
-  if(d.board===0 && d.alight===0){
+  if(bv===0 && av===0){
     zero = confirm("乗った人・降りた人とも0人で送りますか？") ? "ok" : "cancel";
     if(zero==="cancel"){ firstOp(); d.taps++; ev("send", { board:0, alight:0, zero_confirm:"cancel" }); saveRun(); return; }
   }
   firstOp(); d.taps++;
-  ev("send", { board:d.board, alight:d.alight, zero_confirm:zero });
+  ev("send", { board:bv, alight:av, board_unknown:bUnk, alight_unknown:aUnk, zero_confirm:zero });
   const now=Date.now(), sec=Math.floor(now/1000), prac=isPractice();
   const resend=!!run.sent[d.cur];   // この往路で送ったバス停を選び直した（分析では同じ run・同じバス停の最後の記録を使う）
   const sid=uuid(), traj=d.traj.slice(), ls=legSet();
@@ -946,16 +1117,20 @@ function send(){
                leg_by: ls.by, leg_at: ls.at },
     context: Object.assign({
       run_id: run.run_id, dir: DIR, stop: stopObj(d.cur), stop_suggested: stopObj(d.sug),
-      stop_changed: d.cur!==d.sug, resend: resend, board: d.board, alight: d.alight,
+      stop_changed: d.cur!==d.sug, resend: resend, board: bv, alight: av,
+      // ★counter-2.1.0: どちらの枠を「わからない」で送ったか。board / alight が null の理由がこれでわかる
+      board_unknown: bUnk, alight_unknown: aUnk,
       posture: getDaily(POSTURE_KEY), trajectory: traj }, repPoint(traj, sec), {
       screen_w: innerWidth, screen_h: innerHeight, app_version: VERSION,
       device_id: deviceId() }),   // ★counter-2.0.3
     summary: { t_total: now-d.shown_at, t_first: d.first_at-d.shown_at, taps_total: d.taps,
                board_plus: d.cnt.board_plus, board_minus: d.cnt.board_minus,
-               alight_plus: d.cnt.alight_plus, alight_minus: d.cnt.alight_minus },
+               alight_plus: d.cnt.alight_plus, alight_minus: d.cnt.alight_minus,
+               // ★counter-2.1.0: 「わからない」を押した回数（入・切の両方を数える。迷った様子を見るため）
+               board_unknown_taps: d.cnt.board_unknown_taps||0, alight_unknown_taps: d.cnt.alight_unknown_taps||0 },
     events: d.events
   };
-  updRecs(a=>a.push({ sid, uid:user ? user.id : null, state:"rec", at:now, run_id:run.run_id, stop:STOPS[d.cur], board:d.board, alight:d.alight,
+  updRecs(a=>a.push({ sid, uid:user ? user.id : null, state:"rec", at:now, run_id:run.run_id, stop:STOPS[d.cur], board:bv, alight:av,
                        practice:prac, row }));
   // 練習は次のバス停に進めない（のりばで練習しても、本番は今のバス停から始まるように）
   if(!prac){
@@ -977,34 +1152,77 @@ function send(){
 /* ---------------- 画面 ---------------- */
 function updateHeader(){
   $("legTag").textContent = "計数研究　" + (DIR==="out" ? "ゆき" : "かえり");
-  $("sess").innerHTML = user ? `調査員<b>${esc(((user.email||"").split("@")[0]||"").toUpperCase())}</b>` : "";
+  /* ★counter-2.1.1: 参加者のID（カードの文字）は1文字なので「調査員A」と出す。
+     確認用アカウント（admin など）は文字数が多く、そのままだとヘッダが2行に増えて「送信」が押せなくなるので、
+     3文字以上のときは「調査員」を省いてIDだけ出す。参加者の見え方は今までと同じ */
+  const sid = ((user && user.email || "").split("@")[0]||"").toUpperCase();
+  $("sess").innerHTML = user ? (sid.length<=2 ? `調査員<b>${esc(sid)}</b>` : `<b>${esc(sid)}</b>`) : "";
   $("outBtn").style.display = user ? "" : "none";
-  // ★counter-2.0.4: かえり（人数アプリ）へ移るボタンは、ゆき（?dir=out）でログイン中のときだけ出す。
-  //   かえり（?dir なし＝奇数組）では出さない（この先は人数アプリに戻らないため）
-  // ★counter-2.0.6: もうかえりに進んでいるときも出さない（案内の画面に大きなボタンを出すため。
-  //   「かえりに切り替える」という名前も、切り替えたあとでは合わない）
-  $("toIdxBtn").style.display = (DIR==="out" && user && !legMovedOn()) ? "" : "none";
+  /* ★counter-2.1.1: ヘッダに出すのは、ゆき（?dir=out＝偶数組）の「かえりに切り替える」だけにした。
+     桃山台駅で必ず押すボタンなので、数えている画面から見えるところに要る。
+     かえり（?dir なし）の「車内人数アプリへ」は、2.1.0 でヘッダに足したらヘッダが 45.6px → 85.6px に増え、
+     「送信」が画面からはみ出した。数えている最中に押すボタンではないので、画面のいちばん下に移した（botHtml）。
+     ★counter-2.0.6: もうかえりに進んでいるときは出さない（案内の画面に大きなボタンを出すため。
+     「かえりに切り替える」という名前も、切り替えたあとでは合わない） */
+  const tb=$("toIdxBtn");
+  tb.textContent = "かえりに切り替える";
+  tb.style.display = (user && DIR==="out" && !legMovedOn()) ? "" : "none";
 }
 /* ★counter-2.0.4: 偶数組のかえりへ。ゆきをこのアプリで数え終えたら、桃山台駅で人数アプリに移る
    （奇数組とは逆向き。index.html の toCounter と同じ作り・同じ文言）。
    ★counter-2.0.5: 移る前に送れるだけ送るのは今までどおり。送りきれなかった分は、移ったあと人数アプリが
    続けて送るので、そう伝える文言にした（以前は「この画面を開いたままにすると送れます」と、
-   移ったら送れないかのような言い方だった） */
+   移ったら送れないかのような言い方だった）。
+   ★counter-2.1.0: かえり（?dir なし）からも使えるようにして、名前を goCountApp に変えた。
+   行き先は、ゆき（?dir=out）なら count.html?leg=kaeri、かえりなら count.html（leg は付けない）。
+   区間の印（countapp_leg_v1）はどちらでも変えない。移った先が担当でなければ、向こうが案内の画面を出して戻してくれる */
 let moving = false;
+/* ★counter-2.1.1: 画面のいちばん下（記録の一覧の下）に出すボタン。どちらもヘッダから移してきた。
+   ヘッダに置くと、かえりで2行・確認用アカウントで3行になり、「送信」が画面からはみ出していた
+   ・かえり（?dir なし）…「車内人数アプリへ」。かえりでこのアプリを開くと車内人数アプリへ戻る手段が
+     画面に無く行き止まりになるので、その逃げ道。数えている最中に押すボタンではないので下で十分
+   ・確認用アカウント …「かえりへ」「ゆきへ」。本番前の確認にしか使わない
+   ゆき（?dir=out）の「かえりに切り替える」は桃山台駅で必ず押すので、ヘッダのまま残してある */
+function botHtml(){
+  const b=[];
+  if(DIR!=="out") b.push(`<button class="gobtm" id="toIdxBottom">車内人数アプリへ</button>`);
+  if(user && isTestAccount()) b.push(`<button class="gobtm quiet" id="dirBtm">${DIR==="out" ? "かえりへ" : "ゆきへ"}</button>`);
+  return b.join("");
+}
+function wireBot(){
+  const b=$("toIdxBottom"); if(b) b.onclick=()=>goCountApp();
+  const d=$("dirBtm"); if(d) d.onclick=switchDir;
+}
+/* ★counter-2.1.1: 確認用アカウントの、ゆき／かえりの切り替え。
+   記録中のものは先に「送る」印で端末に残してから移る（ページを離れると送信が途中で切れるため）。
+   2.1.0 は「区間の印（countapp_leg_v1）は触らない」と書いてあったが、実際は かえりへ移ると
+   markKaeriLeg が印を kaeri にするので、そのあと「ゆきへ」を押しても legMovedOn が真になり、
+   案内の画面が出てゆきに戻れなかった（ログアウトが要った）。
+   行き来できることがこのボタンの目的なので、ゆきへ戻るときは印も一緒に戻す。
+   参加者には出ないボタンなので、本番の記録には影響しない */
+function switchDir(){
+  finalizeAll();
+  if(isTestAccount() && DIR!=="out"){ setDaily(LEG_KEY, null); setDaily(LEGSET_KEY, null); }
+  location.href = DIR==="out" ? "counter.html" : "counter.html?dir=out";
+}
 // ★counter-2.0.6: quiet を渡すと確認のダイアログを出さない（案内の画面の大きなボタンからはこれで来る。
-//   そこでは「人数アプリを開く」以外に進みようがなく、聞き直す意味がないため）。
-//   ヘッダの「かえりに切り替える」から来たときは、今までどおり確認してから移る
-async function toIndexKaeri(quiet){
+//   そこでは「車内人数アプリを開く」以外に進みようがなく、聞き直す意味がないため）。
+//   ヘッダのボタンから来たときは、今までどおり確認してから移る
+async function goCountApp(quiet){
   if(moving) return;
   // ★counter-2.0.5: 確かめる前に押せなくする。ダイアログを閉じたあとの二重押しで二度動かないように
   moving=true;
-  const b=$("toIdxBtn"), b2=$("toIdxBig");
-  if(b) b.disabled=true;
-  if(b2) b2.disabled=true;
-  const back=()=>{ moving=false; if(b) b.disabled=false; if(b2) b2.disabled=false; setStatus(); };
-  /* ★counter-2.0.7: いまどこにいるかを聞く言い方にした。桃山台駅に着く前に押されると、
-     ゆきの記録がそこで終わってしまうため（以前は移ってよいかだけを聞いていた） */
-  if(!quiet && !confirm("桃山台駅に着きましたか？\nかえりは車内人数アプリで数えます。まだ着いていないときは「キャンセル」を押してください")){ back(); return; }
+  // ★counter-2.1.1: 画面のいちばん下のボタン（toIdxBottom）も一緒に止める
+  const bs=[$("toIdxBtn"), $("toIdxBig"), $("toIdxBottom")].filter(Boolean);
+  bs.forEach(x=>{ x.disabled=true; });
+  const back=()=>{ moving=false; bs.forEach(x=>{ x.disabled=false; }); setStatus(); };
+  const toKaeri = DIR==="out";   // ゆきの画面からは、車内人数アプリの「かえり」へ移る
+  /* ★counter-2.0.7: ゆきでは、いまどこにいるかを聞く言い方にした。桃山台駅に着く前に押されると、
+     ゆきの記録がそこで終わってしまうため（以前は移ってよいかだけを聞いていた）。
+     ★counter-2.1.0: かえりは区間が変わらないので、移ってよいかだけを聞く */
+  if(!quiet && !confirm(toKaeri
+      ? "桃山台駅に着きましたか？\nかえりは車内人数アプリで数えます。まだ着いていないときは「キャンセル」を押してください"
+      : "車内人数アプリに移りますか？\nここまでの記録は端末に残るので、戻れば続きから数えられます")){ back(); return; }
   // ページを離れると送信が途中で切れることがあるので、記録中のものは先に「送る」印で端末に残してから送る
   finalizeAll();
   await Promise.race([flush(), new Promise(r=>setTimeout(r,3000))]);
@@ -1012,7 +1230,8 @@ async function toIndexKaeri(quiet){
   if(n && !confirm(`未送信が ${n}件あります。残りは車内人数アプリが続けて送ります。このまま車内人数アプリに移りますか？`)){
     back(); return;
   }
-  location.href="count.html?leg=kaeri";   // ★counter-2.0.8: 計数研究の人数アプリを count.html に分けた
+  // ★counter-2.0.8: 計数研究の人数アプリを count.html に分けた
+  location.href = toKaeri ? "count.html?leg=kaeri" : "count.html";
 }
 // ★counter-2.0.1: 位置情報が拒否・大まかのときは帯を押せる（押すと直し方の画面）
 function setStatus(){
@@ -1070,6 +1289,17 @@ function renderExpBar(){
   }
   renderPracBanner();
 }
+/* ★counter-2.1.0: 乗ってきた人・降りた人で同じ作りなので1か所にまとめた（p は "b"＝乗 / "a"＝降）。
+   並びは「数 ／ ＋1 ／ −1」。「わからない」は数の枠の下に置き、＋1 とは隣り合わせない。
+   画面での位置は CSS（.ctr）で決めているので、ここは読みやすい順（数 → ＋1 → −1 → わからない）に並べる */
+function ctrHtml(p){
+  return `<div class="ctr" id="${p}Ctr">
+      <div class="val"><span class="vin"><b id="${p}Val">0</b><span id="${p}Unit">人</span></span></div>
+      <button class="plus" id="${p}Plus">＋1</button>
+      <button class="minus" id="${p}Minus" aria-label="−1 1つ戻す"><span class="mn">−1</span><span class="mh">1つ戻す</span></button>
+      <button class="unk" id="${p}Unk" aria-pressed="false">わからない</button>
+    </div>`;
+}
 function renderStop(fresh){
   ensureDraft();
   main.innerHTML = `
@@ -1081,17 +1311,22 @@ function renderStop(fresh){
         <div class="stoprow"><div class="stopname" id="stopName"></div><button class="chg" id="chgBtn">変える</button></div>
         <div class="renote" id="reNote" hidden></div>
       </section>
-      <section class="blk board">
-        <div class="lbl"><span class="no">2</span>乗ってきた人</div>
-        <div class="ctr"><button class="minus" id="bMinus">−1</button><div class="val"><span class="vin"><b id="bVal">0</b><span>人</span></span></div><button class="plus" id="bPlus">＋1</button></div>
-      </section>
-      <section class="blk alight">
-        <div class="lbl"><span class="no">3</span>降りた人</div>
-        <div class="ctr"><button class="minus" id="aMinus">−1</button><div class="val"><span class="vin"><b id="aVal">0</b><span>人</span></span></div><button class="plus" id="aPlus">＋1</button></div>
-      </section>
+      <!-- ★counter-2.1.1: 2つの枠を .pair でまとめた。縦画面の見え方は今までと同じで、
+           横画面のときだけ左右に並ぶ（CSS の @media (orientation:landscape)） -->
+      <div class="pair">
+        <section class="blk board">
+          <div class="lbl"><span class="no">2</span>乗ってきた人</div>
+          ${ctrHtml("b")}
+        </section>
+        <section class="blk alight">
+          <div class="lbl"><span class="no">3</span>降りた人</div>
+          ${ctrHtml("a")}
+        </section>
+      </div>
       <button class="btn primary" id="sendBtn"><span class="no">4</span>送信</button>
       ${run.sent[STOPS.length-1] ? `<button class="btn ghost" id="toEndBtn">終点の画面に戻る</button>` : ""}
       <div class="log" id="log"></div>
+      ${botHtml()}
       <button class="linkbtn" id="dlBtn">記録をJSONで保存</button>
     </div></div>`;
   renderExpBar();
@@ -1100,10 +1335,14 @@ function renderStop(fresh){
   $("chgBtn").onclick=openSheet;
   $("bPlus").onclick=()=>bump("board", 1);   $("bMinus").onclick=()=>bump("board", -1);
   $("aPlus").onclick=()=>bump("alight", 1);  $("aMinus").onclick=()=>bump("alight", -1);
+  // ★counter-2.1.0: 「わからない」は押すたびに入／切が変わる
+  $("bUnk").onclick=()=>setUnknown("board", !isUnk("board"));
+  $("aUnk").onclick=()=>setUnknown("alight", !isUnk("alight"));
   $("sendBtn").onclick=send;
   // 終点を送ったあとの送り直しをやめるとき。入力途中の値は送らずに捨てる
   if($("toEndBtn")) $("toEndBtn").onclick=()=>{ run.draft=null; run.stash=null; run.next=STOPS.length; saveRun(); render(); };
   $("dlBtn").onclick=exportJson;
+  wireBot();   // ★counter-2.1.1: 画面のいちばん下のボタン（かえりの「車内人数アプリへ」・確認用の向き切り替え）
   renderLog(); setStatus();
   startSampling();
   keepAwake(true);
@@ -1114,12 +1353,25 @@ function showStop(){
   el.innerHTML = `${esc(STOPS[d.cur])}<small>${d.cur+1}／${STOPS.length}</small>`;
   // ★2026-10-07: 送り直しであることと前回の値を出す（前回の値から始まるので、数え漏れた人だけ＋1すればよい）
   const re=$("reNote");
-  if(re){ re.hidden=!d.resend; re.textContent = d.resend ? `送り直し（前回 乗${d.prev.board}／降${d.prev.alight}）` : ""; }
+  if(re){ re.hidden=!d.resend; re.textContent = d.resend ? `送り直し（前回 乗${pv(d.prev.board)}／降${pv(d.prev.alight)}）` : ""; }
 }
+// ★counter-2.1.0: 「わからない」で送った枠は null で残っているので、画面には「？」と出す
+function pv(v){ return v==null ? "？" : String(v); }
+/* ★counter-2.1.0: 「わからない」が入のあいだは、数を「？」にして ＋1・−1 を押せなくし、見た目も薄くする。
+   数そのもの（d.board / d.alight）は消さずに持っておくので、切に戻すとそのまま戻る */
 function showVals(){
   const d=run.draft;
-  $("bVal").textContent=String(d.board); $("aVal").textContent=String(d.alight);
-  $("bMinus").disabled = d.board<=0;      $("aMinus").disabled = d.alight<=0;
+  if(!$("bVal")) return;
+  [["b","board"],["a","alight"]].forEach(([p,k])=>{
+    const un=isUnk(k);
+    $(p+"Val").textContent = un ? "？" : String(d[k]);
+    $(p+"Unit").textContent = un ? "" : "人";
+    $(p+"Ctr").classList.toggle("unkon", un);
+    $(p+"Unk").classList.toggle("on", un);
+    $(p+"Unk").setAttribute("aria-pressed", un ? "true" : "false");
+    $(p+"Plus").disabled = un;
+    $(p+"Minus").disabled = un || d[k]<=0;
+  });
 }
 function renderEnd(){
   main.innerHTML = `
@@ -1129,6 +1381,7 @@ function renderEnd(){
       <button class="btn ghost" id="restartBtn">最初からやり直す</button>
       <button class="btn ghost" id="redoBtn">バス停を選んで送り直す</button>
       <div class="log" id="log"></div>
+      ${botHtml()}
       <button class="linkbtn" id="dlBtn">記録をJSONで保存</button>
     </div></div>`;
   renderPracBanner();
@@ -1137,6 +1390,7 @@ function renderEnd(){
   // （ほかのバス停を送り直しても、そのまま終点の画面に戻る）
   $("redoBtn").onclick=openSheet;
   $("dlBtn").onclick=exportJson;
+  wireBot();   // ★counter-2.1.1: 画面のいちばん下のボタン（かえりの「車内人数アプリへ」・確認用の向き切り替え）
   renderLog(); setStatus();
   startSampling();
   geoAutoHelp();
@@ -1154,8 +1408,11 @@ function renderMovedOn(){
       </div>
       <button class="btn go" id="toIdxBig">車内人数アプリを開く</button>
       <div class="log" id="log"></div>
+      ${botHtml()}
     </div></div>`;
-  $("toIdxBig").onclick=()=>toIndexKaeri(true);
+  $("toIdxBig").onclick=()=>goCountApp(true);
+  // ★counter-2.1.1: 確認用アカウントの向き切り替えはここにも出す。無いと確認のときに行き止まりになる
+  wireBot();
   renderLog(); setStatus();
 }
 // 記録一覧（新しい順）。各バス停の乗/降だけを出す（合計は出さない）
@@ -1167,7 +1424,7 @@ function renderLog(){
     (items.length ? items.map(x=>{ const s=st[x.state]||["",""];
       return `<div class="logrow"><span class="lt">${hhmm(x.at)}</span>
         <span class="lmid"><div class="lstop">${esc(x.stop)}${x.practice?`<span class="ptag">練習</span>`:""}</div>
-        <div class="lcount">乗 ${x.board}／降 ${x.alight}</div></span>
+        <div class="lcount">乗 ${pv(x.board)}／降 ${pv(x.alight)}</div></span>
         <span class="lstat ${s[0]}">${s[1]}</span></div>`; }).join("")
     : `<div class="empty">まだ記録がありません</div>`);
 }
@@ -1271,9 +1528,10 @@ async function boot(){
       .forEach(k=>lsSet(k, null));
     user=null; run=null; render();
   };
-  // ★counter-2.0.4: かえり（人数アプリ）へ移るボタン。ゆき（?dir=out）のときだけ出る
+  // ★counter-2.1.1: ヘッダに残すのは、ゆき（?dir=out）の「かえりに切り替える」だけ。
+  //   かえりの「車内人数アプリへ」と確認用の向き切り替えは、画面のいちばん下に移した（botHtml / wireBot）
   // ★counter-2.0.6: 引数なしで呼ぶ（onclick にそのまま渡すと、クリックの情報が quiet として渡り、確認が出なくなる）
-  $("toIdxBtn").onclick=()=>toIndexKaeri();
+  $("toIdxBtn").onclick=()=>goCountApp();
   // ★counter-2.0.1: 位置情報が拒否・大まかなときは、帯を押すと直し方の画面を出す
   const stEl=$("status");
   stEl.addEventListener("click", ()=>{ if(stEl.classList.contains("act")) openGeoHelp(); });

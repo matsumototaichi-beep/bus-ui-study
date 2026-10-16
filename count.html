@@ -450,6 +450,14 @@
      ここで足した処理はすべて計数研究の中だけで動く。UI研究（?round=1 / ?round=2）のふるまいは変えていない
    ---- 下の SUPABASE_URL / ANON_KEY に自分のプロジェクト値を入れる ----
    ========================================================== */
+/* ★countApp-1.1.1（2026-10-16）乗降アプリの独立検証で出た直し
+   ・かえりから2タップで区間を壊せた。乗降アプリ（かえり）の「車内人数アプリへ」で移ると、
+     担当外なので案内画面（renderCountToCounter）が出る。ここまでは正しいが、その画面に
+     「ゆきに戻す」が並んでいたので、奇数組がかえりの便で押すと、以後の回答が
+     「計数研究ゆき」として記録されてしまっていた。
+     「ゆきに戻す」は裏のQRを早く読んでしまった人が自分で直すためのものなので、
+     案内画面では URL から leg=kaeri を受けて区間が決まったときだけ出すようにした（legBackFromUrl）。
+     帯（legBar）に出る「ゆきに戻す」は今までどおり */
 /* ★countApp-1.0.1（2026-10-15）独立検証で出た直し
    (1)【重要】横画面で、貼り付いた送信バーの真下に数字キーの下の段が入っていた。
        「7」を押したつもりが送信になり、17人のつもりが 1人 で送られていた。
@@ -459,7 +467,7 @@
    (3) ログイン画面の題名を「車内人数アプリ」にそろえた（配布用紙・アンケートと同じ呼び名） */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "countApp-1.1.0";
+const APP_VERSION = "countApp-1.1.1";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
@@ -774,6 +782,17 @@ function legBackBtn(t){
   if(studyMode()!=="count" || curLeg()!=="kaeri") return "";
   return `<button id="legBack" class="legsw quiet">${t.leg_to_yuki}</button>`;
 }
+/* ★countApp-1.1.1: 案内画面（renderCountToCounter）に「ゆきに戻す」を出してよいかどうか。
+   このボタンは「裏のQR（count.html?leg=kaeri）を早く読んでしまった人が、自分でゆきに戻す」ためのもの。
+   ところが乗降アプリ（かえり）から「車内人数アプリへ」で移ってきたときも同じ案内画面が出るので、
+   奇数組がかえりの便でこれを押すと、以後の回答が「計数研究ゆき」として記録されてしまっていた
+   （かえりで2タップ＝区間が壊れる）。
+   そこで、URL に leg=kaeri が付いていて、その切り替えで区間が決まったときだけ出す。
+   乗降アプリから移ってきたときは leg が URL に付かないので出ない。
+   帯（legBar）に出る「ゆきに戻す」は今までどおり（偶数組のかえりは人数アプリが担当なので、そこは変えない） */
+function legBackFromUrl(){
+  return URL_LEG==="kaeri" && legSet().by==="switch";
+}
 function wireLegBack(){ const b=$("legBack"); if(b) b.onclick=()=>switchLeg("yuki"); }
 // ★2026-10-07: いまの区間と切り替えボタン。実験者は南口で離脱するので、桃山台では参加者が自分で切り替える
 function legBar(t){
@@ -886,7 +905,10 @@ function renderCountToCounter(){
   // ★uiStudy-0.9.11: 裏のQRを早く読んでしまった奇数組は、かえりの担当が乗降アプリなのでこの画面で止まる。
   //   ここに「ゆきに戻す」が無いと、表のQRを読み直してもログアウトしても自分では直せない。
   //   押し間違いを避けるため、大きな「乗降アプリを開く」より下に、目立たない見た目で置く
-  const back = legBackBtn(t);
+  // ★countApp-1.1.1: ただし出すのは、URL の leg=kaeri を受けて区間が決まったときだけにする（legBackFromUrl）。
+  //   乗降アプリ（かえり）から移ってきただけのときにも出していたので、かえりの便で押されると
+  //   以後の回答が「計数研究ゆき」として記録されてしまっていた
+  const back = legBackFromUrl() ? legBackBtn(t) : "";
   main.innerHTML = `
     <div class="center">
       <div class="legtag">${t.count_study}</div>
