@@ -5,7 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>乗降アプリ</title>
 <!--
-  乗降アプリ（計数研究）  counter-2.2.0
+  乗降アプリ（計数研究）  counter-2.3.1
+
+  ★2026-10-17 (counter-2.3.0): 横画面を、縦画面と同じように最後まで通して使えるようにした（松本の指示）。
+    2.2.0 までは、練習モード・送り直し・位置情報オフ・確認用アカウントが重なると「送信」が画面からはみ出し、
+    ノッチのある端末の横画面（812×375）では 23.3px はみ出して、見えている所を押すと下の帯が反応していた。
+    ・使わない余白と見出しを削って、横画面で 62px ぶんの縦を作った
+      - 練習モードの帯を、着席/立席・練習のボタンと同じ行に出した（1行ぶん 22.3px）
+      - バス停の枠を1行に寄せた（「バス停」の見出しを隠し、送り直しの帯をバス停名の右に置く。92px → 52px）
+    ・作ったぶんは「わからない」と「送信」のあいだに回し、32px → 60px（縦画面と同じ）に戻した。
+      ここが狭いと、「わからない」を押した指がすべってそのまま送信に当たる
+    ・＋1 の高さ（--plush＝44px）と、押せる高さ 44px はどこも下げていない。
+      ＋1・−1・わからない・変える・送信 はすべて 44px 以上のまま
+    ・縦画面（390×664・375×667・360×640・320×568）の見え方は変えていない。
+      直したのは @media (orientation:landscape) and (max-height:520px) の中だけ
+
+  ★2026-10-16 (counter-2.2.1): 「送信」の歯止めを画面に出すようにした
+    ・歯止め（画面が出てから1秒・最後のタップから700ミリ秒）に当たると、これまでは何も知らせずに捨てていた。
+      参加者からは「押したのに無反応」に見え、1回押して目を離すとそのバス停の記録が残らなかった。
+      歯止めのあいだは「送信」を薄くして押せない見た目にする（disabled なので押しても何も起きず、
+      send の中の「少し待ってから」の知らせには届かない。見た目で分かるのでこれでよい）
+    ・「わからない」を押したときも歯止めを効かせる（lastTapAt を動かす）。2.2.0 で横画面の
+      「わからない」と「送信」が 31.8px まで近づき、すべった指がそのまま送られるおそれが出たため
 
   ★2026-10-16 (counter-2.2.0): 松本が実機を見たうえでの指示どおりに、数える枠のボタンを並べ直した
     ・数える枠を1行にした。並びは「数 ／ ＋1 ／ −1 ／ わからない」。
@@ -419,7 +440,11 @@
   }
   /* ★counter-2.1.1: 横画面（667×375 など）は縦が足りないので、乗ってきた人・降りた人の枠を左右に並べる。
      縦に積んだままだと、降りた人の＋1 がスクロールしないと押せなかった。
-     枠の中の並び（数／＋1／−1、その下にわからない）は縦画面と同じまま変えない */
+     枠の中の並び（数／＋1／−1、その下にわからない）は縦画面と同じまま変えない。
+     ★counter-2.3.0: 横画面でも、1バス停ぶんをスクロールなしで最後まで通せるようにした。
+     使わない余白と見出しを削って 62px ぶんの縦を作り、そのぶんを
+     「わからない」と「送信」のあいだ（32px → 60px）に回している。
+     ＋1 の高さ（--plush＝44px）と、押せる高さ 44px はどこも下げていない */
   @media (orientation:landscape) and (max-height:520px){
     .inner{max-width:640px;}
     .pair{flex-direction:row; gap:8px;}
@@ -441,9 +466,48 @@
     .expbar .pz,.expbar .prac{padding-top:4px; padding-bottom:4px;}
     .pbanner{padding:3px 8px; font-size:11px;}
     .statusbar{padding-top:4px; padding-bottom:calc(4px + env(safe-area-inset-bottom,0px));}
-    /* 縦画面の約60px は保てないが、26px あれば ＋1 からすべった指は届かない
-       （＋1 のあとに効く700ミリ秒の歯止めも、横画面では今までどおり働く） */
-    #sendBtn{margin-top:26px;}
+    /* ★counter-2.3.0: 余白だけをさらに 5px 削る。文字の大きさも押せる高さも変えていない。
+       ブラウザのバーが出ていて見えている高さが下がる端末でも、そのぶん入りやすくする */
+    header{padding-top:calc(2px + env(safe-area-inset-top,0px)); padding-bottom:2px;}
+    /* ★counter-2.3.1: 横画面ではノッチが左右に入る。viewport-fit=cover にしているので、
+       左右のよけ幅も自分で取る（取らないとヘッダの「ログアウト」がノッチの下に入る） */
+    header, .scroll, .statusbar{padding-left:calc(12px + env(safe-area-inset-left,0px));
+                                padding-right:calc(12px + env(safe-area-inset-right,0px));}
+    .scroll{padding-top:2px;}
+    .pair > .blk > .lbl{margin-bottom:0;}
+
+    /* ★counter-2.3.0（1）練習モードの帯を、着席/立席・練習のボタンと同じ行に出す。
+       横画面は横が余っていて縦が足りないので、2行を1行にまとめる。22.3px ぶん縦が空く。
+       .inner を2列の格子にして、左の列に操作の帯、右の列に練習モードの帯を置く。
+       そのほか（バス停の枠・数える枠・送信・記録の一覧など）は今までどおり横いっぱい（1 / -1）。
+       終点の画面には操作の帯が無く、左の列は幅0になるので、見え方は今までと同じ */
+    .inner{display:grid; grid-template-columns:auto minmax(0,1fr); row-gap:2px; column-gap:0; align-items:center;}
+    .inner > *{grid-column:1 / -1;}
+    .inner > .expbar{grid-column:1; grid-row:1; margin-right:8px;}
+    .inner > #pracwrap{grid-column:2; grid-row:1;}
+
+    /* ★counter-2.3.0（2）バス停の枠を1行に寄せる。92px → 52px で 40px ぶん縦が空く。
+       ・「バス停」の見出しは横画面では隠す。大きなバス停名と「変える」があるので、
+         何の枠かは見てわかる。見た目だけ隠し、読み上げには残す（★counter-2.3.1）
+       ・送り直しの帯も、下の行ではなくバス停名の右に置く
+       縦画面では今までどおり、見出しも送り直しの帯も別の行のまま変えていない。
+       display:contents でバス停名と「変える」を枠の直下の子にし、order で
+       「バス停名 … 送り直し（前回 乗3／降2） 変える」の並びにする */
+    .inner > .blk{display:flex; align-items:center; gap:10px;}
+    /* ★counter-2.3.1: display:none だと読み上げからも消えるので、見た目だけ隠す */
+    .inner > .blk > .lbl{position:absolute; width:1px; height:1px; margin:-1px; padding:0;
+                         overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0;}
+    .inner > .blk > .stoprow{display:contents;}
+    .stopname{order:1;}
+    .renote{order:2; flex:0 0 auto; margin-top:0; white-space:nowrap;}
+    .chg{order:3;}
+
+    /* ★counter-2.3.0 空いたぶんは、ここ（降りた人の「わからない」と「送信」のあいだ）に回す。
+       2.2.0 の 26px では、画面での見た目のすき間が 31.8px しかなかった。
+       54px にすると、枠の下の余白 3px・枠線 1px・行のすき間 2px と合わせて
+       見た目 60px になり、縦画面（約60px）と同じ広さに戻る。
+       ＋1 のあとに効く700ミリ秒の歯止めと、「わからない」のあとの歯止め（2.2.1）はそのまま */
+    #sendBtn{margin-top:54px;}
   }
   @media (max-width:360px){
     header{gap:7px; padding-left:9px; padding-right:9px;}
@@ -491,7 +555,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
-const VERSION = "counter-2.2.1";
+const VERSION = "counter-2.3.1";
 // index.html と同じプロジェクト・同じ設定。同じサイトなのでログイン状態も共有される
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
