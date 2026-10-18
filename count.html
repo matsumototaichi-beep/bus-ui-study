@@ -148,6 +148,13 @@
   .stopfield label{font-size:12px; color:var(--muted); display:block; margin:0 2px 4px;}
   .stopinput{width:100%;}
   .stoplist{position:absolute; left:0; right:0; top:100%; z-index:20; background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-top:4px; max-height:220px; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; display:none; box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  /* ★countApp-1.1.2: ボタンを続けて押したときに画面が拡大されないようにする。
+     iOS の Safari は viewport の user-scalable=no を無視するので、これが無いと
+     同じ数字を続けて押したとき（44、55 など）にダブルタップとみなされて拡大する。
+     UI研究の参加者 3件から苦情が出ている（「複数回タップして人数を入力する際稀に拡大される」）。
+     UI研究の index.html は凍結中なので直さない（松本の判断 2026-10-18）が、
+     計数研究は本番がまだ 0件なのでこちらは直す。乗降アプリには元から入っている */
+  button{touch-action:manipulation;}
   .stoprow{touch-action:pan-y;}
   .stoplist.show{display:block;}
   .stoprow{padding:11px 12px; font-size:14px; border-bottom:1px solid #26344a;}
@@ -467,7 +474,7 @@
    (3) ログイン画面の題名を「車内人数アプリ」にそろえた（配布用紙・アンケートと同じ呼び名） */
 const SUPABASE_URL      = "https://wwavbfdojschxohvvpzb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_VQxEr0PpNh4WJxA7S6FAAQ_xu97zIPR";  // 公開してよい publishable key
-const APP_VERSION = "countApp-1.1.1";
+const APP_VERSION = "countApp-1.1.2";
 
 /* ==========================================================
    UI研究：条件割当（バリアント）と操作ログ
