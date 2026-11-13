@@ -45,7 +45,20 @@ function createCounting() {
     ]);
   it.setRequired(true);
 
-  it = f.addMultipleChoiceItem().setTitle('問3 そのやり方は、4回の区間（1回目のゆき・かえり、2回目のゆき・かえり）でずっと同じでしたか')
+  // ★2026-10-19: 座っていた（立っていた）場所を聞く。自由記述で
+  //   「座る場所を後方にしていた」「前席の数を把握しておくと数えやすかった」という工夫が出たため。
+  //   同乗者の中央値からのずれを見ると、1名だけ系統的に多めに数えていた（平均+0.99）。
+  //   見える範囲の違いで説明できるかを調べる。
+  //   問2（数え方）のあとに置く。問2 が本体なので、何にも誘導されないうちに先に答えてもらう。
+  //   着席か立席かはアプリが記録しているので、ここでは場所だけを聞く
+  it = f.addGridItem().setTitle('問3 それぞれの便で、車内のどのあたりにいましたか')
+    .setRows(['1本目（1回目のゆき）', '2本目（1回目のかえり）',
+              '3本目（2回目のゆき）', '4本目（2回目のかえり）'])
+    .setColumns(['前のほう', '真ん中あたり', '後ろのほう', '覚えていない']);
+  it.setHelpText('立っていた場合も、いた場所でお答えください');
+  it.setRequired(true);
+
+  it = f.addMultipleChoiceItem().setTitle('問4 そのやり方は、4回の区間（1回目のゆき・かえり、2回目のゆき・かえり）でずっと同じでしたか')
     .setChoiceValues(['ずっと同じだった', '途中で変わった', '覚えていない']);
   it.setRequired(true);
 
@@ -53,16 +66,16 @@ function createCounting() {
   // 「出発直後は」と聞くと「4回のうちどれのことか」が決まらない（松本の指摘 2026-10-17）。
   // 知りたいのは「最初とあとの差」なので、差そのものを 1問で聞く。
   // 混まなかった便に当たった人も「変わらなかった」で答えられる
-  it = f.addScaleItem().setTitle('問4 車内に人が少ないときに比べて、人が増えてくると、車内の人数を数えるのは難しくなりましたか')
+  it = f.addScaleItem().setTitle('問5 車内に人が少ないときに比べて、人が増えてくると、車内の人数を数えるのは難しくなりましたか')
     .setBounds(1, 5).setLabels('ぜんぜん変わらなかった', 'とても難しくなった');
   it.setHelpText('4回の区間全体を通して、だいたいのところでお答えください');
   it.setRequired(true);
 
-  it = f.addScaleItem().setTitle('問5 車内の人数を数えるのは、全体として大変でしたか')
+  it = f.addScaleItem().setTitle('問6 車内の人数を数えるのは、全体として大変でしたか')
     .setBounds(1, 5).setLabels('楽だった', '大変だった');
   it.setRequired(true);
 
-  it = f.addParagraphTextItem().setTitle('問6 数え方について、気づいたことや工夫したことがあれば書いてください（なければ「なし」）');
+  it = f.addParagraphTextItem().setTitle('問7 数え方について、気づいたことや工夫したことがあれば書いてください（なければ「なし」）');
   it.setRequired(true);
 
   Logger.log('数え方のアンケート\n  回答用: ' + f.getPublishedUrl() + '\n  編集用: ' + f.getEditUrl());
